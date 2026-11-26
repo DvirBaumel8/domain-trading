@@ -34,7 +34,7 @@ class _Garbage:
 
 def _order(oid, **k):
     return Order(**{**dict(order_id=oid, business_name="DrainMaster", city="Columbus, OH", niche="plumber",
-                           plan="check", paid_ref="x"), **k})
+                           plan="check", paid_ref="x", paid=True), **k})
 
 
 class FakeVendors(unittest.TestCase):

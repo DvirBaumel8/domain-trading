@@ -36,11 +36,14 @@ def build_findings(score, niche, signals=None, target_reviews=None, competitor_r
                 "Ask every real customer for a review (no incentives, no fake reviews; FTC rule bans them).",
                 f"You have {target_reviews} reviews; named competitors' median is {med}.",
                 "strong-correlation", "medium"))
-    f.append(Finding(
-        f"AI engines cite trade sites for {niche.plural}: " + ", ".join(niche.referees[:4]) + ".",
-        "Claim and complete your profiles there; same name, address, phone and hours everywhere.",
-        "Referee sites per trade from AI Syndicate Nov 2026 (331,925 citations) and Cited Lens 2026.",
-        "some-evidence", "medium"))
+    low = score.score < 20      # business-specific evidence: generic items only appear next to it
+    if low:
+        f.append(Finding(
+            f"AI engines cite trade sites for {niche.plural}: " + ", ".join(niche.referees[:4]) + ".",
+            "Claim and complete your profiles there; same name, address, phone and hours everywhere.",
+            f"You were named in {score.score}% of answers; referee sites per trade from AI Syndicate "
+            "Nov 2026 (331,925 citations) and Cited Lens 2026.",
+            "some-evidence", "medium"))
     if signals is not None and signals.fetched:
         if signals.blocked_bots:
             f.append(Finding(
@@ -61,9 +64,11 @@ def build_findings(score, niche, signals=None, target_reviews=None, competitor_r
                 "State the city/neighborhoods and main services in plain text near the top of the page.",
                 "Topical relevance is the most reproducible lever in the GEO literature (Martinez 2026).",
                 "some-evidence", "low"))
-    f.append(Finding(
-        "Few independent mentions (local news, 'best of' lists, community sites).",
-        "Earn real mentions: local press, sponsorships, association listings. No paid fake lists.",
-        "Brand web mentions correlate 0.664 with AI Overview visibility vs 0.218 for backlinks (Ahrefs, 75k brands).",
-        "strong-correlation", "high"))
+    if low and top:
+        f.append(Finding(
+            "Few independent mentions (local news, 'best of' lists, community sites).",
+            "Earn real mentions: local press, sponsorships, association listings. No paid fake lists.",
+            f"You were named in {score.score}% of answers while {len(top)} other businesses were named. "
+            "Brand web mentions correlate 0.664 with AI Overview visibility vs 0.218 for backlinks (Ahrefs, 75k brands).",
+            "strong-correlation", "high"))
     return f
