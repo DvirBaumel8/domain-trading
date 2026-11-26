@@ -7,6 +7,7 @@ for k in ("ORDERS_REPO", "ORDERS_GITHUB_TOKEN", "ORDER_ALERT_WEBHOOK_URL"):
     os.environ.pop(k, None)
 os.environ["POLAR_WEBHOOK_SECRET"] = "test-secret"
 import server  # noqa: E402
+import delivery  # noqa: E402
 server.LOCAL_ORDERS = os.environ["ORDERS_LOCAL_DIR"]
 
 CALLS = []
@@ -177,12 +178,14 @@ class StoreTests(unittest.TestCase):
 
 class OrderAndPolarTests(Base):
     def setUp(self):
+        self._sync = delivery.SYNC; delivery.SYNC = True      # the webhook worker runs inline
         self.sent = []
         def hook(req, timeout=15):
             self.sent.append(json.loads(req.data)); return 200, b"ok"
         server.http_call = hook
         os.environ["ORDER_ALERT_WEBHOOK_URL"] = "https://alerts.example/hook"
     def tearDown(self):
+        delivery.SYNC = self._sync
         server.http_call = fake_http
         os.environ.pop("ORDER_ALERT_WEBHOOK_URL", None)
 
