@@ -1,0 +1,18 @@
+# Render Blueprint for AI Visibility Check. plan is explicitly free.
+# Do not apply this in a public repo. Intended private repo: DvirBaumel8/ai-visibility-check
+# (not created until deploy is confirmed).
+services:
+  - type: web
+    name: ai-visibility-check
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: "python3 -m compileall -q site engine"
+    startCommand: "python3 site/server.py --free-run --host 0.0.0.0"
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: AIVIS_FREE_RUN
+        value: "1"
+      - key: PYTHONUNBUFFERED
+        value: "1"

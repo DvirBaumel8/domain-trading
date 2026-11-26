@@ -1,0 +1,338 @@
+{
+ "niche": "dentist",
+ "niche_label": "dentists",
+ "city": "Austin, TX",
+ "answers": [
+  {
+   "names": [
+    "Austin Dental Clinic",
+    "Krause Dentistry",
+    "Baker Family Dental",
+    "Van Dyke Dental Associates",
+    "Vadevet Dental"
+   ],
+   "raw": [
+    "Austin Dental Clinic",
+    "Krause Dentistry",
+    "Baker Family Dental",
+    "Van Dyke Dental",
+    "Vadevet Dental"
+   ]
+  },
+  {
+   "names": [
+    "Austin Dental Spa, PLLC",
+    "Neva Dental & Orthodontics",
+    "Clear Dental Group",
+    "Soothe Dental Spa",
+    "Austin Family Dentistry Pplc"
+   ],
+   "raw": [
+    "Austin Dental Spa",
+    "Neva Dental & Orthodontics",
+    "Clear Dental Group",
+    "Soothe Dental Spa",
+    "Austin Family Dentistry"
+   ]
+  },
+  {
+   "names": [
+    "Cromwell Dental Associates",
+    "Downtown Dental & Orthodontics",
+    "Central Austin Dental Practice",
+    "Urban Smiles Dentistry",
+    "Austin Core Dental Studio"
+   ],
+   "raw": [
+    "Cromwell Dental Associates",
+    "Downtown Dental & Orthodontics",
+    "Central Austin Dental Practice",
+    "Urban Smiles Dentistry",
+    "Austin Core Dental Studio"
+   ]
+  },
+  {
+   "names": [
+    "Zijewski Family Dental Practice",
+    "Austin Dental Group PLLC",
+    "Taylorsville Smiles",
+    "Dr. Barbara S\u00e1nchez",
+    "Austin Happy Smiles"
+   ],
+   "raw": [
+    "Zijewski Family Dental Practice",
+    "Austin Dental Group",
+    "Taylorsville Smiles",
+    "Dr. Barbara S\u00e1nchez",
+    "Austin Happy Smiles"
+   ]
+  },
+  {
+   "names": [
+    "Austin Dental & Orthodontics",
+    "Midtown Dental",
+    "South Austin Family Dentistry",
+    "Hill Country Invisalign",
+    "Kay Walker Orthodontics",
+    "Austin Family Dentistry Pplc"
+   ],
+   "raw": [
+    "Austin Dental & Orthodontics",
+    "Midtown Dental",
+    "South Austin Family Dentistry",
+    "Hill Country Invisalign",
+    "Kay Walker Orthodontics",
+    "Austin Family Dentistry Pplc"
+   ]
+  },
+  {
+   "names": [
+    "Southside Dental & Family Care",
+    "Cathedral Hill Dental Studio",
+    "Spear Point Dental Clinic",
+    "Elm and Jefferson Dental Group",
+    "O'Connor Family Dentistry"
+   ],
+   "raw": [
+    "Southside Dental & Family Care",
+    "Cathedral Hill Dental Studio",
+    "Spear Point Dental Clinic",
+    "Elm and Jefferson Dental Group",
+    "O'Connor Family Dentistry"
+   ]
+  },
+  {
+   "names": [
+    "Austin Dental Clinic",
+    "Smile & Shine Dentistry",
+    "Whitmore Dental",
+    "Austin Family Dental",
+    "Baylor Medical & Dental"
+   ],
+   "raw": [
+    "Austin Dental Clinic",
+    "Smile & Shine Dentistry",
+    "Whitmore Dental",
+    "Austin Family Dental",
+    "Baylor Dental Group"
+   ]
+  },
+  {
+   "names": [
+    "McKenna Dental & Cosmetic Center",
+    "Austin Family Dental Group",
+    "Sentrum Orthodontics",
+    "Austin Dental Studio",
+    "Goldsmith Family Dentistry"
+   ],
+   "raw": [
+    "McKenna Dental & Cosmetic Center",
+    "Austin Family Dental Group",
+    "Sentrum Orthodontics",
+    "Austin Dental Studio",
+    "Goldsmith Family Dentistry"
+   ]
+  },
+  {
+   "names": [
+    "Radiant Smiles Dental & Orthodontics",
+    "Dr. Karen Lopez Family Dentistry",
+    "Austin Premier Dental Group",
+    "Smile Works Dental Clinic",
+    "Soothe Dental Care"
+   ],
+   "raw": [
+    "Radiant Smiles Dental & Orthodontics",
+    "Dr. Karen Lopez Family Dentistry",
+    "Austin Premier Dental Group",
+    "Smile Works Dental Clinic",
+    "Soothe Dental Care"
+   ]
+  },
+  {
+   "names": [
+    "Chapin Family Dental",
+    "River Oaks Dental Associates",
+    "Temple Dental and Cosmetic Care",
+    "Sabine Dental Studio",
+    "Cirolan Dentistry and Cosmetic Clinic"
+   ],
+   "raw": [
+    "Chapin Family Dental",
+    "River Oaks Dental Associates",
+    "Temple Dental and Cosmetic Care",
+    "Sabine Dental Studio",
+    "Cirolan Dentistry and Cosmetic Clinic"
+   ]
+  },
+  {
+   "names": [
+    "Austin Dental Clinic",
+    "Crown & Bridge Dental",
+    "Dentistry Care Center",
+    "North Austin Dental Group",
+    "Austin Dental Group PLLC"
+   ],
+   "raw": [
+    "Austin Dental Clinic",
+    "Crown & Bridge Dental",
+    "Dentistry Care Center",
+    "North Austin Dental Group",
+    "Austin Dental Group PLLC"
+   ]
+  },
+  {
+   "names": [
+    "Bauer Dental & Cosmetic Clinic",
+    "Cathedral Dental Group",
+    "Taylors Dental Studio",
+    "Austintops Cosmetic Dentistry",
+    "Dr. Emily Tan, DDS"
+   ],
+   "raw": [
+    "Bauer Dental & Cosmetic Clinic",
+    "Cathedral Dental Group",
+    "Taylors Dental Studio",
+    "Austintops Cosmetic Dentistry",
+    "Dr. Emily Tan, DDS"
+   ]
+  },
+  {
+   "names": [
+    "Austin Dental & Orthodontics",
+    "Midtown Dental",
+    "South Austin Family Dentistry",
+    "The Center for Dental & Cosmetic Care",
+    "Temple Dental and Cosmetic Dentistry",
+    "Austin Family Dentistry Pplc"
+   ],
+   "raw": [
+    "Austin Dental & Orthodontics",
+    "Midtown Dental",
+    "South Austin Family Dentistry",
+    "The Center for Dental & Cosmetic Care",
+    "Temple Dental and Cosmetic Dentistry",
+    "Austin Family Dentistry Pplc"
+   ]
+  },
+  {
+   "names": [
+    "Dr. Emily Tan, DMD",
+    "Comfort Dental PLLC",
+    "DentalMind Austin",
+    "Austin Family Dentistry Pplc",
+    "Globe City Dental"
+   ],
+   "raw": [
+    "Dr. Emily Tan, DMD",
+    "Comfort Care Dental & Orthodontics",
+    "DentalMind Austin",
+    "Austin Family Dentistry",
+    "Globe City Dental"
+   ]
+  },
+  {
+   "names": [
+    "McKenna Dental Group",
+    "Coxy Dental",
+    "Nelson & Associates Dental Studio",
+    "Rise Dental",
+    "Austintops Dental"
+   ],
+   "raw": [
+    "McKenna Dental Group",
+    "Coxy Dental",
+    "Nelson & Associates Dental Studio",
+    "Rise Dental",
+    "Austintops Dental"
+   ]
+  },
+  {
+   "names": [
+    "Austin Endodontics Clinic",
+    "Dr. Karen Lopez",
+    "360 Dental Care P.a.",
+    "Capitol City\u00ae Endo Practices",
+    "Austin Ridge Endodontic Specialists",
+    "Austin Endodontics Llp"
+   ],
+   "raw": [
+    "Austin Endodontics Clinic",
+    "Dr. Karen Lopez",
+    "Smiles 360 Dental",
+    "Capitol City\u00ae Endo Practices",
+    "Austin Ridge Endodontic Specialists",
+    "Austin Endodontics Llp"
+   ]
+  },
+  {
+   "names": [
+    "Austin Dental Clinic & Spa",
+    "Smiley Dental Studio",
+    "Austin Dental Wellness",
+    "Central Lake Dental Care",
+    "Barton Creek Dental Group"
+   ],
+   "raw": [
+    "Austin Dental Clinic & Spa",
+    "Smiley Dental Studio",
+    "Austin Dental Wellness",
+    "Central Lake Dental Care",
+    "Barton Creek Dental Group"
+   ]
+  },
+  {
+   "names": [
+    "Austin Dental & Cosmetic Center",
+    "Cathedral Hill Family Dentistry",
+    "Spear Dental Group",
+    "Texas Dental and Implant Center",
+    "Sundial Dental"
+   ],
+   "raw": [
+    "Austin Dental & Cosmetic Center",
+    "Cathedral Hill Family Dentistry",
+    "Spear Dental Group",
+    "Texas Dental and Implant Center",
+    "Sundial Dental"
+   ]
+  },
+  {
+   "names": [
+    "Dr. Daniel J. Kearney, D.D.S",
+    "Cedar Park Dental & Orthodontics",
+    "Human\u00a0Healthcare Dental Clinic",
+    "North Austin Family Dentistry",
+    "Equality\u202fSmile Dentistry",
+    "Austin Family Dentistry Pplc"
+   ],
+   "raw": [
+    "Dr. Daniel J. Kearney, D.D.S",
+    "Cedar Park Dental & Orthodontics",
+    "Human\u00a0Healthcare Dental Clinic",
+    "North Austin Family Dentistry",
+    "Equality\u202fSmile Dentistry",
+    "Austin Family Dentistry Pplc"
+   ]
+  },
+  {
+   "names": [
+    "Austin Dental Health Center",
+    "Southwest Dental Care",
+    "Smiles 4 All Dental",
+    "Treehouse Dental",
+    "The Dental Studio"
+   ],
+   "raw": [
+    "Austin Dental Health Center",
+    "Southwest Dental Care",
+    "Smiles 4 All Dental",
+    "Treehouse Dental",
+    "The Dental Studio"
+   ]
+  }
+ ],
+ "competitors": 8,
+ "unverified_pct": 88,
+ "source_note": "one AI model answering from memory (no web search), 20 questions, 25 Nov 2026."
+}

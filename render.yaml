@@ -17,6 +17,7 @@ services:
         - docs/**
         - .claude/**
         - CLAUDE.md
+        - ai-visibility-check/**
     envVars:
       - key: NODE_VERSION
         value: "26"

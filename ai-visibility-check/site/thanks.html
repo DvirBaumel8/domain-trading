@@ -1,0 +1,29 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Thank you — tell us about your business</title><link rel="stylesheet" href="assets/style.css"></head><body>
+<nav><div class="wrap"><a class="logo" href="index.html"><i></i>AI Visibility Check</a></div></nav>
+<section><div class="wrap" style="max-width:720px">
+<h2>Thanks for your order</h2><p class="sub">Two minutes of details and we start. Your report arrives by email within 2 business days.</p>
+<form id="intake" class="card">
+ <div class="row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+  <div><label>Business name (as customers know it)</label><input name="business" required maxlength="120"></div>
+  <div><label>City, State</label><input name="city" required placeholder="Austin, TX"></div></div>
+ <label>Type of business</label><select name="niche"><option value="dentist">Dentist</option><option value="orthodontist">Orthodontist</option><option value="cosmetic_dentist">Cosmetic dentist</option><option value="personal_injury_lawyer">Personal injury lawyer</option><option value="criminal_defense_lawyer">Criminal defense lawyer</option><option value="family_law_attorney">Family law attorney</option><option value="med_spa">Med spa</option><option value="chiropractor">Chiropractor</option><option value="veterinarian">Veterinarian</option><option value="hvac">HVAC</option><option value="roofing">Roofing</option><option value="plumber">Plumber</option><option value="electrician">Electrician</option><option value="garage_door">Garage door</option><option value="real_estate_agent">Real estate agent</option></select>
+ <label>Website</label><input name="website" placeholder="https://">
+ <label>Email for the report</label><input name="email" type="email" required>
+ <label>Up to 5 competitors you watch (optional, comma separated)</label><input name="competitors">
+ <label>Payment reference (from your PayPal receipt)</label><input name="paid_ref" maxlength="60">
+ <p><button class="btn">Send details</button></p><div id="msg" class="small"></div>
+</form></div></section>
+<script src="assets/config.js"></script>
+<script>
+document.getElementById("intake").addEventListener("submit", async e => {
+  e.preventDefault(); const f = e.target, m = document.getElementById("msg");
+  try { const r = await fetch((window.AIVIS_CONFIG.apiBase||"") + "/api/intake", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(Object.fromEntries(new FormData(f).entries()))});
+    const j = await r.json(); if (!r.ok) throw new Error(j.error); m.innerHTML = "<b>Received.</b> Order " + j.order_id + ". We'll email your report.";
+  } catch(err) { m.textContent = "Preview mode: not connected (" + (err.message||err) + ")."; }
+});
+</script><footer><div class="wrap">
+ <p>© 2026 Dvir Baumel · <a href="mailto:dvirbaumel9-mcbgx2@mail.grokbot.com">dvirbaumel9-mcbgx2@mail.grokbot.com</a> · <span class="ph">[Physical postal address — added before any marketing email]</span></p>
+ <p><a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="refunds.html">Refunds</a> · Not affiliated with OpenAI, Google, Perplexity or Anthropic.</p>
+</div></footer>
+</body></html>

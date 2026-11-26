@@ -1,0 +1,65 @@
+"""Orchestrates one audit: prompts -> providers x repeats -> parse -> score -> findings."""
+from dataclasses import dataclass
+
+from .niches import Niche
+from .parse import find_mentions
+from .prompts import generate_prompts
+from .providers.base import ProviderError
+from .reasons import build_findings
+from .score import score_audit
+
+
+@dataclass
+class AuditResult:
+    niche: Niche
+    city: str
+    target: str
+    prompts: list
+    records: list
+    score: object
+    findings: list
+    errors: list
+    cost_usd: float
+
+
+def run_audit(niche, city, target, roster_names, providers, n_prompts=30, repeats=3, seed=0,
+              signals=None, target_reviews=None, competitor_reviews=None, max_errors=10):
+    if target not in roster_names:
+        roster_names = list(roster_names) + [target]
+    prompts = generate_prompts(niche, city, n_prompts, seed)
+    records, errors, cost = [], [], 0.0
+    for prov in providers:
+        for p in prompts:
+            for r in range(repeats):
+                try:
+                    ans = prov.ask(p.text, city=city, run=r)
+                except ProviderError as e:
+                    errors.append(f"{prov.name}: {e}")
+                    if len(errors) >= max_errors:
+                        break
+                    continue
+                cost += ans.cost_usd
+                records.append((ans, find_mentions(ans.text, roster_names, city=city), p.intent))
+    sc = score_audit(target, records)
+    findings = build_findings(sc, niche, signals, target_reviews, competitor_reviews)
+    return AuditResult(niche, city, target, prompts, records, sc, findings, errors, cost)
+
+
+def result_from_saved(niche, city, target, raw_answers, roster_names):
+    """Rebuild an AuditResult from saved answers (no new queries)."""
+    from .providers.base import Answer
+    from .prompts import Prompt
+    names = list(roster_names)
+    if target not in names:
+        names.append(target)
+    records = []
+    for x in raw_answers:
+        ans = Answer(x["provider"], "", x["prompt"], x["text"], x.get("citations", []), x["mode"], 0.0, x.get("repeat", 0))
+        records.append((ans, find_mentions(ans.text, names, city=city), x["intent"]))
+    sc = score_audit(target, records)
+    prompts = []
+    for x in raw_answers:
+        p = Prompt(x["prompt"], x["intent"])
+        if p not in prompts:
+            prompts.append(p)
+    return AuditResult(niche, city, target, prompts, records, sc, build_findings(sc, niche), [], 0.0)

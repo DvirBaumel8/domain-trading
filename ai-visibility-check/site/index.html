@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Visibility Check — does ChatGPT recommend your business?</title>
+<meta name="description" content="See whether AI assistants recommend your local business, who they name instead, and what to fix. Free quick check.">
+<link rel="stylesheet" href="assets/style.css"></head>
+<body>
+<nav><div class="wrap"><a class="logo" href="#"><i></i>AI Visibility Check</a>
+<div class="links"><a href="#how">How it works</a><a href="#sample">Sample report</a><a href="#pricing">Pricing</a><a href="agency.html">For agencies</a><a href="#faq">FAQ</a><a class="btn" href="#check">Free check</a></div></div></nav>
+
+<header class="hero"><div class="wrap">
+ <div>
+  <span class="eyebrow">For dentists, law firms and local service businesses in the US</span>
+  <h1>When customers ask AI for a recommendation, <em>are you on the list?</em></h1>
+  <p class="lead">More people now ask ChatGPT, Gemini, Perplexity or Claude “who's the best dentist near me?”. They answer with 3–5 names. We check, question by question, whether yours is one of them — and who gets named instead.</p>
+  <p><a class="btn" href="#check">Run a free quick check</a> &nbsp; <a class="btn ghost" href="sample-report.pdf" target="_blank">See a sample report</a></p>
+  <p class="small">No guarantees, no fake reviews, no spam. Just measured answers and a clear fix list.</p>
+ </div>
+ <div class="chat" aria-label="Illustration of a customer asking an AI assistant">
+  <div class="bubble me">I just moved to Austin. Which dentist should I go to?</div>
+  <div class="bubble ai">Here are some well-reviewed options:<ol><li>Practice A</li><li>Practice B</li><li>Practice C</li></ol></div>
+  <div class="miss">✕ Your practice: not mentioned</div>
+  <p class="small" style="margin:8px 0 0">Illustration. Names hidden.</p>
+ </div>
+</div></header>
+
+<section id="how"><div class="wrap">
+ <h2>How it works</h2><p class="sub">AI answers change from one ask to the next, so a single screenshot proves nothing. We measure.</p>
+ <div class="steps">
+  <div class="card"><div class="num">1</div><h3>We ask what your customers ask</h3><p>Dozens of real questions for your trade and city — “emergency dentist near downtown”, “best implant dentist in Austin” — asked to each AI assistant, several times.</p></div>
+  <div class="card"><div class="num">2</div><h3>We check every name</h3><p>Every business the AI names is checked against official registers, so you see real competitors — and names that don't match any registered business.</p></div>
+  <div class="card"><div class="num">3</div><h3>You get the why and the fixes</h3><p>A one-page report: how often you're named, who's named instead, the likely reasons, and a prioritized fix list rated by how strong the evidence is.</p></div>
+ </div>
+</div></section>
+
+<section id="check"><div class="wrap"><div class="check">
+ <h2>Free quick check</h2><p class="sub">Tell us your business and city. If we already have data for your trade and city you'll see a result right away; otherwise we run a short free test.</p>
+ <form id="checkform">
+  <div class="row"><div><label for="business">Business name</label><input id="business" name="business" required maxlength="120" placeholder="Example Family Dental"></div>
+  <div><label for="city">City, State</label><input id="city" name="city" required pattern="[^,]+,\s*[A-Za-z]{2}" placeholder="Austin, TX"></div></div>
+  <div class="row"><div><label for="niche">Type of business</label><select id="niche" name="niche">
+   <option value="dentist">Dentist</option><option value="orthodontist">Orthodontist</option><option value="cosmetic_dentist">Cosmetic dentist</option>
+   <option value="personal_injury_lawyer">Personal injury lawyer</option><option value="criminal_defense_lawyer">Criminal defense lawyer</option><option value="family_law_attorney">Family law attorney</option>
+   <option value="med_spa">Med spa</option><option value="chiropractor">Chiropractor</option><option value="veterinarian">Veterinarian</option>
+   <option value="hvac">HVAC</option><option value="roofing">Roofing</option><option value="plumber">Plumber</option><option value="electrician">Electrician</option><option value="garage_door">Garage door</option><option value="real_estate_agent">Real estate agent</option></select></div>
+  <div><label for="email">Email (optional, to get the result)</label><input id="email" name="email" type="email" maxlength="160" placeholder="you@yourpractice.com"></div></div>
+  <label class="small" style="font-weight:400"><input type="checkbox" name="consent" style="width:auto"> Email me my result. We use your email only for this request. No newsletters unless you ask.</label>
+  <p><button class="btn" type="submit">Check my business</button></p>
+  <p class="small">The free quick check uses one AI model answering from its own memory, without live web search, so it can differ from what you see in ChatGPT. The paid report uses the assistants listed below.</p>
+ </form>
+ <div id="result" class="result"></div>
+</div></div></section>
+
+<section id="sample"><div class="wrap sample">
+ <div><h2>What the report looks like</h2><p class="sub">This sample comes from a free test on Austin dentists: 20 customer questions, names checked against 479 practices in the US NPI registry. Names are hidden.</p>
+ <ul><li>Your score and how often each assistant named you</li><li>Who gets recommended instead, and how often</li><li>Names that match no registered business</li><li>Likely reasons, with the strength of evidence behind each fix</li></ul>
+ <p><a class="btn ghost" href="sample-report.pdf" target="_blank">Open sample (PDF)</a></p></div>
+ <a href="sample-report.html" target="_blank"><img src="assets/sample-report.png" alt="Sample AI visibility report"></a>
+</div></section>
+
+<section id="pricing"><div class="wrap">
+ <h2>Simple pricing</h2>
+ <p class="sub">One-time work, or a monthly plan you can cancel anytime. Prices in US dollars. Payment is collected before we run any paid AI checks.</p>
+
+ <h3 class="price-head">One-time</h3>
+ <table class="sheet">
+  <tr><th>Product</th><th>What's in it</th><th>Price</th></tr>
+  <tr><td><b>AI Visibility Check</b></td><td>Whether ChatGPT, Gemini, Perplexity or Claude name you; who they name instead; a prioritized fix list. Names checked against official registers. Delivered in 2 business days.</td><td class="amt">$149</td></tr>
+  <tr><td><b>Google Maps Audit</b></td><td>Name, address, phone, categories, services and description checked; 4 posts; a map-visibility baseline once we have access.</td><td class="amt">$149</td></tr>
+  <tr><td><b>Listings Audit</b></td><td>17 directories AI assistants read: listed, wrong or missing, plus an ordered checklist.</td><td class="amt">$99</td></tr>
+  <tr><td><b>Listings Audit + fixes</b></td><td>The audit, plus we claim and fix the free listings, and re-check after 30 days.</td><td class="amt">$249</td></tr>
+  <tr><td><b>Content Fix Pack</b></td><td>Full-site crawl, a priority table, rewrites for 5 pages, and ready-to-paste structured data.</td><td class="amt">$249</td></tr>
+  <tr><td><b>Fix-It Bundle</b></td><td>AI Check + Maps Audit + Listings Audit + Content Fix Pack (the four would be $646 separately).</td><td class="amt">$397 <span class="save">save $249</span></td></tr>
+ </table>
+
+ <p style="margin-top:14px"><a class="btn" data-pay="payLinkCheck" href="#pricing">Buy the AI Visibility Check — $149</a></p>
+
+ <h3 class="price-head">Monthly</h3>
+ <p class="small">The first month of Growth or Dominate includes the Fix-It Bundle at no extra cost.</p>
+ <div class="prices">
+  <div class="price"><b>Visibility</b><div class="amt">$249 <span>/ month</span></div>
+   <ul><li>Monthly AI re-check on the same questions, across four assistants</li><li>Small fixes and listings sync</li><li>Cancel anytime</li></ul>
+   <a class="btn" data-pay="payLinkMonthly" href="#">Start Visibility</a></div>
+  <div class="price hot"><b>Growth</b><div class="amt">$449 <span>/ month</span></div>
+   <ul><li>Everything in Visibility</li><li>Maps: weekly map check, 1 post a week, profile upkeep</li><li>Honest Reviews: requests to every customer (not only happy ones), reply drafts, alerts</li><li>Cancel anytime</li></ul>
+   <a class="btn" data-pay="payLinkMonthly" href="#">Start Growth</a></div>
+  <div class="price"><b>Dominate</b><div class="amt">$699 <span>/ month</span></div>
+   <ul><li>Everything in Growth</li><li>Content refresh: 4–8 pages or Q&amp;A pages a month, published only after your OK</li><li>Cancel anytime</li></ul>
+   <a class="btn" data-pay="payLinkMonthly" href="#">Start Dominate</a></div>
+ </div>
+ <p class="small" style="margin-top:14px">Single monthly add-ons, if you already have a plan: Maps $199 · Reviews $129 · Content Refresh $299 · Listings sync $49.</p>
+
+ <h3 class="price-head">For agencies</h3>
+ <p>White-label reports and monthly plans under your logo, from <b>$39</b> wholesale. You set the retail price. <a href="agency.html">See agency pricing</a>.</p>
+
+ <ul class="rules">
+  <li>No ranking guarantees. AI answers change every time, so we report how often you're named, with a range.</li>
+  <li>No fake, bought, filtered or incentivized reviews, and no review gating. Fake reviews are illegal under the FTC rule.</li>
+  <li>Every change to your site, profiles or listings goes live only after your OK.</li>
+  <li>The service is for US businesses. We do not send marketing email to Israeli businesses without prior opt-in.</li>
+ </ul>
+ <p class="small" style="margin-top:14px">See the <a href="refunds.html">refund policy</a>. The $149 AI Visibility Check can be paid at checkout. Monthly plans are not available to buy yet — contact us.</p>
+</div></section>
+
+<section id="faq"><div class="wrap">
+ <h2>Honest answers</h2>
+ <details><summary>Can you guarantee that ChatGPT will recommend my business?</summary><p>No, and nobody honestly can. AI assistants change their answers constantly. We measure how often you're named, show you what the businesses being named have in common, and help you fix what's in your control. Then we re-measure with the same questions.</p></details>
+ <details><summary>Is this what I'd see if I asked ChatGPT myself?</summary><p>Close, but not identical. Answers vary by person, location and time — identical lists repeat in under 1% of runs (SparkToro, January 2026). That's why we ask many questions several times and report a rate with a range, instead of one screenshot.</p></details>
+ <details><summary>Which AI assistants do you check?</summary><p>The paid report checks ChatGPT, Gemini, Perplexity and Claude with their web-search features turned on. The free quick check uses one AI model answering from memory only, so treat it as a first look.</p></details>
+ <details><summary>What do the fixes involve?</summary><p>Mostly the basics AI assistants read: complete and consistent profiles on the sites they cite for your trade (Google, Yelp, Healthgrades, Avvo and so on), clear service and city information on your website, and honest review requests to real customers. Studies link these to being named; none prove a guaranteed effect, and we say which evidence is stronger.</p></details>
+ <details><summary>Do you post fake reviews or spam forums?</summary><p>Never. Fake reviews are illegal under the FTC's rule, and undisclosed forum posting backfires. We only work with real customers and truthful content.</p></details>
+ <details><summary>Are you affiliated with OpenAI, Google, Perplexity or Anthropic?</summary><p>No. We're an independent service. Product names belong to their owners.</p></details>
+ <details><summary>What do you do with my data?</summary><p>We use your business details to run your check and your email to deliver it. We don't sell data. See the <a href="privacy.html">privacy policy</a>.</p></details>
+</div></section>
+
+<footer><div class="wrap">
+ <p>© 2026 Dvir Baumel · <a href="mailto:dvirbaumel9-mcbgx2@mail.grokbot.com">dvirbaumel9-mcbgx2@mail.grokbot.com</a> · <span class="ph">[Physical postal address — added before any marketing email]</span></p>
+ <p><a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="refunds.html">Refunds</a> · Not affiliated with OpenAI, Google, Perplexity or Anthropic.</p>
+</div></footer>
+<script src="assets/config.js"></script><script src="assets/app.js"></script>
+</body></html>

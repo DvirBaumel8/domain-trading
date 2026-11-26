@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+*.env
+site/data/requests.jsonl
+site/data/orders/
+site/data/free-checks/
