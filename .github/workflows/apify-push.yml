@@ -53,7 +53,13 @@ jobs:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
         run: |
           for a in $ACTORS; do
-            (cd "apify-actors/$a" && apify push) > /dev/null
+            # Show the CLI output (errors included); redact the token value in case it is ever echoed.
+            if ! out=$(cd "apify-actors/$a" && apify push 2>&1); then
+              printf '%s\n' "$out" | sed "s|$APIFY_TOKEN|***|g"
+              echo "push failed: $a"
+              exit 1
+            fi
+            printf '%s\n' "$out" | sed "s|$APIFY_TOKEN|***|g"
             echo "pushed $a"
           done
       - name: Post-push check (fails if public or priced) and summary
