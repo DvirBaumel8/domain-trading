@@ -356,6 +356,8 @@ def test_error_reason_mapping():
     assert runner.error_reason(_chained(httpx.ConnectError("x"), ConnectionRefusedError())) == "connection_refused"
     assert runner.error_reason(httpx.ConnectTimeout("x")) == "connect_timeout"
     assert runner.error_reason(_chained(httpx.ConnectError("x"), ssl.SSLError("bad"))) == "tls_error"
+    assert runner.error_reason(_chained(httpx.ConnectError("x"), ConnectionResetError())) == "connection_reset"
+    assert runner.error_reason(_chained(httpx.ReadError("x"), ConnectionResetError(104, "reset"))) == "connection_reset"
     assert runner.error_reason(httpx.ReadError("x")) == "other"
     assert runner.error_reason(httpx.ReadTimeout("x")) == "other"
     assert runner.error_reason(None) == "other"

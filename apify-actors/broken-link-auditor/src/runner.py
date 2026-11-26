@@ -28,7 +28,7 @@ def make_client(timeout: float = 20) -> httpx.AsyncClient:
 
 
 def error_reason(exc: BaseException | None) -> str:
-    """A plain reason for a failed request: dns_failure, connection_refused, connect_timeout, tls_error or other."""
+    """A plain reason for a failed request: dns_failure, connection_refused, connection_reset, connect_timeout, tls_error or other."""
     chain, e = [], exc
     while e is not None and e not in chain:
         chain.append(e)
@@ -39,6 +39,8 @@ def error_reason(exc: BaseException | None) -> str:
         return "tls_error"
     if any(isinstance(e, ConnectionRefusedError) for e in chain):
         return "connection_refused"
+    if any(isinstance(e, ConnectionResetError) for e in chain):
+        return "connection_reset"
     if any(isinstance(e, socket.gaierror) or any(h in str(e).lower() for h in DNS_HINTS) for e in chain):
         return "dns_failure"
     return "other"
