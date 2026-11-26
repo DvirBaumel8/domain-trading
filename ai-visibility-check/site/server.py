@@ -24,6 +24,7 @@ from aivis.order import US_STATES, US_ONLY_MSG, normalize_website
 from aivis.uscities import is_us_place  # noqa: E402
 from site_config import BUSINESS_ADDRESS    # noqa: E402
 import delivery                             # noqa: E402
+import refs                                 # noqa: E402
 import html as _html
 
 DATA = os.path.join(HERE, "data")
@@ -288,7 +289,7 @@ def new_order(d, req):
     token = delivery.new_token()
     intake = {"order_id": oid, "business_name": req["business"], "city": req["city"],
               "niche": req["niche"], "email": req["email"], "website": req["website"],
-              "token": token, "plan": "check", "paid_ref": str(d.get("paid_ref", ""))[:60], "paid": False,
+              "token": token, "plan": "check", "ref": refs.clean_ref(d.get("ref")), "paid_ref": str(d.get("paid_ref", ""))[:60], "paid": False,
               "competitors": [c.strip()[:120] for c in str(d.get("competitors", "")).split(",") if c.strip()][:5]}
     store.put(f"orders/{oid}.json", intake)
     delivery.register_token(store, oid, token)
@@ -427,6 +428,7 @@ class H(http.server.BaseHTTPRequestHandler):
             body = fh.read()
         if f.endswith(".html"):
             body = render_page(body)
+            refs.record_hit(self.path, f, HERE, DATA, save_line)
         return self._send(200, ctype, body)
 
     def do_POST(self):
@@ -436,8 +438,10 @@ class H(http.server.BaseHTTPRequestHandler):
                 code, obj = handle_polar(hdr, self._body(MAX_HOOK_BODY))
                 return self._json(code, obj)
             if self.path == "/api/check":
-                req = clean(json.loads(self._body() or b"{}"))
-                rec = {**req, "at": datetime.datetime.now().isoformat(timespec="seconds"), "ip": self.client_address[0]}
+                body = json.loads(self._body() or b"{}")
+                req = clean(body)
+                rec = {**req, "at": datetime.datetime.now().isoformat(timespec="seconds"), "ip": self.client_address[0],
+                       "ref": refs.clean_ref(body.get("ref"))}
                 r = instant(req)
                 if r:
                     save_line(os.path.join(DATA, "requests.jsonl"), {**rec, "result": "instant"})
