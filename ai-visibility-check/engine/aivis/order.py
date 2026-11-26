@@ -1,8 +1,8 @@
 """Customer orders: intake -> cost estimate -> capped run -> report files.
 
 Modes
-- 'free'  : Pollinations (no key, no cost, model memory only). For the free
-            self-check and for dry runs. Report is labelled accordingly.
+- 'free'  : Gemini API free tier with Google Search grounding (GEMINI_FREE_API_KEY only, never
+            GEMINI_API_KEY; zero spend). For the free self-check. Pollinations stays an explicit CLI option.
 - 'paid'  : OpenAI / Gemini / Claude with live web search.
             NEVER runs unless ALL hold: env AIVIS_ALLOW_PAID=1, the engine's
             API key is in env, and the estimated cost <= the order's cap.
@@ -27,7 +27,7 @@ from .niches import NICHES, get_niche
 from .parse import match_name
 from . import config
 from .uscities import is_us_place
-from .providers import REGISTRY, BudgetGuard, Business, MockProvider, PollinationsProvider, ProviderError
+from .providers import REGISTRY, BudgetGuard, Business, MockProvider, PollinationsProvider, GeminiFreeProvider, ProviderError
 
 PAID_ENGINES = config.PAID_ENGINES
 ENV_KEYS = config.ENV_KEYS
@@ -151,7 +151,7 @@ def paid_readiness(engines) -> dict:
 
 def build_providers(order: Order, mode: str, cap_usd: float, roster=None, seed=0):
     if mode == "free":
-        return [PollinationsProvider()], None
+        return [GeminiFreeProvider()], None
     if mode == "mock":
         names = roster or [order.business_name]
         strength = {n: 1.0 + (zlib.crc32(n.encode()) % 7) for n in names}
@@ -284,7 +284,8 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
             f.write(render(res))
     raw = [{"provider": a.provider, "mode": a.mode, "prompt": a.prompt, "intent": i, "repeat": a.run,
             "text": a.text, "citations": a.citations,
-            "usage": a.usage, "mentions": [[m.raw, m.position, m.roster_name] for m in ms]} for a, ms, i in res.records]
+            "usage": a.usage, "mentions": [[m.raw, m.position, m.roster_name] for m in ms]}
+           for a, ms, i in res.records if not a.suggestions_html]     # grounded answers are never written to disk
     with open(os.path.join(folder, "answers.json"), "w", encoding="utf-8") as f:
         json.dump(raw, f, indent=1)
     with open(os.path.join(folder, "order-log.json"), "w", encoding="utf-8") as f:

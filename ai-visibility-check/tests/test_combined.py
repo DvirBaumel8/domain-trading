@@ -368,17 +368,17 @@ class NamesOffByDefaultTests(Base):
         from aivis.providers.base import Answer
 
         class P:
-            name, mode, paid = "pollinations", "model-memory", False
+            name, mode, paid = "gemini-free", "web-search", False
             def ask(self, prompt, city="", run=0):
                 return Answer(self.name, "openai", prompt, "1. **Alpha Dental**\n2. **Beta Smiles**", [], self.mode, 0.0, run)
-        saved = order.PollinationsProvider
-        order.PollinationsProvider = lambda: P()
+        saved = order.GeminiFreeProvider
+        order.GeminiFreeProvider = lambda: P()
         try:
             with contextlib.redirect_stderr(io.StringIO()):
                 server.free_job("abcdef12-0001", {"business": "Zed Co", "city": "Austin, TX", "niche": "dentist",
                                                   "email": "a@b.co"})
         finally:
-            order.PollinationsProvider = saved
+            order.GeminiFreeProvider = saved
         r = server.JOBS["abcdef12-0001"]
         self.assertEqual(r["names"]["heading"], "Names the AI gave (AI output, not verified)")
         self.assertIs(cities.SHOW_NAMES, False)         # the free check does not switch city names on (or use the flag)

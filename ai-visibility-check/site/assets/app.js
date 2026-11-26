@@ -30,6 +30,7 @@
     try {
       const r = await fetch((C.apiBase || "") + "/api/check", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data)});
       const j = await r.json();
+      if (r.status === 503 && j.code === "daily_cap_reached") { out.innerHTML = "<p>" + esc(j.error) + "</p>"; return; }
       if (!r.ok) throw new Error(j.error || "error");
       out.innerHTML = render(j, data);
       wirePay(out);
@@ -49,6 +50,20 @@
         `<li>${esc(x.name)} — ${x.answers} of ${n.answers} answers${x.match ? " (" + esc(x.match) + ")" : ""}</li>`).join("") + "</ul>";
     } else { h += `<p class="small">${esc(n.empty_note || "The AI did not name any businesses in its answers.")}</p>`; }
     return h + `<p class="small">${esc(n.register_note || "")}</p>`;
+  }
+  // Google Search Suggestions: the vendor HTML is shown exactly as received (never edited or restyled), each block
+  // full width under the result and kept visible with it. An iframe keeps the vendor CSS from touching this page;
+  // a chip opens the Google results page directly (new tab), no step in between.
+  function showSuggestions(el, list){
+    (list || []).forEach(html => {
+      const fr = document.createElement("iframe");
+      fr.setAttribute("sandbox", "allow-same-origin allow-popups allow-popups-to-escape-sandbox");
+      fr.setAttribute("title", "Google Search Suggestions");
+      fr.style.cssText = "width:100%;border:0;display:block;margin:8px 0";
+      fr.srcdoc = '<base target="_blank">' + html;
+      fr.onload = () => { try { fr.style.height = fr.contentDocument.documentElement.scrollHeight + "px"; } catch (e) {} };
+      el.appendChild(fr);
+    });
   }
   function render(j, d){
     if (j.status === "instant") {
@@ -71,8 +86,8 @@
     const t = setInterval(async () => {
       if (Date.now() - started > 5 * 60 * 1000) { return stop(t, "<p>This is taking longer than expected. Please try again in a few minutes.</p>"); }
       try { const r = await fetch((C.apiBase||"") + "/api/check/" + p.dataset.id); const j = await r.json();
-        if (j.status === "done") { stop(t, `<p><b>Done.</b> Named in ${j.named_in} of ${j.answers} answers. <a href="${esc(j.report)}" target="_blank">Open your free result</a></p>${namesHtml(j.names)}`); }
-        if (j.status === "partial") { stop(t, `<p><b>${esc(j.message)}</b> This is not a reliable check, so we are not showing a score. <a href="${esc(j.report)}" target="_blank">Open the partial result</a></p>${namesHtml(j.names)}`); }
+        if (j.status === "done") { stop(t, `<p><b>Done.</b> Named in ${j.named_in} of ${j.answers} answers. <a href="${esc(j.report)}" target="_blank">Open your free result</a></p>${namesHtml(j.names)}`); showSuggestions(p, j.suggestions); }
+        if (j.status === "partial") { stop(t, `<p><b>${esc(j.message)}</b> This is not a reliable check, so we are not showing a score. <a href="${esc(j.report)}" target="_blank">Open the partial result</a></p>${namesHtml(j.names)}`); showSuggestions(p, j.suggestions); }
         if (j.status === "failed") { stop(t, `<p>${esc(j.message || "We could not get answers from the AI model right now. Please try again in a few minutes.")} We saved your request.</p>`); }
         if (j.status === "unknown") { stop(t, "<p>This check expired. Please run it again.</p>"); }
       } catch(e) {}

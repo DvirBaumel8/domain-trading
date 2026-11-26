@@ -155,9 +155,8 @@ def cmd_order(a):
     try:
         res, log = run_order(o, mode=a.mode, cap_usd=DEFAULT_CAP_USD if a.cap is None else a.cap, roster=names, out_dir=a.out, dry_run=a.dry_run,
                              unpaid_override=bool(a.allow_unpaid and not o.paid),
-                             render=lambda r: render(r, sample=(a.mode != "paid"),
-                                                     run_note=("Free quick check: one AI model answering from memory, "
-                                                               "no web search." if a.mode == "free" else "Simulated data.")))
+                             render=None if a.mode == "free" else   # free = Google-grounded text: never written to disk
+                             (lambda r: render(r, sample=(a.mode != "paid"), run_note="Simulated data.")))
     except OrderError as e:
         sys.exit(f"order refused: {e}")
     print(json.dumps(log, indent=1))

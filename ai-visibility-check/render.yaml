@@ -18,3 +18,5 @@ services:
         value: "1"
       - key: AVC_TEST_BYPASS_TOKEN   # internal testing only; set in the Render dashboard, never here
         sync: false
+      - key: GEMINI_FREE_API_KEY     # free-tier key for the free check; set in the dashboard, never here
+        sync: false

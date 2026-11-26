@@ -4,9 +4,10 @@ python3 server.py [--port 8080] [--free-run]
 
 POST /api/check   free self-check. Instant answer from data/markets/*.json when we
                   have that niche+city; else, with --free-run, a short free run
-                  (Pollinations, 8 questions, $0) in the background; else the
+                  (Gemini free tier with Google Search grounding, 8 questions, $0) in the background; else the
                   request is just saved. Requests go to the private orders store (leads/).
                   Limits per client address: 5 checks an hour, 3 free jobs at once (429 beyond).
+                  A daily Gemini call cap (AVC_GEMINI_DAILY_CALL_CAP, Pacific day) refuses a new free run with 503 daily_cap_reached.
 GET  /api/check/<id>  status of a background free run.
 POST /api/intake  order intake -> orders store (private GitHub repo via ORDERS_REPO +
                   ORDERS_GITHUB_TOKEN; else a local folder that is never served).
@@ -24,6 +25,7 @@ from aivis.parse import match_name          # noqa: E402
 from aivis.niches import NICHES, get_niche  # noqa: E402
 from aivis.order import US_STATES, US_ONLY_MSG, normalize_website, FREE_MIN_ANSWERS
 from aivis import names as names_mod
+from aivis.providers.gemini_free import CAP as GEMINI_CAP
 from aivis.uscities import is_us_place  # noqa: E402
 from site_config import BUSINESS_ADDRESS, SUPPORT_EMAIL    # noqa: E402
 import delivery                             # noqa: E402
@@ -44,6 +46,10 @@ BUSY_MSG = "Too many checks right now, try again in a few minutes."
 FREE_PER_HOUR = 5           # free checks per client address per hour
 FREE_CONCURRENT = 3         # free jobs running at once per client address
 FREE_QUESTIONS = 8          # questions in one free run
+CAP_MSG = "We have reached today's free-check limit. Please try again tomorrow."
+CAP_CODE = "daily_cap_reached"
+FREE_NOTE = "Free quick check: one AI model with Google Search grounding, 8 questions."
+LIVE_KEYS = ("names", "suggestions")    # grounded-answer material: sent once to the visitor, then dropped from memory
 FAIL_MSG = "We could not get answers from the AI model right now. Please try again in a few minutes."
 BYPASS_ENV = "AVC_TEST_BYPASS_TOKEN"
 BYPASS_HEADER = "X-AVC-Test-Token"
@@ -994,37 +1000,52 @@ def free_alert(status):
     notify_event("free_check", ref="free-check", status=status, unique=now().strftime("%y%m%d%H"), webhook=True)
 
 
+def free_summary_page(answers, expected, named_in, reasons):
+    """The only stored free report: our own derived fields (counts, named flag, reason codes). It holds no
+    names, grounded text or Search Suggestions: those are shown live only (Gemini terms)."""
+    E = _html.escape
+    h = ["<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
+         "<title>Free quick check</title></head><body style='font:16px/1.5 system-ui,sans-serif;max-width:680px;margin:32px auto;padding:0 16px'>",
+         "<h1>Free quick check</h1>", f"<p>{E(FREE_NOTE)}</p>"]
+    if answers < FREE_MIN_ANSWERS:
+        h.append(f"<p><b>Partial result: {answers} of {expected} questions answered</b> Do not rely on these numbers.</p>")
+    elif named_in is not None:
+        h.append(f"<p>Your business was {'named in %d of %d answers' % (named_in, answers) if named_in else 'not named'}"
+                 f" ({answers} of {expected} questions answered).</p>")
+    bad = {k: v for k, v in (reasons or {}).items() if k != "ok"}
+    if bad:
+        h.append("<p>Questions not answered: " + E(", ".join(f"{k} {v}" for k, v in sorted(bad.items()))) + ".</p>")
+    h.append("<p><small>The names the AI gave and the Google Search Suggestions are shown once, when the check runs. "
+             "They are not stored, so they are not shown here.</small></p></body></html>")
+    return "".join(h)
+
+
 def free_job(job_id, req):
-    from aivis.order import Order, run_order, AnswerShortfall
-    from aivis.report_pro import render
+    from aivis.order import Order, run_order, AnswerShortfall, build_providers
     tmp = tempfile.mkdtemp(prefix="free-")
     reasons, answers, expected = {}, 0, FREE_QUESTIONS
+    providers = []
     try:
         o = Order(order_id="FREE-" + job_id[:8], business_name=req["business"], city=req["city"],
                   niche=req["niche"], plan="free")
         register, roster = fetch_roster(get_niche(req["niche"]), req["city"])
-        note = "Free quick check: one AI model answering from memory, no web search, 8 questions."
-
-        def paint(r):
-            got = r.score.total_answers
-            part = f"Partial result: {got} of {expected} questions answered" if got < FREE_MIN_ANSWERS else ""
-            return render(r, sample=True, run_note=note, register=register, partial_note=part,
-                          names_asked=expected, names_min=FREE_MIN_ANSWERS)
-        res, lg = run_order(o, mode="free", out_dir=tmp, render=paint, **({"roster": roster} if roster else {}))
+        providers, _ = build_providers(o, "free", 0.0)
+        res, lg = run_order(o, mode="free", out_dir=tmp, providers=providers, **({"roster": roster} if roster else {}))
         answers = res.score.total_answers
         reasons = (lg or {}).get("reasons") or (res.reason_counts() if hasattr(res, "reason_counts") else {})
-        with open(os.path.join(tmp, o.order_id, "report.html"), encoding="utf-8") as fh:
-            Store().put_text(free_report_path(o.order_id), fh.read())
-        out = {"report": f"/free/{o.order_id}", "answers": answers, "expected": expected,
+        named_in = sum(p.target_hits for p in res.score.providers) if answers >= FREE_MIN_ANSWERS else None
+        Store().put_text(free_report_path(o.order_id), free_summary_page(answers, expected, named_in, reasons))
+        out = {"report": f"/free/{o.order_id}", "answers": answers, "expected": expected, "note": FREE_NOTE,
                "reasons": {k: v for k, v in reasons.items() if k != "ok"}}
         records = getattr(res, "records", None)
         if records is not None:
             out["names"] = names_mod.from_records(records, req["business"], req["city"], register,
                                                  asked=expected, min_answers=FREE_MIN_ANSWERS)
+            out["suggestions"] = list(dict.fromkeys(a.suggestions_html for a, _, _ in records if a.suggestions_html))
         if answers < FREE_MIN_ANSWERS:
             out.update({"status": "partial", "message": f"Partial result: {answers} of {expected} questions answered"})
         else:
-            out.update({"status": "done", "named_in": sum(p.target_hits for p in res.score.providers)})
+            out.update({"status": "done", "named_in": named_in})
         finish_job(job_id, out)
     except Exception as e:  # never leak internals to the browser
         if isinstance(e, AnswerShortfall):
@@ -1036,6 +1057,9 @@ def free_job(job_id, req):
         print("free job failed:", type(e).__name__, file=sys.stderr)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+        reserved = JOB_META.get(job_id, {}).get("reserved", 0)
+        if reserved:                    # swap the reservation for the Gemini attempts really made (retries included)
+            GEMINI_CAP.settle(reserved, sum(getattr(p, "attempts", 0) for p in providers))
     print(free_summary_line(answers, expected, reasons), file=sys.stderr)
     if answers < FREE_MIN_ANSWERS:
         free_alert("failed" if answers == 0 else "partial")
@@ -1158,7 +1182,13 @@ class H(http.server.BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/check/([a-f0-9-]{36})", path)
         if m:
             prune_jobs()
-            return self._json(200, JOBS.get(m.group(1), {"status": "unknown"}))
+            res = JOBS.get(m.group(1), {"status": "unknown"})
+            self._json(200, res)
+            if any(k in res for k in LIVE_KEYS):    # delivered once: later polls rebuild from counts and flags only
+                with LOCK:
+                    if JOBS.get(m.group(1)) is res:
+                        JOBS[m.group(1)] = {k: v for k, v in res.items() if k not in LIVE_KEYS}
+            return
         m = re.fullmatch(r"/(r|status)/(.*)", path)
         if m:
             try:
@@ -1228,9 +1258,15 @@ class H(http.server.BaseHTTPRequestHandler):
                         log("lead save failed: " + type(e).__name__)
                     return self._json(200, r)
                 if FREE_RUN:
+                    if not GEMINI_CAP.reserve(FREE_QUESTIONS):      # daily Gemini cap; the test token does not bypass it
+                        with LOCK:
+                            if CHECK_LOG.get(ip):
+                                CHECK_LOG[ip].pop()                 # a refused check does not use up the visitor's hourly limit
+                        return self._json(503, {"error": CAP_MSG, "code": CAP_CODE})
                     job = str(uuid.uuid4())
                     with LOCK:
-                        JOBS[job] = {"status": "running"}; JOB_META[job] = {"ip": ip, "started": clock()}
+                        JOBS[job] = {"status": "running"}
+                        JOB_META[job] = {"ip": ip, "started": clock(), "reserved": FREE_QUESTIONS}
                     threading.Thread(target=free_job, args=(job, req), daemon=True).start()
                     try:
                         save_lead({**rec, "result": "free-run", "job": job})

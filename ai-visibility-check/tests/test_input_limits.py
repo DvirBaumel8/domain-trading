@@ -130,10 +130,7 @@ class PersistenceTests(Reset):
     def test_free_job_writes_report_to_store(self):
         import aivis.order as order
         orig = order.run_order
-        def fake(o, mode, out_dir, render):
-            os.makedirs(os.path.join(out_dir, o.order_id))
-            with open(os.path.join(out_dir, o.order_id, "report.html"), "w") as f:
-                f.write("<p>done</p>")
+        def fake(o, mode, out_dir, **kw):
             class P: target_hits = 1
             class S: providers = [P()]; total_answers = 8
             class R: score = S()
@@ -144,7 +141,8 @@ class PersistenceTests(Reset):
         finally:
             order.run_order = orig
         self.assertEqual(server.JOBS["12345678-aaaa"]["report"], "/free/FREE-12345678")
-        self.assertEqual(server.Store().get_text("free/FREE-12345678/report.html"), "<p>done</p>")
+        page = server.Store().get_text("free/FREE-12345678/report.html")
+        self.assertIn("Your business was named in 1 of 8 answers", page)
         self.assertEqual(self.req("GET", "/free/FREE-12345678")[0], 200)
 
     def test_saved_request_lands_in_store(self):
