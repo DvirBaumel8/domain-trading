@@ -22,6 +22,7 @@ About 1,650 lines. The app keeps nothing: it reads `data/state.json` at start an
 | `src/sources/web-risk.ts`, `domain-status.ts`, `afternic.ts`, `auctions.ts`, `tsdr.ts` | One file per source, reads only |
 | `src/http/auth.ts`, `errors.ts` | Tokens, limits, the error shape |
 | `src/core/` | `money.ts`, `dates.ts`, `rdap.ts`; `src/domain-name.ts` is beside it |
+| `apify-actors/` | Python Apify actors (not the API): four old ones, `wayback-domain-history`, `broken-link-auditor`, `bulk-pagespeed-checker` (each `src/core.py` logic, `src/runner.py` loop, `src/main.py` Apify adapter, `tests/`), `shared/` (`polite.py` is copied into each actor), `ci/` (workflow files to install by hand), `tests/test_contract.py` (all actors), `tools/sync-store-meta.py`, `tools/bot-text-guard.py`, `usage-report.py` (Part B, not wired). CI: `apify-actors/ci/apify-actors.yml` once installed. Push to Apify only by hand |
 | `scripts/release.ts` | `npm run release -- X.Y.Z "summary"` |
 
 Tests: `tests/app.test.ts` (every route), `tests/prefilter.test.ts` (the job), `tests/unit/` (state, config, money, rdap, domain names, stateless guard, no AI, no top-up, removed providers), `tests/registrars/`, `tests/contract/version-sync.test.ts`.

@@ -1,0 +1,95 @@
+{
+  "actorSpecification": 1,
+  "fields": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string"
+      },
+      "category": {
+        "type": "string",
+        "description": "ok, redirect, 4xx, 5xx, error or robots_blocked"
+      },
+      "statusCode": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "finalUrl": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "redirectChain": {
+        "type": "array"
+      },
+      "redirectLoop": {
+        "type": "boolean"
+      },
+      "error": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "responseTimeMs": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "contentType": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "sources": {
+        "type": "array"
+      },
+      "checkedAt": {
+        "type": "string"
+      }
+    }
+  },
+  "views": {
+    "overview": {
+      "title": "Overview",
+      "transformation": {
+        "fields": [
+          "url",
+          "category",
+          "statusCode",
+          "finalUrl",
+          "responseTimeMs",
+          "contentType"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "url": {
+            "label": "url"
+          },
+          "category": {
+            "label": "category"
+          },
+          "statusCode": {
+            "label": "statusCode"
+          },
+          "finalUrl": {
+            "label": "finalUrl"
+          },
+          "responseTimeMs": {
+            "label": "responseTimeMs"
+          },
+          "contentType": {
+            "label": "contentType"
+          }
+        }
+      }
+    }
+  }
+}

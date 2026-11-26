@@ -1,0 +1,25 @@
+{
+  "actorSpecification": 1,
+  "name": "wayback-domain-history",
+  "title": "Wayback Domain History",
+  "description": "Archive history of any domain from the Internet Archive: first and last capture, snapshots per year, status codes, gaps and sample snapshot links. Uses only public Internet Archive APIs.",
+  "version": "0.1.0",
+  "buildTag": "latest",
+  "meta": {
+    "templateId": "python-empty"
+  },
+  "input": "./input_schema.json",
+  "output": "./output_schema.json",
+  "storages": {
+    "dataset": "./dataset_schema.json"
+  },
+  "dockerfile": "../Dockerfile",
+  "readme": "../README.md",
+  "minMemoryMbytes": 256,
+  "maxMemoryMbytes": 1024,
+  "defaultRunOptions": {
+    "memoryMbytes": 256
+  },
+  "seoTitle": "Wayback Machine Domain History Checker",
+  "seoDescription": "Check the archive history of domains: first and last capture, captures per year, status codes, gaps and sample snapshots, from the Internet Archive."
+}

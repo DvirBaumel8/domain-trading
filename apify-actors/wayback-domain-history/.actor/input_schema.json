@@ -1,0 +1,47 @@
+{
+  "title": "Wayback Domain History",
+  "type": "object",
+  "schemaVersion": 1,
+  "required": [
+    "domains"
+  ],
+  "properties": {
+    "domains": {
+      "title": "Domains",
+      "type": "array",
+      "description": "Domains, URLs or hostnames. Schemes, paths and www are removed.",
+      "editor": "stringList",
+      "prefill": [
+        "example.com"
+      ]
+    },
+    "includeSubdomains": {
+      "title": "Include subdomains",
+      "type": "boolean",
+      "description": "Count captures of all subdomains too.",
+      "default": false
+    },
+    "fromYear": {
+      "title": "From year",
+      "type": "integer",
+      "description": "Only captures from this year on.",
+      "minimum": 1996,
+      "maximum": 2100
+    },
+    "toYear": {
+      "title": "To year",
+      "type": "integer",
+      "description": "Only captures up to this year.",
+      "minimum": 1996,
+      "maximum": 2100
+    },
+    "sampleSnapshots": {
+      "title": "Sample snapshots per year",
+      "type": "integer",
+      "description": "How many snapshot links to list for each year.",
+      "default": 1,
+      "minimum": 1,
+      "maximum": 5
+    }
+  }
+}
