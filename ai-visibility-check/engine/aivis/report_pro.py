@@ -10,6 +10,7 @@ import datetime as _dt
 import html
 import string
 
+from .niches import niche_label
 from .report import GRADE_LABEL
 
 E = html.escape
@@ -77,18 +78,22 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
     if sample:
         h.append("<div class='ribbon'>SAMPLE</div>")
     h.append(f"<div class='brand'><i></i>{E(brand.upper())}</div>")
-    h.append(f"<h1>{E(tlabel)}</h1><div class='sub'>{E(result.niche.label.title())} · {E(result.city)} · "
+    h.append(f"<h1>{E(tlabel)}</h1><div class='sub'>{E(niche_label(result.niche.label))} · {E(result.city)} · "
              f"{len(result.prompts)} customer questions · {s.total_answers} AI answers · {E(date)}</div>")
     if sample:
         h.append("<div class='notice'><b>This is a sample report.</b> " + E(run_note) +
-                 " Business names are hidden on this public sample. A paid report runs the AI assistants you "
+                 (" Business names are hidden on this public sample." if anonymize else "") +
+                 " A paid report runs the AI assistants you "
                  "choose, on more questions and repeats; its numbers will differ from this sample.</div>")
+    reg = getattr(result, "has_register", False)
     vr = 1 - (len(unv) / total_named) if total_named else 0
+    kpi3 = (f"<div class='kpi'><b>{vr:.0%}</b><span>of named businesses matched an official register</span></div>" if reg else
+            "<div class='kpi'><b>n/a</b><span>no official register to check names against for this trade</span></div>")
     h.append(f"<div class='grid'><div class='gauge' style='--v:{max(s.score,1)};--c:{color}'><div><div>"
              f"<b>{s.score}</b><span>out of 100<br>AI visibility</span></div></div></div><div><div class='kpis'>"
              f"<div class='kpi'><b>{sum(p.target_hits for p in s.providers)}/{s.total_answers}</b><span>answers that named this business</span></div>"
              f"<div class='kpi'><b>{len(comp_names)}</b><span>local competitors named instead</span></div>"
-             f"<div class='kpi'><b>{vr:.0%}</b><span>of named businesses matched an official register</span></div></div>"
+             f"{kpi3}</div>"
              f"<p class='sub' style='margin-top:10px'>Engines: {E(engines)}. We report how often you are named across many "
              f"questions, with a 95% range, because AI answers change every time.</p></div></div>")
     h.append("<h2>By AI assistant</h2><table><tr><th>Assistant</th><th>Mode</th><th>Named you</th><th>95% range</th></tr>")
@@ -105,19 +110,24 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
     if ex:
         h.append(f"<h2>Example answer</h2><div class='q'>Asked <b>“{E(ex[0])}”</b>, {E(ex[1])} named: "
                  f"{', '.join(nm(n) for n in ex[2])}. <b>Not you.</b></div>")
-    if unv:
+    if unv and reg:
         h.append(f"<h2>Names we could not verify</h2><div class='q warn'>{len(unv)} of {total_named} business names in "
                  f"these answers did not match any practice in the official register for {E(result.city)}. Some may be "
                  f"real businesses listed under another legal name; others may not exist. Customers asking AI may be "
                  f"sent to them.</div>")
+    elif unv:
+        h.append(f"<h2>Names we could not verify</h2><div class='q warn'>{len(unv)} of {total_named} business names in "
+                 f"these answers: we could not check these names against a register for this trade. Some may be real "
+                 f"businesses, others may not exist.</div>")
     h.append("<h2>Likely reasons and what to fix</h2><ol>")
     for f in result.findings:
         cls = "tag e" if f.grade == "strong-correlation" else "tag"
-        h.append(f"<li><b>{E(f.reason)}</b><br>{E(f.fix)}<span class='{cls}'>{E(GRADE_LABEL[f.grade])}</span>"
+        h.append(f"<li><b>{E(f.reason)}</b><br>{E(f.fix)}<br><span class='sub'>Evidence: {E(f.evidence)}</span><br><span class='{cls}'>{E(GRADE_LABEL[f.grade])}</span>"
                  f"<span class='tag'>effort: {E(f.effort)}</span></li>")
     h.append("</ol>")
     h.append("<div class='foot'><b>Method.</b> Fixed set of real customer questions for this trade and city, asked to each "
-             "assistant; every business name is checked against official registers (e.g. the US NPI registry). Identical AI "
+             "assistant; " + ("every business name is checked against official registers (e.g. the US NPI registry). " if reg else
+             "names are not checked against an official register for this trade. ") + "Identical AI "
              "lists repeat in under 1% of runs (SparkToro, Jan 2026), so we report rates, not ranks. We never promise a "
              "ranking and never use fake reviews. Not affiliated with OpenAI, Google, Perplexity or Anthropic.</div>")
     h.append("</div></body></html>")
