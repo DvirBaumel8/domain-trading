@@ -3,7 +3,8 @@
   "type": "object",
   "schemaVersion": 1,
   "required": [
-    "urls"
+    "urls",
+    "apiKey"
   ],
   "properties": {
     "urls": {
@@ -51,9 +52,9 @@
       ]
     },
     "apiKey": {
-      "title": "Google API key (optional)",
+      "title": "Google PageSpeed Insights API key",
       "type": "string",
-      "description": "Your own PageSpeed Insights API key. Without it the actor runs slowly within Google's keyless quota.",
+      "description": "Your own Google API key with the PageSpeed Insights API enabled. Required. It is never logged or written to the results.",
       "editor": "textfield",
       "isSecret": true
     }
