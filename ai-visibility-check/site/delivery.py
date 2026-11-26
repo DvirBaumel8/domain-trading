@@ -5,12 +5,14 @@ AIVIS_AUTORUN=1; the per-order cap defaults to 12.00 (config) and AIVIS_ORDER_CA
 logging are passed in by server.py. Nothing here emails anyone; alerts carry order id, status and
 cost only (never email, keys or report content).
 """
-import datetime, hashlib, hmac, os, queue, re, secrets, sys, threading
+import datetime, hashlib, hmac, html as _html, os, queue, re, secrets, sys, threading
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "engine"))
 
 TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{22,100}")
+import products                   # noqa: E402
+
 MAX_ATTEMPTS = 2
 SYNC = False                      # tests set True to run jobs inline
 _Q = queue.Queue()
@@ -76,6 +78,10 @@ def on_paid(store, oid, alert, lead=""):
         if lead:
             alert(lead)
         return
+    if o.get("order_type", "base") not in products.AUTORUN_TYPES:     # manual products never run an engine
+        if lead:
+            alert(lead)
+        return
     send = (lambda m: alert(lead + "; " + m)) if lead else alert
     if os.environ.get("AIVIS_AUTORUN") != "1":
         set_status(store, oid, "queued", send, "AIVIS_AUTORUN is off; build the report by hand")
@@ -106,7 +112,7 @@ def run_job(store, oid, alert, roster_fn=None, providers_fn=None):
     spent = 0.0
     for attempt in range(1, MAX_ATTEMPTS + 1):
         o, _ = store.get(f"orders/{oid}.json")
-        if o is None:
+        if o is None or o.get("order_type", "base") not in products.AUTORUN_TYPES:
             return
         set_status(store, oid, "running", alert, f"attempt {attempt}", attempts=attempt, spent_usd=round(spent, 4))
         try:
@@ -144,14 +150,24 @@ def status_page(store, token):
     if not o:
         return None
     st = o.get("status") or ("queued" if o.get("paid") else "awaiting payment")
+    manual = [m for m in (store.get(f"orders/{mid}.json")[0] for mid in o.get("manual_orders", [])
+                          if re.fullmatch(r"[A-Za-z0-9_-]{3,40}", str(mid))) if m]
+    body = ""
     if st == "ready":
         body = f'<h2>Your report is ready</h2><p><a href="/r/{token}">Open your report</a></p>'
     elif st == "failed":
         body = "<h2>Your report is taking longer than expected</h2><p>We are looking into it. This page updates when it is ready.</p>"
     elif st == "awaiting payment":
-        body = "<h2>Waiting for your payment</h2><p>This page updates once the payment is received.</p>"
+        if not manual:
+            body = "<h2>Waiting for your payment</h2><p>This page updates once the payment is received.</p>"
     else:
         body = "<h2>Your report is being prepared</h2><p>Refresh this page in a few minutes.</p>"
+    if manual:      # prepared by a person; there is never a link here until a human publishes the result
+        items = "".join(f"<li><b>{_html.escape(m.get('product_name', ''))}</b>: being prepared by hand, due by "
+                        f"{_html.escape(m.get('due_at', ''))}</li>" for m in manual)
+        body += ("<h2>Prepared by hand</h2><p>These items are done by a person, not automatically. "
+                 f"Each is due within {products.MANUAL_DELIVERY_BUSINESS_DAYS} business days of your payment and "
+                 f"details.</p><ul>{items}</ul>")
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow">'
             '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Your report</title>'
             '<link rel="stylesheet" href="/assets/style.css"></head><body><section><div class="wrap" style="max-width:720px">'
