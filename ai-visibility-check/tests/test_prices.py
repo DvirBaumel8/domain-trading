@@ -91,7 +91,7 @@ class MonthlyTests(unittest.TestCase):
             self.assertNotIn("Start ", a)
 
     def test_no_monthly_checkout_key_or_link(self):
-        self.assertNotIn("payLinkMonthly", read("assets", "config.js") + read("assets", "app.js") + read("index.html"))
+        self.assertNotIn("payLinkMonthly", read("assets", "app.js") + read("index.html"))
         self.assertNotIn("data-pay=\"payLinkMonthly", read("index.html"))
 
     def test_monthly_prices_unchanged(self):

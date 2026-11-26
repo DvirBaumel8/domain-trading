@@ -1,6 +1,6 @@
 """The one map of Polar products: product id -> order type, whether it autoruns, manual parts.
 
-Product ids are public identifiers, not secrets. Checkout URLs live only in site/assets/config.js.
+Product ids are public identifiers, not secrets. Checkout URLs live only in PAY_LINKS below; the served assets/config.js is generated from it.
 `price_usd` (integer dollars) is the one place prices live: the Dvir-approved Polar prices. The site's
 wording is checked against it in tests/test_addons.py.
 
@@ -8,7 +8,7 @@ Order types: base | maps | listings | content | bundle.
 Only `base` and `bundle` may reach the paid-run path (delivery.on_paid, behind its own gate).
 maps / listings / content are delivered by hand: no engine is ever called for them.
 """
-import datetime, re
+import datetime, os, re
 
 MANUAL_DELIVERY_BUSINESS_DAYS = 3        # Mon-Fri; inside the 5 business days promised in refunds.html
 
@@ -43,6 +43,28 @@ TYPES = {p["type"]: p for p in PRODUCTS.values()}
 # config.js key of each buy button -> order type (checked against the exact URLs in the tests)
 PAY_KEYS = {"payLinkCheck": "base", "payLinkMaps": "maps", "payLinkListings": "listings",
             "payLinkContent": "content", "payLinkBundle": "bundle"}
+
+# The one server-side map of Polar checkout URLs (public once shown, but the add-on ones are served only when
+# the ADDONS_CHECKOUT flag is on). The base check is always served.
+PAY_LINKS = {
+    "payLinkCheck": "https://buy.polar.sh/polar_cl_y4lp8S18BldD0ZyWWdevI07SSgM4eXEwJ6zOI4Fw8mv",
+    "payLinkMaps": "https://buy.polar.sh/polar_cl_WLbIDFdoECel8rAZTJvC6UaexF6pSCNv9MpoY1vyfj2",
+    "payLinkListings": "https://buy.polar.sh/polar_cl_m2zedkpR2g1l5AFs08clQMdfhGWqRr94czipg06Tuhk",
+    "payLinkContent": "https://buy.polar.sh/polar_cl_7Vku9OAnFyhBOiQTJtvGUXvSTSqJyV6B69tvV2UXXtw",
+    "payLinkBundle": "https://buy.polar.sh/polar_cl_oYtWtZ6fV3CZgv4QbZnQtpAlOs0Vta35Gx3zx2z7sjw",
+}
+ADDON_PAY_KEYS = ("payLinkMaps", "payLinkListings", "payLinkContent", "payLinkBundle")
+
+
+def addons_checkout_on():
+    """ADDONS_CHECKOUT, read at request time: only the exact string 'on' shows the add-on checkout buttons."""
+    return os.environ.get("ADDONS_CHECKOUT") == "on"
+
+
+def visible_pay_links():
+    """Checkout URLs that may appear in a served response right now (the single hook for any page or script)."""
+    on = addons_checkout_on()
+    return {k: u for k, u in PAY_LINKS.items() if on or k not in ADDON_PAY_KEYS}
 
 
 BILLING_REASON_PURCHASE = "purchase"     # Polar's billing_reason of a one-time purchase
