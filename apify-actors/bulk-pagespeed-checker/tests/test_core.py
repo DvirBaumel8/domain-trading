@@ -55,7 +55,7 @@ def drive(inp, handler):
 
 
 def test_full_fixture_with_field_data():
-    (ok, _), pushed, _ = drive({"urls": ["ex.com"], "strategies": ["mobile"], "categories": ["performance", "seo"]},
+    (ok, _), pushed, _ = drive({"urls": ["ex.com"], "apiKey": SECRET, "strategies": ["mobile"], "categories": ["performance", "seo"]},
                                lambda r: httpx.Response(200, json=FULL))
     row, charge = pushed[0]
     assert ok and charge and row["status"] == "ok" and row["url"] == "https://ex.com" and row["strategy"] == "mobile"
@@ -68,13 +68,13 @@ def test_full_fixture_with_field_data():
 
 
 def test_without_field_data_is_still_charged_ok():
-    _, pushed, _ = drive({"urls": ["https://ex.com"], "strategies": ["desktop"]}, lambda r: httpx.Response(200, json=NO_FIELD))
+    _, pushed, _ = drive({"urls": ["https://ex.com"], "apiKey": SECRET, "strategies": ["desktop"]}, lambda r: httpx.Response(200, json=NO_FIELD))
     row, charge = pushed[0]
     assert row["status"] == "ok" and charge and row["fieldDataPresent"] is False and row["fieldData"] is None and row["originFieldData"] is None
 
 
 def test_origin_fallback_is_not_url_field_data():
-    _, pushed, _ = drive({"urls": ["https://ex.com"], "strategies": ["mobile"]}, lambda r: httpx.Response(200, json=ORIGIN_ONLY))
+    _, pushed, _ = drive({"urls": ["https://ex.com"], "apiKey": SECRET, "strategies": ["mobile"]}, lambda r: httpx.Response(200, json=ORIGIN_ONLY))
     row, _ = pushed[0]
     assert row["fieldDataPresent"] is False and row["fieldData"] is None and row["originFieldData"]["lcpMs"]["category"] == "SLOW"
 
@@ -85,9 +85,9 @@ def test_default_both_strategies_and_params():
     def h(req):
         seen.append(req.url.params)
         return httpx.Response(200, json=NO_FIELD)
-    _, pushed, _ = drive({"urls": ["https://ex.com"]}, h)
+    _, pushed, _ = drive({"urls": ["https://ex.com"], "apiKey": SECRET}, h)
     assert sorted(p["strategy"] for p in seen) == ["desktop", "mobile"] and seen[0].get_list("category") == ["PERFORMANCE"]
-    assert "key" not in seen[0] and len(pushed) == 2
+    assert seen[0]["key"] == SECRET and len(pushed) == 2
 
 
 def test_429_then_success():
@@ -96,26 +96,26 @@ def test_429_then_success():
     def h(req):
         n["c"] += 1
         return httpx.Response(429) if n["c"] == 1 else httpx.Response(200, json=FULL)
-    _, pushed, _ = drive({"urls": ["https://ex.com"], "strategies": ["mobile"]}, h)
+    _, pushed, _ = drive({"urls": ["https://ex.com"], "apiKey": SECRET, "strategies": ["mobile"]}, h)
     assert n["c"] == 2 and pushed[0][0]["status"] == "ok" and pushed[0][1] is True
 
 
 def test_500_is_uncharged_error_row():
-    _, pushed, _ = drive({"urls": ["https://ex.com"], "strategies": ["mobile"]}, lambda r: httpx.Response(500, json={"error": {"message": "x"}}))
+    _, pushed, _ = drive({"urls": ["https://ex.com"], "apiKey": SECRET, "strategies": ["mobile"]}, lambda r: httpx.Response(500, json={"error": {"message": "x"}}))
     row, charge = pushed[0]
     assert row["status"] == "error" and "500" in row["error"] and charge is False and row["scores"] == {}
 
 
 def test_lighthouse_runtime_error_is_uncharged():
     bad = {"lighthouseResult": {"runtimeError": {"code": "FAILED_DOCUMENT_REQUEST"}}}
-    _, pushed, _ = drive({"urls": ["https://ex.com"], "strategies": ["mobile"]}, lambda r: httpx.Response(200, json=bad))
+    _, pushed, _ = drive({"urls": ["https://ex.com"], "apiKey": SECRET, "strategies": ["mobile"]}, lambda r: httpx.Response(200, json=bad))
     assert pushed[0][0]["status"] == "error" and "FAILED_DOCUMENT_REQUEST" in pushed[0][0]["error"] and pushed[0][1] is False
 
 
 def test_timeout_error_row_not_charged():
     def h(req):
         raise httpx.ReadTimeout("slow")
-    _, pushed, _ = drive({"urls": ["https://ex.com"], "strategies": ["mobile"]}, h)
+    _, pushed, _ = drive({"urls": ["https://ex.com"], "apiKey": SECRET, "strategies": ["mobile"]}, h)
     assert pushed[0][0]["error"] == "timeout" and pushed[0][1] is False
 
 
@@ -140,11 +140,51 @@ def test_key_not_in_transport_error_row():
     assert SECRET not in json.dumps(pushed)
 
 
-def test_status_message_mentions_keyless():
-    _, _, st = drive({"urls": ["https://ex.com"], "strategies": ["mobile"]}, lambda r: httpx.Response(200, json=NO_FIELD))
-    assert "keyless" in st[0].lower()
-    _, _, st = drive({"urls": ["https://ex.com"], "strategies": ["mobile"], "apiKey": SECRET}, lambda r: httpx.Response(200, json=NO_FIELD))
-    assert "keyless" not in st[0].lower() and SECRET not in st[0]
+def test_api_key_is_required_in_schema_and_run():
+    root = pathlib.Path(__file__).resolve().parents[1]
+    schema = json.loads((root / ".actor" / "input_schema.json").read_text())
+    assert schema["required"] == ["urls", "apiKey"] and schema["properties"]["apiKey"]["isSecret"] is True
+    text = (json.dumps(schema) + (root / "README.md").read_text() + (root / "src" / "runner.py").read_text()).lower()
+    assert "keyless" not in text and "without a key" not in text and "without it" not in text
+    for inp in ({"urls": ["https://ex.com"]}, {"urls": ["https://ex.com"], "apiKey": "  "}):
+        calls = []
+        (ok, msg), pushed, _ = drive(inp, lambda r: (calls.append(1), httpx.Response(200, json=FULL))[1])
+        assert not ok and "API key" in msg and pushed == [] and calls == []
+
+
+def test_http_errors_get_plain_reasons():
+    want = {400: "Bad API key or bad URL", 403: "not enabled for this API key", 500: "HTTP 500"}
+    for code, text in want.items():
+        _, pushed, _ = drive({"urls": ["https://ex.com"], "apiKey": SECRET, "strategies": ["mobile"]},
+                             lambda r, c=code: httpx.Response(c, json={"error": {"message": f"bad key {SECRET}"}}))
+        row, charge = pushed[0]
+        assert row["status"] == "error" and text in row["error"] and charge is False and SECRET not in json.dumps(row)
+
+
+def test_quota_429_stops_run_at_once(caplog):
+    caplog.set_level(logging.DEBUG)
+    n = {"c": 0}
+
+    def h(req):
+        n["c"] += 1
+        return httpx.Response(429, json={"error": {"message": f"Quota exceeded {req.url}"}})
+    urls = [f"https://ex{i}.com" for i in range(6)]
+    (ok, msg), pushed, statuses = drive({"urls": urls, "apiKey": SECRET}, h)
+    assert not ok and "Quota exceeded" in msg
+    assert n["c"] <= 4 * 3 and len(pushed) <= 3  # only tests already in flight; the rest never start
+    assert all(r["status"] == "error" and "Quota exceeded" in r["error"] and c is False for r, c in pushed)
+    blob = caplog.text + json.dumps(pushed) + msg + " ".join(statuses)
+    assert SECRET not in blob and "googleapis.com" not in blob
+
+
+def test_quota_after_some_success_ends_with_status_not_failure():
+    n = {"c": 0}
+
+    def h(req):
+        n["c"] += 1
+        return httpx.Response(200, json=FULL) if n["c"] == 1 else httpx.Response(429)
+    (ok, msg), pushed, _ = drive({"urls": [f"https://ex{i}.com" for i in range(8)], "apiKey": SECRET, "strategies": ["mobile"]}, h)
+    assert ok and "Quota exceeded" in msg and pushed[0][1] is True and len(pushed) < 8
 
 
 def test_empty_and_invalid_input_fails_without_charge():
@@ -155,5 +195,5 @@ def test_empty_and_invalid_input_fails_without_charge():
 
 def test_row_matches_dataset_schema():
     schema = json.loads((pathlib.Path(__file__).resolve().parents[1] / ".actor" / "dataset_schema.json").read_text())
-    _, pushed, _ = drive({"urls": ["https://ex.com"], "strategies": ["mobile"]}, lambda r: httpx.Response(200, json=FULL))
+    _, pushed, _ = drive({"urls": ["https://ex.com"], "apiKey": SECRET, "strategies": ["mobile"]}, lambda r: httpx.Response(200, json=FULL))
     assert set(pushed[0][0]) <= set(schema["fields"]["properties"])
