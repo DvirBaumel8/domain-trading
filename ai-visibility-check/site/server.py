@@ -29,6 +29,7 @@ import delivery                             # noqa: E402
 import products                             # noqa: E402
 import discovery                            # noqa: E402
 import refs                                 # noqa: E402
+import cities                               # noqa: E402
 import html as _html
 
 DATA = os.path.join(HERE, "data")
@@ -1002,6 +1003,12 @@ class H(http.server.BaseHTTPRequestHandler):
             if page is None:
                 return self._json(404, {"error": "not found"})
             return self._send(200, "text/html; charset=utf-8", render_page(page, self._origin()), cache=True)
+        r = cities.route(path, self.headers)
+        if r:
+            st, ctype, body = r
+            if st != 200:
+                return self._json(404, {"error": "not found"})
+            return self._send(200, ctype, render_page(body) if ctype.startswith("text/html") else body)
         m = re.fullmatch(r"/api/check/([a-f0-9-]{36})", path)
         if m:
             prune_jobs()
