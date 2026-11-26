@@ -28,6 +28,9 @@ from aivis.uscities import is_us_place  # noqa: E402
 from site_config import BUSINESS_ADDRESS, SUPPORT_EMAIL    # noqa: E402
 import delivery                             # noqa: E402
 import products                             # noqa: E402
+import polar_adapter                        # noqa: E402
+import agency                               # noqa: E402
+import agency_web                           # noqa: E402
 import discovery                            # noqa: E402
 import refs                                 # noqa: E402
 import cities                               # noqa: E402
@@ -55,8 +58,9 @@ ROSTER_OPENER = None        # tests inject a fake
 JOB_KEEP_SECONDS = 3600     # finished JOBS entries are dropped after this
 JOB_META = {}               # job id -> {"ip", "started", "finished"}; never sent to the browser
 CHECK_LOG = {}              # client address -> start times of recent checks
-PUBLIC_FILES = {"index.html", "agency.html", "privacy.html", "refunds.html", "sample-report.html",
+PUBLIC_FILES = {"index.html", "agency.html", "agency-terms.html", "privacy.html", "refunds.html", "sample-report.html",
                 "sample-report.pdf", "terms.html", "thanks.html", "favicon.ico"}
+AGENCY_ONLY_FILES = {"agency-terms.html"}    # served only while AIVIS_AGENCY=1
 PUBLIC_DIRS = {"assets": {".css", ".js", ".png"}}   # direct children only, these extensions only
 LOCAL_ORDERS = os.environ.get("ORDERS_LOCAL_DIR") or os.path.join(HERE, "..", "private-orders")
 
@@ -88,7 +92,7 @@ def render_addon_buttons(raw):
 
 def config_js():
     """The served assets/config.js, generated: add-on checkout URLs only when ADDONS_CHECKOUT is on."""
-    cfg = {"brand": "AI Visibility Check", **products.visible_pay_links(), "contactEmail": SUPPORT_EMAIL, "apiBase": ""}
+    cfg = {"brand": "AI Visibility Check", **products.visible_pay_links(), **products.agency_pay_links(), "contactEmail": SUPPORT_EMAIL, "apiBase": ""}
     return ("window.AIVIS_CONFIG = " + json.dumps(cfg, indent=2) + ";\n").encode()
 
 
@@ -369,7 +373,7 @@ def alert_text(kind, oid="", status="", ptype="", ref=""):
     """-> (title, body). Only the internal order id, the status, the product type and (for a payment with
     no order) the opaque Polar order id and a reason code. Every value is checked against a fixed shape."""
     oid = oid if re.fullmatch(r"(ORD-\d{6}-[a-f0-9]{6}|MAN-[a-f0-9]{12})", oid or "") else ""
-    ptype = ptype if ptype in products.TYPES else "unknown"
+    ptype = ptype if ptype in products.TYPES or ptype == "agency_bundle" else "unknown"
     status = re.sub(r"[^a-z_ ]", "", str(status or "").lower())[:30]
     ref = clean_ref(ref)
     what = ALERT_TITLES.get(kind, "alert")
@@ -448,37 +452,14 @@ def retry_pending_alerts(store):
 
 delivery.EVENT = notify_event
 delivery.CHANNEL = alerts_configured
+agency.install(lambda text: alert(text))
 
 
 def email_key(email):
     return hashlib.sha256(email.strip().lower().encode()).hexdigest()[:32]
 
 
-def verify_polar(secret, headers, body):
-    """Standard Webhooks signature: HMAC-SHA256 over '<id>.<timestamp>.<body>', base64, 'v1,' prefix."""
-    if not secret:
-        return False
-    mid, ts, sig = headers.get("webhook-id", ""), headers.get("webhook-timestamp", ""), headers.get("webhook-signature", "")
-    try:
-        if abs(time.time() - int(ts)) > 300:
-            return False
-    except ValueError:
-        return False
-    keys = []
-    if secret.startswith("whsec_"):          # Standard Webhooks: key is the base64-decoded part after the prefix
-        try:
-            keys.append(base64.b64decode(secret[len("whsec_"):]))
-        except ValueError:
-            pass
-    keys.append(secret.encode("utf-8"))      # legacy: the secret string itself
-    msg = f"{mid}.{ts}.".encode() + body
-    sigs = [c.split(",", 1)[1] for c in sig.split() if c.startswith("v1,")]
-    ok = False
-    for key in keys:
-        want = base64.b64encode(hmac.new(key, msg, hashlib.sha256).digest()).decode()
-        for s in sigs:
-            ok = hmac.compare_digest(want, s) or ok
-    return ok
+verify_polar = polar_adapter.verify      # the signature check lives in the one Polar adapter file
 
 
 def mark_paid(store, oid, ref):
@@ -645,6 +626,9 @@ def _process_paid(store, d, eid):
     meta_oid = str((d.get("metadata") or {}).get("order_id", "")).strip()
     ids = products.product_ids(d)
     info = products.PRODUCTS.get(ids[0]) if len(ids) == 1 else None
+    bundle = products.agency_info(ids[0]) if len(ids) == 1 and info is None else None
+    if bundle:          # agency bundle: one normalised event, one create-only bundle per Polar order id
+        return agency.handle_paid(store, polar_adapter.parse("order.paid", d), bundle, ref, alert, notify_event)
     rec, _ = store.get(f"purchases/{ref}.json")
     if rec and rec.get("done"):
         return {"status": "duplicate"}
@@ -749,7 +733,9 @@ def run_event(store, d, eid, etype, reraise=False):
     """Order matching, status changes and delivery start for one claimed event. A failure marks the event
     `failed` (payload kept) and alerts, so a retry or a human can pick it up."""
     try:
-        res = process_paid(store, d, eid) if etype == "order.paid" else {"status": "ignored"}
+        res = (process_paid(store, d, eid) if etype == "order.paid" else
+               agency.handle_refund(store, polar_adapter.parse(etype, d), clean_ref(d.get("id")) or "x", alert)
+               if etype == "order.refunded" and isinstance(d, dict) else {"status": "ignored"})
     except BaseException as e:
         log("event failed: " + type(e).__name__)
         try:
@@ -809,7 +795,7 @@ def handle_polar(headers, body):
     ev = json.loads(body or b"{}")
     d = ev.get("data") or {}
     etype = str(ev.get("type", ""))
-    if not claim_event(store, eid, etype, d if etype == "order.paid" else None):
+    if not claim_event(store, eid, etype, d if etype in ("order.paid", "order.refunded") else None):
         return 200, {"status": "duplicate"}
     if delivery.SYNC:
         return 200, run_event(store, d, eid, etype, reraise=True)
@@ -1051,11 +1037,17 @@ def health():
             "alerts": alerts_configured(), "orders_store": "remote" if Store().remote else "local"}
 
 
+def agency_heal(store):
+    if products.agency_on():
+        agency.heal(store)
+
+
 def maintenance_tick():
     """Resume lost runs, retry failed events and alerts, sweep stuck orders. One step failing never stops the rest."""
     store = Store()
     for step in (lambda: retry_events(store), lambda: delivery.resume_orders(store, alert),
-                 lambda: delivery.sweep_orders(store, notify_event), lambda: retry_pending_alerts(store)):
+                 lambda: delivery.sweep_orders(store, notify_event), lambda: retry_pending_alerts(store),
+                 lambda: agency_heal(store)):
         try:
             step()
         except Exception as e:
@@ -1113,6 +1105,40 @@ class H(http.server.BaseHTTPRequestHandler):
             raise ValueError("Request too large.")
         return self.rfile.read(n)
 
+    def _bounded(self, limit):
+        """Body of an agency route: its own limit, read in bounded chunks. An oversize body is drained (never held in
+        memory) up to 8 MB so the client gets the answer, then refused."""
+        raw = self.headers.get("Content-Length")
+        if raw is None or not re.fullmatch(r"[0-9]{1,9}", raw.strip()):
+            raise ValueError(BAD_FORM_MSG)
+        n = int(raw)
+        if n > limit:
+            left = min(n, 8 * 1024 * 1024)
+            while left > 0:
+                chunk = self.rfile.read(min(65536, left))
+                if not chunk:
+                    break
+                left -= len(chunk)
+            self.close_connection = True
+            raise ValueError("Request too large.")
+        return self.rfile.read(n)
+
+    def _agency(self, method):
+        """Agency routes; False (nothing sent) while AIVIS_AGENCY is off or the path is not one of theirs."""
+        u = urllib.parse.urlsplit(self.path)
+        if not (u.path.startswith("/agency/") or (u.path.startswith("/r/") and u.path.endswith(".pdf"))):
+            return False
+        try:
+            res = agency_web.handle(method, u.path, u.query, client_ip(self.headers, self.client_address[0]),
+                                    self._bounded, Store())
+        except Exception as e:
+            print("error:", type(e).__name__, file=sys.stderr)
+            res = (500, "application/json", b'{"error": "Something went wrong."}')
+        if res is None:
+            return False
+        self._send(res[0], res[1], res[2], private=True)
+        return True
+
     def _form(self):
         """The request body as a JSON object; anything else is a plain 400 that never quotes the parser."""
         raw = self._body()
@@ -1159,6 +1185,8 @@ class H(http.server.BaseHTTPRequestHandler):
         if m:
             prune_jobs()
             return self._json(200, JOBS.get(m.group(1), {"status": "unknown"}))
+        if self._agency("GET"):
+            return
         m = re.fullmatch(r"/(r|status)/(.*)", path)
         if m:
             try:
@@ -1195,13 +1223,19 @@ class H(http.server.BaseHTTPRequestHandler):
             ctype += "; charset=utf-8"
         with open(f, "rb") as fh:
             body = fh.read()
+        if os.path.basename(f) in AGENCY_ONLY_FILES and not products.agency_on():
+            return self._json(404, {"error": "not found"})
         if f.endswith(".html"):
+            if os.path.basename(f) == "agency.html" and products.agency_on():
+                body = agency_web.bundle_page(body)
             body = render_page(body, self._origin())
             refs.record_hit(self.path, f, HERE, DATA, save_line)
         return self._send(200, ctype, body)
 
     def do_POST(self):
         try:
+            if self._agency("POST"):
+                return
             if self.path == "/api/polar/webhook":
                 hdr = {k.lower(): v for k, v in self.headers.items()}
                 code, obj = handle_polar(hdr, self._body(MAX_HOOK_BODY))

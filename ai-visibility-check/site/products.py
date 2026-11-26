@@ -67,6 +67,37 @@ PAY_LINKS = {
 ADDON_PAY_KEYS = ("payLinkMaps", "payLinkListingsCheck", "payLinkListings", "payLinkContent", "payLinkBundle")
 
 
+# Agency report bundles (CR-133). Behind AIVIS_AGENCY: only the exact value '1' turns the feature on.
+# N reports -> proposed list price in whole USD (not live: no Polar product ids exist and the flag is off).
+AGENCY_BUNDLE_PRICES_USD = {1: 59, 5: 245, 10: 475, 25: 1075}
+# N reports -> Polar product id. EMPTY = not for sale. The four ids come later; none is invented here.
+AGENCY_PRODUCT_IDS = {1: "", 5: "", 10: "", 25: ""}
+AGENCY_PAY_KEYS = {"payLinkAgency1": 1, "payLinkAgency5": 5, "payLinkAgency10": 10, "payLinkAgency25": 25}
+AGENCY_PAY_LINKS = {"payLinkAgency1": "", "payLinkAgency5": "", "payLinkAgency10": "", "payLinkAgency25": ""}
+
+
+def agency_on():
+    """AIVIS_AGENCY, read at request time: only the exact string '1' turns the agency feature on."""
+    return os.environ.get("AIVIS_AGENCY") == "1"
+
+
+def agency_bundles():
+    """Product id -> {type: agency_bundle, reports: N, price_usd}, only for ids that are set (empty = not for sale)."""
+    return {pid: {"type": "agency_bundle", "name": "Agency report bundle", "reports": n,
+                  "price_usd": AGENCY_BUNDLE_PRICES_USD[n], "autorun": False, "manual": ()}
+            for n, pid in AGENCY_PRODUCT_IDS.items() if pid and n in AGENCY_BUNDLE_PRICES_USD}
+
+
+def agency_info(product_id):
+    """The bundle product for this id, or None (also None while the flag is off)."""
+    return agency_bundles().get(product_id) if agency_on() else None
+
+
+def agency_pay_links():
+    """Bundle checkout URLs to show: only non-empty ones, only with the flag on."""
+    return {k: u for k, u in AGENCY_PAY_LINKS.items() if u} if agency_on() else {}
+
+
 def addons_checkout_on():
     """ADDONS_CHECKOUT, read at request time: on by default; only the exact string 'off' hides the add-on buttons."""
     return os.environ.get("ADDONS_CHECKOUT") != "off"

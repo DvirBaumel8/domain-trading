@@ -25,6 +25,9 @@ CHANNEL = lambda: False           # server.py installs: is any alert channel con
 RESUME_STALE_SECONDS = 20 * 60    # a running order older than this is taken as lost
 STUCK_SECONDS = 2 * 3600
 ALERT_REPEAT_SECONDS = 6 * 3600
+GATE = lambda store, o: ""        # agency.py installs: a plain note when a run must wait (daily cap), else ""
+SETTLE = lambda store, o: None    # agency.py installs: a run ended (ready, or failed for good)
+RENDER_ARGS = lambda store, o: None   # agency.py installs: brand keywords for a bundle run's report
 
 
 def log(msg):
@@ -76,6 +79,8 @@ def set_status(store, oid, status, alert, note="", **extra):
     alert(msg)
     if status == "failed":
         EVENT(kind="failed", oid=oid, status=status, ptype=o.get("order_type", "base"))
+    if status == "ready" or (status == "failed" and not note.endswith("retrying")):
+        SETTLE(store, o)
     return o
 
 
@@ -173,6 +178,13 @@ def run_job(store, oid, alert, roster_fn=None, providers_fn=None):
         return
     spent = float(o.get("spent_usd") or 0)
     done = int(o.get("attempts") or 0)
+    if may_run(o) and not (done >= MAX_ATTEMPTS):
+        wait = GATE(store, o)
+        if wait:
+            note = "waiting: " + wait
+            if o.get("status") != "queued" or o.get("status_note") != note:
+                set_status(store, oid, "queued", alert, note, status_note=note)
+            return
     if may_run(o) and done >= MAX_ATTEMPTS:      # the limit is reached: no provider call
         set_status(store, oid, "failed", alert, "attempt limit reached", spent_usd=round(spent, 4))
         return
@@ -187,7 +199,9 @@ def run_job(store, oid, alert, roster_fn=None, providers_fn=None):
             cap = order_cap_usd()
             if spent >= cap - 1e-9:
                 raise JobFailed("spend cap reached", retryable=False)
-            files = build_report(o, cap - spent, roster_fn, providers_fn() if providers_fn else None)
+            args = RENDER_ARGS(store, o)
+            files = build_report({**o, "_render": args} if args else o, cap - spent, roster_fn,
+                                 providers_fn() if providers_fn else None)
             spent += files.pop("spent_usd")
             for name, text in files.items():           # publish only after the whole run passed
                 store.put_text(f"reports/{oid}/{name}", text)
@@ -272,6 +286,8 @@ def resume_orders(store, alert):
             over = True
         if int(o.get("attempts") or 0) >= MAX_ATTEMPTS or over:
             set_status(store, oid, "failed", alert, "attempt or spend limit reached", status_note="")
+        elif GATE(store, o):
+            continue                  # waits for the daily cap; it stays queued with its note
         else:
             set_status(store, oid, "queued", alert, "resumed", status_note="")
             enqueue(store, oid, alert)

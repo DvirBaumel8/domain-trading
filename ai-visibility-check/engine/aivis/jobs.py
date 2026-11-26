@@ -10,6 +10,7 @@ import tempfile
 from . import config
 from .niches import get_niche
 from .order import TIERS, AnswerShortfall, CapExceeded, Order, OrderError, run_order
+from . import stored
 from .report_pro import render
 from .roster import from_nppes
 
@@ -64,10 +65,16 @@ def build_report(order_dict, cap_usd, roster_fn=None, providers=None):
         except Exception as e:
             raise JobFailed("roster lookup failed: " + type(e).__name__) from None
     n, r = TIERS[order.plan]
+    rk = order_dict.get("_render")      # agency bundle run: brand options of the report (render keywords)
+    seen = []
+
+    def paint(x):
+        seen.append(x)
+        return render(x, sample=False, **rk) if rk else render(x, sample=False)
     with tempfile.TemporaryDirectory(prefix="aivis-job-") as tmp:
         try:
             res, log = run_order(order, mode="paid", cap_usd=cap_usd, roster=names, out_dir=tmp,
-                                 providers=providers, render=lambda x: render(x, sample=False))
+                                 providers=providers, render=paint)
         except AnswerShortfall as e:     # vendors answered too little: retryable, and it cost money
             raise JobFailed("engines under-answered: " + str(e)[:100], spent=e.spent,
                             retryable=e.spent < cap_usd - 1e-9) from None
@@ -88,6 +95,8 @@ def build_report(order_dict, cap_usd, roster_fn=None, providers=None):
                 e.retryable = False
             raise
         out = {"spent_usd": spent}
+        if rk and seen:         # kept so a re-brand can re-render without any new engine call
+            out["result.json"] = stored.dumps(stored.to_dict(seen[-1], rk.get("date") or ""))
         folder = os.path.join(tmp, order.order_id)
         for name in FILES:
             with open(os.path.join(folder, name), encoding="utf-8") as fh:

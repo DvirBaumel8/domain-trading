@@ -47,6 +47,13 @@ padding:1px 8px;margin-left:6px;background:#eef2ff;color:#3730a3}.tag.e{backgrou
 """
 
 
+def _agency_css(accent):
+    if not accent:
+        return ""
+    return (f".brand{{color:{accent}}}.bar i{{background:{accent}}}.q{{border-left-color:{accent}}}"
+            f".tag{{color:{accent}}}")
+
+
 def _alias_map(names, keep):
     letters = list(string.ascii_uppercase) + [a + b for a in string.ascii_uppercase for b in string.ascii_uppercase]
     out, i = {}, 0
@@ -66,8 +73,32 @@ def _vendor(provider):
     return FREE_MODEL if provider == "pollinations" else provider
 
 
+ACCENT_RE = re.compile(r"#[0-9a-fA-F]{6}")
+HEALTH_NICHES = frozenset({"dentist", "cosmetic_dentist", "orthodontist", "chiropractor", "med_spa", "veterinarian"})
+NOT_MEDICAL = "This report measures how AI assistants name businesses. It is not medical advice."
+UNBRANDED_NAME = "AI Visibility Report"
+
+
+def method_footer(result, date):
+    """The fixed method footer of every agency report (branded or not): engines used, answers counted,
+    run date, and the honest limits. Health niches add the not-medical-advice line."""
+    engines = ", ".join(sorted({f"{_vendor(p.provider)} ({p.mode})" for p in result.score.providers}))
+    text = (f"Method: engines used: {engines}. Answers counted: {result.score.total_answers}. Run date: {date}. "
+            "Results vary from run to run; no ranking is promised.")
+    if result.niche.key in HEALTH_NICHES:
+        text += " " + NOT_MEDICAL
+    return text
+
+
 def render(result, sample=False, anonymize=False, brand="AI Visibility Check", target_label=None,
-           run_note="", date=None, register=None, partial_note="", names_asked=None, names_min=0) -> str:
+           run_note="", date=None, register=None, partial_note="", names_asked=None, names_min=0,
+           logo=None, accent=None, hide_vendor=False, footer=None, prepared_for=None, contact_line=None) -> str:
+    """logo (a data: URI), accent (#rrggbb), hide_vendor, footer, prepared_for and contact_line are the agency
+    options: with none of them the output is byte-for-byte the same as before they existed."""
+    agency = bool(logo or accent or hide_vendor or footer or prepared_for or contact_line)
+    accent = accent if accent and ACCENT_RE.fullmatch(accent) else None
+    if logo and not re.fullmatch(r"data:image/(png|jpeg);base64,[A-Za-z0-9+/=]+", logo):
+        logo = None
     s = result.score
     target = result.target
     tlabel = target_label or target
@@ -102,10 +133,16 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
     models_txt = ("Engines and exact models: " + "; ".join(f"{E(p)} {E(m)}" for p, m in models) +
                   f"; run date {E(date)}. ") if models else ""
     h = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-         f"<title>{E(brand)} — {E(tlabel)}</title><style>{CSS}</style></head><body><div class='page'>"]
+         f"<title>{E(brand)} — {E(tlabel)}</title><style>{CSS}{_agency_css(accent) if agency else ''}</style></head><body><div class='page'>"]
     if sample:
         h.append("<div class='ribbon'>SAMPLE</div>")
-    h.append(f"<div class='brand'><i></i>{E(brand.upper())}</div>")
+    if agency:
+        mark = f"<img src='{logo}' alt='' style='max-height:44px;max-width:220px'>" if logo else ("" if hide_vendor else "<i></i>")
+        h.append(f"<div class='brand'>{mark}{E(brand.upper())}</div>")
+        if prepared_for:
+            h.append(f"<div class='sub'>Prepared for {E(prepared_for)}</div>")
+    else:
+        h.append(f"<div class='brand'><i></i>{E(brand.upper())}</div>")
     h.append(f"<h1>{E(tlabel)}</h1><div class='sub'>{E(niche_label(result.niche.label))} · {E(result.city)} · "
              f"{len(result.prompts)} customer questions · {s.total_answers} AI answers · {E(date)}</div>")
     if partial_note:
@@ -164,6 +201,11 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
         h.append(f"<li><b>{E(f.reason)}</b><br>{E(f.fix)}<br><span class='sub'>Evidence: {E(f.evidence)}</span><br><span class='{cls}'>{E(GRADE_LABEL[f.grade])}</span>"
                  f"<span class='tag'>effort: {E(f.effort)}</span></li>")
     h.append("</ol>")
+    if agency:
+        if contact_line:
+            h.append(f"<div class='foot'>{E(contact_line)}</div>")
+        h.append(f"<div class='foot'>{E(footer or method_footer(result, date))}</div></div></body></html>")
+        return "".join(h)
     h.append("<div class='foot'><b>Method.</b> Fixed set of real customer questions for this trade and city, asked to each "
              "assistant; " + ("every business name is checked against official registers (e.g. the US NPI registry). " if reg else
              "business names are listed as named by the AI and are not verified for this trade. ") + "Identical AI "
