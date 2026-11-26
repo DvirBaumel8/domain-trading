@@ -36,7 +36,7 @@
  <h2>Free quick check</h2><p class="sub">Tell us your business and city. If we already have data for your trade and city you'll see a result right away; otherwise we run a short free test.</p>
  <form id="checkform">
   <div class="row"><div><label for="business">Business name</label><input id="business" name="business" required maxlength="120" placeholder="Example Family Dental"></div>
-  <div><label for="city">City, State</label><input id="city" name="city" required pattern="[^,]+,\s*[A-Za-z]{2}" placeholder="Austin, TX"></div></div>
+  <div><label for="city">City, State</label><input id="city" name="city" required maxlength="60" pattern="[^,]{2,60},\s*(?:[Aa][Kk]|[Aa][Ll]|[Aa][Rr]|[Aa][Zz]|[Cc][Aa]|[Cc][Oo]|[Cc][Tt]|[Dd][Cc]|[Dd][Ee]|[Ff][Ll]|[Gg][Aa]|[Hh][Ii]|[Ii][Aa]|[Ii][Dd]|[Ii][Ll]|[Ii][Nn]|[Kk][Ss]|[Kk][Yy]|[Ll][Aa]|[Mm][Aa]|[Mm][Dd]|[Mm][Ee]|[Mm][Ii]|[Mm][Nn]|[Mm][Oo]|[Mm][Ss]|[Mm][Tt]|[Nn][Cc]|[Nn][Dd]|[Nn][Ee]|[Nn][Hh]|[Nn][Jj]|[Nn][Mm]|[Nn][Vv]|[Nn][Yy]|[Oo][Hh]|[Oo][Kk]|[Oo][Rr]|[Pp][Aa]|[Rr][Ii]|[Ss][Cc]|[Ss][Dd]|[Tt][Nn]|[Tt][Xx]|[Uu][Tt]|[Vv][Aa]|[Vv][Tt]|[Ww][Aa]|[Ww][Ii]|[Ww][Vv]|[Ww][Yy])" title="US businesses only: city and state like Austin, TX" placeholder="Austin, TX"></div></div>
   <div class="row"><div><label for="niche">Type of business</label><select id="niche" name="niche">
    <option value="dentist">Dentist</option><option value="orthodontist">Orthodontist</option><option value="cosmetic_dentist">Cosmetic dentist</option>
    <option value="personal_injury_lawyer">Personal injury lawyer</option><option value="criminal_defense_lawyer">Criminal defense lawyer</option><option value="family_law_attorney">Family law attorney</option>

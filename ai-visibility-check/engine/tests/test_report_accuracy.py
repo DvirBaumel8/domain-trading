@@ -116,5 +116,61 @@ class MatchName(unittest.TestCase):
         self.assertEqual(match_name("Oak Hill Dental Group", ["Oak Hill Family Dental"]), "Oak Hill Family Dental")
 
 
+
+class IntakeGateTests(unittest.TestCase):
+    def base(self, **kw):
+        return {"order_id": "ORD-1", "business_name": "Acme", "city": CITY, "niche": REG_NICHE, **kw}
+
+    def test_us_state_whitelist_incl_dc(self):
+        from aivis.order import US_STATES
+        self.assertEqual(len(US_STATES), 51); self.assertIn("DC", US_STATES)
+        for code in sorted(US_STATES):
+            Order.from_dict(self.base(city=f"Somewhere, {code}"))
+
+    def test_rejects_non_us_city(self):
+        from aivis.order import OrderError
+        for city in ("Tel Aviv, ZZ", "Toronto, ON", "Paris, FR", "Austin", "Austin, tx", "Austin, TXX"):
+            with self.assertRaises(OrderError, msg=city):
+                Order.from_dict(self.base(city=city))
+
+    def test_from_dict_keeps_paid_fields(self):
+        o = Order.from_dict(self.base(paid=True, paid_at="2026-11-26T10:00:00", paid_ref="pol_1"))
+        self.assertEqual((o.paid, o.paid_at, o.paid_ref), (True, "2026-11-26T10:00:00", "pol_1"))
+        self.assertFalse(Order.from_dict(self.base()).paid)
+
+    def test_unpaid_order_refused_in_paid_mode(self):
+        from aivis.order import OrderError
+        o = Order.from_dict(self.base())
+        with mock.patch.object(order_mod, "build_providers", side_effect=AssertionError("must not be reached")):
+            with self.assertRaises(OrderError) as cm:
+                run_order(o, mode="paid", out_dir=tempfile.mkdtemp())
+        self.assertIn("not marked paid", str(cm.exception))
+
+    def test_override_is_logged(self):
+        import io
+        from contextlib import redirect_stderr
+        o = Order.from_dict(self.base())
+        err = io.StringIO()
+        with mock.patch.object(order_mod, "build_providers", side_effect=RuntimeError("stop")), redirect_stderr(err):
+            with self.assertRaises(RuntimeError):
+                run_order(o, mode="paid", out_dir=tempfile.mkdtemp(), allow_unpaid=True)
+        self.assertIn("--allow-unpaid", err.getvalue()); self.assertIn("ORD-1", err.getvalue())
+
+    def test_paid_order_passes_gate(self):
+        o = Order.from_dict(self.base(paid=True))
+        with mock.patch.object(order_mod, "build_providers", side_effect=RuntimeError("stop")):
+            with self.assertRaises(RuntimeError):
+                run_order(o, mode="paid", out_dir=tempfile.mkdtemp())
+
+    def test_normalize_website(self):
+        from aivis.order import normalize_website
+        self.assertEqual(normalize_website("drainmasterohio.com"), "https://drainmasterohio.com")
+        self.assertEqual(normalize_website("http://a.com"), "http://a.com")
+        self.assertEqual(normalize_website(""), "")
+        for bad in ("a b", "ftp://a.com", "localhost", "https://"):
+            with self.assertRaises(ValueError, msg=bad):
+                normalize_website(bad)
+
+
 if __name__ == "__main__":
     unittest.main()

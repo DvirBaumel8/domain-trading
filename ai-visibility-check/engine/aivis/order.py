@@ -16,6 +16,7 @@ import datetime as _dt
 import json
 import os
 import re
+import sys
 import zlib
 from dataclasses import dataclass, field, asdict
 
@@ -36,8 +37,42 @@ TIERS = {                        # prompts x repeats per engine
 }
 
 
+US_STATES = frozenset(
+    "AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK "
+    "OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC".split())
+US_ONLY_MSG = ("The check covers US businesses only: enter the city like 'Austin, TX' "
+               "(a US state code or DC after the comma).")
+
+
 class OrderError(RuntimeError):
     pass
+
+
+def split_us_city(city, any_case=False):
+    """'Austin, TX' -> ('Austin', 'TX') if it ends with a US state code or DC, else None.
+    Lower-case codes only count with any_case=True (intake form); stored orders must be upper-case."""
+    m = re.fullmatch(r"([^,]{2,60}),\s*([A-Za-z]{2})", (city or "").strip())
+    if not m or (m.group(2) if not any_case else m.group(2).upper()) not in US_STATES:
+        return None
+    return m.group(1).strip(), m.group(2).upper()
+
+
+def normalize_website(raw):
+    """'' stays ''. Adds https:// when the scheme is missing. Raises ValueError on obviously invalid input."""
+    w = str(raw or "").strip()
+    if not w:
+        return ""
+    if re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://", w):
+        if not re.match(r"^https?://", w, re.I):
+            raise ValueError("The website must start with http:// or https:// (or just be like example.com).")
+    else:
+        w = "https://" + w
+    m = re.fullmatch(r"https?://([^/?#\s:@]+)(:\d{1,5})?([/?#]\S*)?", w, re.I)
+    host = m.group(1) if m else ""
+    if not m or len(w) > 200 or "." not in host or not re.fullmatch(r"[A-Za-z0-9.-]+", host) \
+            or host.startswith((".", "-")) or host.endswith((".", "-")) or ".." in host:
+        raise ValueError("That website doesn't look right. Enter it like example.com or https://example.com.")
+    return w
 
 
 @dataclass
@@ -51,6 +86,8 @@ class Order:
     plan: str = "check"          # check | lean | free
     engines: list = field(default_factory=lambda: list(PAID_ENGINES))
     paid_ref: str = ""           # payment reference (Polar order id), filled by the operator
+    paid: bool = False           # set by the Polar webhook; paid runs are refused unless True
+    paid_at: str = ""
     competitors: list = field(default_factory=list)
 
     @staticmethod
@@ -64,8 +101,8 @@ class Order:
             raise OrderError("order_id must be 3-40 letters, digits, - or _")
         if not self.business_name.strip():
             raise OrderError("business_name is required")
-        if not re.fullmatch(r"[^,]+,\s*[A-Z]{2}", self.city.strip()):
-            raise OrderError("city must look like 'Austin, TX' (US only)")
+        if split_us_city(self.city) is None:
+            raise OrderError(US_ONLY_MSG)
         if self.niche not in NICHES:
             raise OrderError(f"unknown niche {self.niche!r}; choose one of {sorted(NICHES)}")
         if self.plan not in TIERS:
@@ -110,9 +147,16 @@ def build_providers(order: Order, mode: str, cap_usd: float, roster=None, seed=0
 
 
 def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD, roster=None,
-              out_dir="orders", seed=0, render=None, dry_run=False, providers=None):
-    """Run one order. Returns (result, log dict). `providers` lets tests inject fakes."""
+              out_dir="orders", seed=0, render=None, dry_run=False, providers=None, allow_unpaid=False):
+    """Run one order. Returns (result, log dict). `providers` lets tests inject fakes.
+    Paid mode refuses unless order.paid is True, or the operator passes allow_unpaid (logged)."""
     order.validate()
+    if mode == "paid" and not dry_run and not order.paid:
+        if not allow_unpaid:
+            raise OrderError("order is not marked paid (paid:true missing); nothing was called. "
+                             "Operator override: --allow-unpaid")
+        print(f"WARNING: --allow-unpaid override used: running paid mode for unpaid order {order.order_id}",
+              file=sys.stderr)
     n, r = TIERS["free"] if mode == "free" else TIERS[order.plan]
     est = 0.0 if mode in ("free", "mock") else estimate_cost(order)
     log = {"order_id": order.order_id, "mode": mode, "plan": order.plan, "prompts": n, "repeats": r,

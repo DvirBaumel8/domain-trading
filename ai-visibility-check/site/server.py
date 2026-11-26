@@ -20,6 +20,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "engine"))
 from aivis.parse import match_name          # noqa: E402
 from aivis.niches import NICHES, get_niche  # noqa: E402
+from aivis.order import split_us_city, normalize_website, US_ONLY_MSG  # noqa: E402
 from site_config import BUSINESS_ADDRESS    # noqa: E402
 import html as _html
 
@@ -214,8 +215,8 @@ def handle_polar(headers, body):
     if ev.get("type") == "order.paid":
         ref = str(d.get("id", ""))[:60]
         email = str((d.get("customer") or {}).get("email") or d.get("customer_email") or "").strip().lower()
-        oid = str((d.get("metadata") or {}).get("order_id", ""))
-        if not re.fullmatch(r"ORD-\d{6}-[a-f0-9]{6}", oid):
+        oid = str((d.get("metadata") or {}).get("order_id", "")).strip()
+        if not re.fullmatch(r"ORD-\d{6}-[a-f0-9]{6}", oid) or store.get(f"orders/{oid}.json")[0] is None:
             oid = (store.get(f"index/{email_key(email)}.json")[0] or {}).get("order_id", "") if email else ""
         if oid and mark_paid(store, oid, ref):
             alert(f"Order {oid} PAID (Polar {ref})")
@@ -223,7 +224,7 @@ def handle_polar(headers, body):
         else:
             if email:   # payment arrived before the intake form: remember it
                 store.put(f"payments/{email_key(email)}.json", {"ref": ref}, overwrite=True)
-            alert(f"Polar payment {ref} has no matching order yet")
+            alert(f"UNMATCHED Polar payment {ref}: no order matched (metadata.order_id or email). Match it by hand.")
             res = {"status": "unmatched"}
     else:
         res = {"status": "ignored"}
@@ -236,7 +237,7 @@ def new_order(d, req):
     store = Store()
     oid = "ORD-" + datetime.date.today().strftime("%y%m%d") + "-" + uuid.uuid4().hex[:6]
     intake = {"order_id": oid, "business_name": req["business"], "city": req["city"],
-              "niche": req["niche"], "email": req["email"], "website": str(d.get("website", ""))[:200],
+              "niche": req["niche"], "email": req["email"], "website": req["website"],
               "plan": "check", "paid_ref": str(d.get("paid_ref", ""))[:60], "paid": False,
               "competitors": [c.strip()[:120] for c in str(d.get("competitors", "")).split(",") if c.strip()][:5]}
     store.put(f"orders/{oid}.json", intake)
@@ -264,12 +265,16 @@ def clean(d):
     city = str(d.get("city", "")).strip()[:60]
     niche = str(d.get("niche", "")).strip()
     email = str(d.get("email", "")).strip()[:160]
-    if not biz or not re.fullmatch(r"[^,]{2,40},\s*[A-Za-z]{2}", city) or niche not in NICHES:
+    if not biz or niche not in NICHES:
         raise ValueError("Please enter a business name, a US city like 'Austin, TX', and a business type.")
+    parts = split_us_city(city, any_case=True)
+    if parts is None:
+        raise ValueError(US_ONLY_MSG)
     if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         raise ValueError("That email doesn't look right.")
-    city = city.split(",")[0].strip().title() + ", " + city.split(",")[1].strip().upper()
-    return {"business": biz, "city": city, "niche": niche, "email": email, "consent": bool(d.get("consent"))}
+    city = parts[0].title() + ", " + parts[1]
+    return {"business": biz, "city": city, "niche": niche, "email": email, "consent": bool(d.get("consent")),
+            "website": normalize_website(d.get("website", ""))}
 
 
 def instant(req):

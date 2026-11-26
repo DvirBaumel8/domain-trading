@@ -242,6 +242,58 @@ class OrderAndPolarTests(Base):
         oid = self.order("early@x.co")
         self.assertTrue(self.stored(oid)["paid"])
 
+    def test_unmatched_payment_alerts_with_polar_id_only(self):
+        body = json.dumps({"type": "order.paid", "data": {"id": "pol_unm", "customer": {"email": "nobody@x.co"},
+                                                          "metadata": {"order_id": "ORD-000000-abcdef"}}}).encode()
+        self.assertEqual(json.loads(self.hook(body, mid="evt-unm")[1])["status"], "unmatched")
+        self.assertEqual(len(self.sent), 1)
+        txt = json.dumps(self.sent)
+        self.assertIn("pol_unm", txt); self.assertIn("UNMATCHED", txt)
+        self.assertNotIn("nobody", txt); self.assertNotIn("@", txt)
+
+    def test_metadata_wins_over_email(self):
+        a = self.order("one@x.co"); b = self.order("two@x.co")
+        body = json.dumps({"type": "order.paid", "data": {"id": "pol_w", "customer": {"email": "one@x.co"},
+                                                          "metadata": {"order_id": b}}}).encode()
+        self.hook(body, mid="evt-win")
+        self.assertTrue(self.stored(b)["paid"]); self.assertFalse(self.stored(a)["paid"])
+
+    def test_email_match_trimmed_case_insensitive(self):
+        oid = self.order("  Mixed@Case.Co ")
+        body = json.dumps({"type": "order.paid", "data": {"id": "pol_ci", "customer": {"email": " MIXED@case.co  "}}}).encode()
+        self.assertEqual(json.loads(self.hook(body, mid="evt-ci")[1])["order_id"], oid)
+
+    def test_intake_rejects_non_us_city(self):
+        for city in ("Tel Aviv, ZZ", "Toronto, ON", "Austin", "Paris, FR"):
+            st, b = self.post("/api/intake", {**ORDER, "city": city})
+            self.assertEqual(st, 400, city); self.assertIn("US businesses only", json.loads(b)["error"])
+
+    def test_intake_accepts_all_states_and_dc(self):
+        for code in ("dc", "DC", "tx", "WY", "AK", "HI"):
+            self.assertEqual(self.post("/api/intake", {**ORDER, "city": f"Springfield, {code}"})[0], 200, code)
+
+    def test_intake_normalises_website(self):
+        oid = json.loads(self.post("/api/intake", {**ORDER, "website": " drainmasterohio.com/x "})[1])["order_id"]
+        self.assertEqual(self.stored(oid)["website"], "https://drainmasterohio.com/x")
+        oid = json.loads(self.post("/api/intake", {**ORDER, "website": ""})[1])["order_id"]
+        self.assertEqual(self.stored(oid)["website"], "")
+
+    def test_intake_rejects_bad_website(self):
+        for w in ("not a site", "ftp://x.com", "http://", "localhost", "javascript:alert(1)"):
+            st, b = self.post("/api/intake", {**ORDER, "website": w})
+            self.assertEqual(st, 400, w)
+
+    def test_city_pattern_in_forms_matches_whitelist(self):
+        import re
+        for page in ("index.html", "thanks.html"):
+            t = open(os.path.join(server.HERE, page), encoding="utf-8").read()
+            pat = re.search(r'name="city"[^>]*pattern="([^"]+)"', t).group(1)
+            self.assertIn('maxlength="60"', t)
+            for ok in ("Austin, TX", "Washington, dc"):
+                self.assertTrue(re.fullmatch(pat, ok), (page, ok))
+            for bad in ("Tel Aviv, ZZ", "Toronto, ON", "Austin, T"):
+                self.assertFalse(re.fullmatch(pat, bad), (page, bad))
+
     def test_other_events_ignored(self):
         body = json.dumps({"type": "checkout.created", "data": {}}).encode()
         self.assertEqual(json.loads(self.hook(body, mid="evt-other")[1])["status"], "ignored")
