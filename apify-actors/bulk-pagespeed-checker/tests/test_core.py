@@ -5,6 +5,7 @@ import pathlib
 import sys
 
 import httpx
+import pytest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from src import core, runner  # noqa: E402
@@ -32,6 +33,11 @@ FULL = {"lighthouseResult": lh({"seo": {"score": 1.0}}),
 NO_FIELD = {"lighthouseResult": lh(), "loadingExperience": {"id": "x", "initial_url": "x"}}
 ORIGIN_ONLY = {"lighthouseResult": lh(), "loadingExperience": {"origin_fallback": True, "overall_category": "SLOW", "metrics": {
     "LARGEST_CONTENTFUL_PAINT_MS": {"percentile": 5000, "category": "SLOW"}}}}
+
+
+@pytest.fixture(autouse=True)
+def _no_env_key(monkeypatch):
+    monkeypatch.delenv("PAGESPEED_API_KEY", raising=False)
 
 
 async def nosleep(_):
@@ -140,10 +146,10 @@ def test_key_not_in_transport_error_row():
     assert SECRET not in json.dumps(pushed)
 
 
-def test_api_key_is_required_in_schema_and_run():
+def test_api_key_is_optional_in_schema_and_missing_everywhere_fails():
     root = pathlib.Path(__file__).resolve().parents[1]
     schema = json.loads((root / ".actor" / "input_schema.json").read_text())
-    assert schema["required"] == ["urls", "apiKey"] and schema["properties"]["apiKey"]["isSecret"] is True
+    assert schema["required"] == ["urls"] and schema["properties"]["apiKey"]["isSecret"] is True
     text = (json.dumps(schema) + (root / "README.md").read_text() + (root / "src" / "runner.py").read_text()).lower()
     assert "keyless" not in text and "without a key" not in text and "without it" not in text
     for inp in ({"urls": ["https://ex.com"]}, {"urls": ["https://ex.com"], "apiKey": "  "}):
@@ -197,3 +203,106 @@ def test_row_matches_dataset_schema():
     schema = json.loads((pathlib.Path(__file__).resolve().parents[1] / ".actor" / "dataset_schema.json").read_text())
     _, pushed, _ = drive({"urls": ["https://ex.com"], "apiKey": SECRET, "strategies": ["mobile"]}, lambda r: httpx.Response(200, json=FULL))
     assert set(pushed[0][0]) <= set(schema["fields"]["properties"])
+
+
+ENV_KEY = "AIzaENVKEY456"
+URL_INP = {"urls": ["https://ex.com"], "strategies": ["mobile"]}
+
+
+def keys_sent(inp):
+    seen = []
+    res = drive(inp, lambda r: (seen.append(r.url.params.get("key")), httpx.Response(200, json=FULL))[1])
+    return seen, res
+
+
+def test_env_key_used_when_input_missing(monkeypatch):
+    monkeypatch.setenv("PAGESPEED_API_KEY", ENV_KEY)
+    seen, ((ok, _), _, _) = keys_sent(dict(URL_INP))
+    assert ok and seen == [ENV_KEY]
+
+
+@pytest.mark.parametrize("blank", ["", "   ", "\t\n", None])
+def test_env_key_used_when_input_blank(monkeypatch, blank):
+    monkeypatch.setenv("PAGESPEED_API_KEY", f"  {ENV_KEY} ")
+    seen, ((ok, _), _, _) = keys_sent({**URL_INP, "apiKey": blank})
+    assert ok and seen == [ENV_KEY]
+
+
+def test_input_key_overrides_env(monkeypatch):
+    monkeypatch.setenv("PAGESPEED_API_KEY", ENV_KEY)
+    seen, ((ok, _), _, _) = keys_sent({**URL_INP, "apiKey": SECRET})
+    assert ok and seen == [SECRET]
+
+
+@pytest.mark.parametrize("env", [None, "", "  "])
+def test_both_missing_keeps_existing_error(monkeypatch, env):
+    if env is not None:
+        monkeypatch.setenv("PAGESPEED_API_KEY", env)
+    seen, ((ok, msg), pushed, _) = keys_sent({**URL_INP, "apiKey": "  "})
+    assert not ok and msg == runner.KEY_MISSING and pushed == [] and seen == []
+
+
+def test_env_and_input_keys_never_leak(monkeypatch, caplog):
+    caplog.set_level(logging.DEBUG)
+    monkeypatch.setenv("PAGESPEED_API_KEY", ENV_KEY)
+    for inp in (dict(URL_INP), {**URL_INP, "apiKey": SECRET}):
+        for code in (200, 500):
+            caplog.clear()
+            (ok, msg), pushed, statuses = drive(inp, lambda r: httpx.Response(code, json=FULL))
+            blob = caplog.text + json.dumps(pushed) + msg + " ".join(statuses)
+            assert ENV_KEY not in blob and SECRET not in blob
+
+    def h(req):
+        raise httpx.ConnectError(f"failed {req.url}")
+    _, pushed, statuses = drive(dict(URL_INP), h)
+    assert ENV_KEY not in json.dumps(pushed) + " ".join(statuses) + caplog.text
+
+
+def rows_inp(n, **extra):
+    return {"urls": [f"https://ex{i}.com" for i in range(n)], "strategies": ["mobile"], **extra}
+
+
+def test_fallback_run_over_cap_processes_first_50_with_message(monkeypatch, caplog):
+    caplog.set_level(logging.DEBUG)
+    monkeypatch.setenv("PAGESPEED_API_KEY", ENV_KEY)
+    seen, ((ok, msg), pushed, statuses) = keys_sent(rows_inp(60))
+    assert ok and len(seen) == 50 and len(pushed) == 50
+    assert "Free runs check up to 50 URL/strategy rows" in msg and "apiKey field to check more" in msg
+    assert ENV_KEY not in msg + json.dumps(pushed) + " ".join(statuses) + caplog.text
+
+
+@pytest.mark.parametrize("n", [1, 50])
+def test_fallback_run_within_cap_has_no_message(monkeypatch, n):
+    monkeypatch.setenv("PAGESPEED_API_KEY", ENV_KEY)
+    seen, ((ok, msg), pushed, _) = keys_sent(rows_inp(n))
+    assert ok and len(pushed) == n and "Free runs" not in msg
+
+
+def test_blank_input_key_is_fallback_and_capped(monkeypatch):
+    monkeypatch.setenv("PAGESPEED_API_KEY", ENV_KEY)
+    seen, ((ok, msg), pushed, _) = keys_sent(rows_inp(60, apiKey="  "))
+    assert len(pushed) == 50 and "Free runs" in msg
+
+
+def test_own_key_has_no_cap(monkeypatch, caplog):
+    caplog.set_level(logging.DEBUG)
+    monkeypatch.setenv("PAGESPEED_API_KEY", ENV_KEY)
+    seen, ((ok, msg), pushed, statuses) = keys_sent(rows_inp(60, apiKey=SECRET))
+    assert ok and len(pushed) == 60 and set(seen) == {SECRET} and "Free runs" not in msg
+    assert SECRET not in msg + json.dumps(pushed) + " ".join(statuses) + caplog.text
+
+
+def test_cap_env_override_and_bad_values(monkeypatch):
+    monkeypatch.setenv("PAGESPEED_API_KEY", ENV_KEY)
+    monkeypatch.setenv("PAGESPEED_FALLBACK_ROW_CAP", "5")
+    _, ((ok, msg), pushed, _) = keys_sent(rows_inp(8))
+    assert len(pushed) == 5 and "up to 5 URL/strategy rows" in msg
+    monkeypatch.setenv("PAGESPEED_FALLBACK_ROW_CAP", "junk")
+    assert runner.fallback_row_cap() == 50
+    monkeypatch.setenv("PAGESPEED_FALLBACK_ROW_CAP", "0")
+    assert runner.fallback_row_cap() == 50
+
+
+def test_cap_is_not_an_input_field():
+    schema = json.loads((pathlib.Path(__file__).resolve().parents[1] / ".actor/input_schema.json").read_text())
+    assert not any("cap" in k.lower() for k in schema["properties"])
