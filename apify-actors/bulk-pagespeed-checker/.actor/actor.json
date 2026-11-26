@@ -3,7 +3,7 @@
   "name": "bulk-pagespeed-checker",
   "title": "Bulk PageSpeed & Core Web Vitals Checker",
   "description": "Run Google PageSpeed Insights on many URLs. Returns category scores, lab metrics and real-user Core Web Vitals (field data) for mobile and desktop. Uses only the official PageSpeed Insights API v5.",
-  "version": "0.1.0",
+  "version": "0.1",
   "buildTag": "latest",
   "meta": {
     "templateId": "python-empty"

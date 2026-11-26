@@ -3,7 +3,7 @@
   "name": "broken-link-auditor",
   "title": "Broken Link & URL Status Auditor",
   "description": "Check the HTTP status of a list of URLs, a sitemap or a whole site crawl. Returns the final status, the redirect chain, loops, response time and content type, and for crawls the source page and anchor text of every link.",
-  "version": "0.1.0",
+  "version": "0.1",
   "buildTag": "latest",
   "meta": {
     "templateId": "python-empty"

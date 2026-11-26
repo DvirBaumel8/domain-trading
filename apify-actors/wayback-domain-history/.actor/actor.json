@@ -3,7 +3,7 @@
   "name": "wayback-domain-history",
   "title": "Wayback Domain History",
   "description": "Archive history of any domain from the Internet Archive: first and last capture, snapshots per year, status codes, gaps and sample snapshot links. Uses only public Internet Archive APIs.",
-  "version": "0.1.0",
+  "version": "0.1",
   "buildTag": "latest",
   "meta": {
     "templateId": "python-empty"

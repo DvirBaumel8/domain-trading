@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0
+## 0.1.0 (actor.json version `0.1`; Apify needs MAJOR.MINOR)
 - First version (CR-129). Private and unpublished. No price is set in the repo (pay-per-event `result`, set on Apify).
 
 ## Release checklist
