@@ -24,6 +24,7 @@ from aivis.order import US_STATES, US_ONLY_MSG, normalize_website
 from aivis.uscities import is_us_place  # noqa: E402
 from site_config import BUSINESS_ADDRESS    # noqa: E402
 import delivery                             # noqa: E402
+import discovery                            # noqa: E402
 import html as _html
 
 DATA = os.path.join(HERE, "data")
@@ -38,8 +39,9 @@ PUBLIC_DIRS = {"assets": {".css", ".js", ".png"}}   # direct children only, thes
 LOCAL_ORDERS = os.environ.get("ORDERS_LOCAL_DIR") or os.path.join(HERE, "..", "private-orders")
 
 
-def render_page(raw):
-    """Fill the {{BUSINESS_ADDRESS}} token of a static HTML page from site_config."""
+def render_page(raw, origin=""):
+    """Fill the {{BUSINESS_ADDRESS}} token (and the discovery tokens) of an HTML page."""
+    raw = discovery.fill_tokens(raw, origin)
     return raw.replace(b"{{BUSINESS_ADDRESS}}", _html.escape(BUSINESS_ADDRESS).encode())
 
 
@@ -368,8 +370,13 @@ class H(http.server.BaseHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(b)
 
-    def _send(self, code, ctype, body, private=False):
+    def _origin(self):
+        return discovery.public_origin(self.headers.get("Host"), self.headers.get("X-Forwarded-Proto"))
+
+    def _send(self, code, ctype, body, private=False, cache=False):
         self.send_response(code); self.send_header("Content-Type", ctype)
+        if cache:
+            self.send_header("Cache-Control", "public, max-age=3600")
         if private:
             for k, v in (("X-Robots-Tag", "noindex, nofollow"), ("Cache-Control", "no-store"),
                          ("Referrer-Policy", "no-referrer")):
@@ -395,7 +402,17 @@ class H(http.server.BaseHTTPRequestHandler):
         if path in ("/health", "/healthz"):
             return self._json(200, {"ok": True})
         if path == "/robots.txt":
-            return self._send(200, "text/plain", b"User-agent: *\nAllow: /\nDisallow: /data/\nDisallow: /api/\nDisallow: /r/\nDisallow: /status/\n")
+            return self._send(200, "text/plain; charset=utf-8", discovery.robots_txt(self._origin()).encode(), cache=True)
+        if path == "/sitemap.xml":
+            return self._send(200, "application/xml; charset=utf-8", discovery.sitemap_xml(self._origin()).encode(), cache=True)
+        if path == "/llms.txt":
+            return self._send(200, "text/plain; charset=utf-8", discovery.llms_txt(self._origin()).encode(), cache=True)
+        if path == "/for" or path.startswith("/for/"):     # trade pages: allow-listed slugs only
+            m = re.fullmatch(r"/for/([a-z0-9-]{1,80})", path)
+            page = discovery.trade_page(m.group(1), self._origin()) if m else None
+            if page is None:
+                return self._json(404, {"error": "not found"})
+            return self._send(200, "text/html; charset=utf-8", render_page(page, self._origin()), cache=True)
         m = re.fullmatch(r"/api/check/([a-f0-9-]{36})", path)
         if m:
             return self._json(200, JOBS.get(m.group(1), {"status": "unknown"}))
@@ -426,7 +443,7 @@ class H(http.server.BaseHTTPRequestHandler):
         with open(f, "rb") as fh:
             body = fh.read()
         if f.endswith(".html"):
-            body = render_page(body)
+            body = render_page(body, self._origin())
         return self._send(200, ctype, body)
 
     def do_POST(self):
