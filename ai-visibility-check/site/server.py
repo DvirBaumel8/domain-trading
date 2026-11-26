@@ -16,9 +16,12 @@ Only the files in PUBLIC_FILES / PUBLIC_DIRS are served. Nothing here sends emai
 import argparse, base64, datetime, hashlib, hmac, http.server, json, mimetypes, os, posixpath, re, sys, threading, time, urllib.parse, urllib.request, uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "engine"))
 from aivis.parse import match_name          # noqa: E402
 from aivis.niches import NICHES, get_niche  # noqa: E402
+from site_config import BUSINESS_ADDRESS    # noqa: E402
+import html as _html
 
 DATA = os.path.join(HERE, "data")
 JOBS = {}
@@ -30,6 +33,11 @@ PUBLIC_FILES = {"index.html", "agency.html", "privacy.html", "refunds.html", "sa
                 "sample-report.pdf", "terms.html", "thanks.html"}
 PUBLIC_DIRS = {"assets": {".css", ".js", ".png"}}   # direct children only, these extensions only
 LOCAL_ORDERS = os.environ.get("ORDERS_LOCAL_DIR") or os.path.join(HERE, "..", "private-orders")
+
+
+def render_page(raw):
+    """Fill the {{BUSINESS_ADDRESS}} token of a static HTML page from site_config."""
+    return raw.replace(b"{{BUSINESS_ADDRESS}}", _html.escape(BUSINESS_ADDRESS).encode())
 
 
 def log(msg):
@@ -344,7 +352,10 @@ class H(http.server.BaseHTTPRequestHandler):
         if ctype.startswith("text/"):
             ctype += "; charset=utf-8"
         with open(f, "rb") as fh:
-            return self._send(200, ctype, fh.read())
+            body = fh.read()
+        if f.endswith(".html"):
+            body = render_page(body)
+        return self._send(200, ctype, body)
 
     def do_POST(self):
         try:
