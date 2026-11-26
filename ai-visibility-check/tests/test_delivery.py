@@ -17,6 +17,7 @@ from aivis.order import PAID_ENGINES  # noqa: E402
 spec = importlib.util.spec_from_file_location("fake_apis", os.path.join(HERE, "..", "..", "docs", "requests", "avc-mock-run", "fake_apis.py"))
 fake_apis = importlib.util.module_from_spec(spec); spec.loader.exec_module(fake_apis)
 
+BASE_PID = "5a9d5f7a-72a6-4ea4-8ae7-e9d4ac498fde"   # base product (site/products.py)
 EMAIL = "buyer.secret@example.com"
 KEYS = {"OPENAI_API_KEY": "k1", "PERPLEXITY_API_KEY": "k2", "GEMINI_API_KEY": "k3", "ANTHROPIC_API_KEY": "k4"}
 ORDER = {"business": "DrainMaster", "city": "Columbus, OH", "niche": "plumber", "email": EMAIL, "website": ""}
@@ -68,7 +69,7 @@ class DeliveryTests(unittest.TestCase):
 
     def paid_order(self):
         oid, token = server.new_order(dict(ORDER), dict(ORDER, consent=True))
-        body = json.dumps({"type": "order.paid", "data": {"id": "pol_1", "metadata": {"order_id": oid},
+        body = json.dumps({"type": "order.paid", "data": {"product_id": BASE_PID, "id": "pol_1", "metadata": {"order_id": oid},
                                                          "customer": {"email": EMAIL}}}).encode()
         code, res = server.handle_polar(sign(body, "evt-" + oid), body)
         self.assertEqual((code, res["status"]), (200, "paid"))

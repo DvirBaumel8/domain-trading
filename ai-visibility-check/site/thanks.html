@@ -2,7 +2,7 @@
 <title>Thank you — tell us about your business</title><link rel="stylesheet" href="assets/style.css"></head><body>
 <nav><div class="wrap"><a class="logo" href="index.html"><i></i>AI Visibility Check</a></div></nav>
 <section><div class="wrap" style="max-width:720px">
-<h2>Thanks for your order</h2><p class="sub">Two minutes of details and we start. Your report appears on a private page within 2 business days (we email nothing automatically).</p>
+<h2>Thanks for your order</h2><p class="sub">Two minutes of details and we start. Your AI Visibility Check report appears on a private page within 2 business days (we email nothing automatically). Add-ons (Google Maps Visibility Check, Listings Consistency Audit, AI Content Pack) are done by hand and delivered within 3 business days of your payment and these details; your private page shows the due date.</p>
 <form id="intake" class="card">
  <div class="row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
   <div><label>Business name (as customers know it)</label><input name="business" required maxlength="120"></div>
@@ -19,7 +19,7 @@
 document.getElementById("intake").addEventListener("submit", async e => {
   e.preventDefault(); const f = e.target, m = document.getElementById("msg");
   try { const r = await fetch((window.AIVIS_CONFIG.apiBase||"") + "/api/intake", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(Object.fromEntries(new FormData(f).entries()))});
-    const j = await r.json(); if (!r.ok) throw new Error(j.error); m.innerHTML = "<b>Received.</b> Order " + j.order_id + ". Your report appears on <a href='" + (window.AIVIS_CONFIG.apiBase||"") + j.status_url + "'>your private status page</a> when it is ready. Bookmark it.";
+    const j = await r.json(); if (!r.ok) throw new Error(j.error); m.innerHTML = "<b>Received.</b> Order " + j.order_id + ". Your report and the due dates of any add-ons appear on <a href='" + (window.AIVIS_CONFIG.apiBase||"") + j.status_url + "'>your private status page</a> Bookmark it.";
   } catch(err) { m.textContent = "Preview mode: not connected (" + (err.message||err) + ")."; }
 });
 </script><footer><div class="wrap">
