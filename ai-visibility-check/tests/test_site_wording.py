@@ -1,7 +1,27 @@
 import pathlib
+import re
+import sys
 import unittest
 
-SITE = pathlib.Path(__file__).resolve().parent.parent / "site"
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+SITE = ROOT / "site"
+sys.path.insert(0, str(SITE))
+sys.path.insert(0, str(ROOT / "engine"))
+import server  # noqa: E402
+from site_config import BUSINESS_ADDRESS  # noqa: E402
+
+OLD_ADDRESS = "Physical postal address"
+BANNED = [OLD_ADDRESS, "should be confirmed before the terms take effect", "Fix & Track", "Fix &amp; Track",
+          "TODO", "FIXME", "TBD", "lorem ipsum", "placeholder text", "draft text", "[Your ", "address appears after launch"]
+
+
+def served_pages():
+    return {n: server.render_page((SITE / n).read_bytes()).decode() for n in sorted(server.PUBLIC_FILES) if n.endswith(".html")}
+
+
+def email_templates():
+    return {str(p.relative_to(ROOT)): p.read_text(encoding="utf-8") for p in (ROOT / "engine").rglob("*.py")
+            if "email" in p.name.lower() or "footer" in p.name.lower()}
 
 
 class SiteWording(unittest.TestCase):
@@ -12,6 +32,34 @@ class SiteWording(unittest.TestCase):
                 if "paypal" in p.read_text(encoding="utf-8", errors="ignore").lower():
                     hits.append(str(p.relative_to(SITE)))
         self.assertEqual(hits, [])
+
+    def test_no_draft_or_placeholder_text(self):
+        hits = []
+        for name, text in {**served_pages(), **email_templates()}.items():
+            low = text.lower()
+            hits += [f"{name}: {b}" for b in BANNED if b.lower() in low]
+            if re.search(r"\[[^\]]*(added before|to be added|insert|your address)[^\]]*\]", text, re.I):
+                hits.append(f"{name}: bracket placeholder")
+        self.assertEqual(hits, [])
+
+    def test_address_comes_from_one_constant(self):
+        self.assertEqual(BUSINESS_ADDRESS, "Dvir Baumel, A.D Gordon 18, Tel Aviv 6340726, Israel")
+        for p in SITE.glob("*.html"):
+            raw = p.read_text(encoding="utf-8")
+            self.assertNotIn("A.D Gordon", raw, p.name)          # no hard-coded copy
+            if p.name in {"sample-report.html"}:
+                continue
+            self.assertIn("{{BUSINESS_ADDRESS}}", raw, p.name)
+            self.assertIn(BUSINESS_ADDRESS, served_pages()[p.name], p.name)
+        for p in ROOT.rglob("*.py"):
+            if p.name not in {"site_config.py", "test_site_wording.py"} and "venv" not in p.parts:
+                self.assertNotIn("A.D Gordon", p.read_text(encoding="utf-8"), str(p))
+
+    def test_terms_and_refunds(self):
+        pages = served_pages()
+        self.assertIn("Tel Aviv have exclusive jurisdiction", pages["terms.html"])
+        for w in ("Maps", "Listings", "Content", "Bundle"):
+            self.assertIn(w, pages["refunds.html"])
 
 
 if __name__ == "__main__":
