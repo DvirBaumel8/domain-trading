@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from datetime import datetime, timezone
 
 from . import core
@@ -68,7 +69,7 @@ async def run(inp: dict, *, client, push, set_status, sleep=asyncio.sleep, limit
         return False, "Add at least one valid URL in the URLs field."
     strategies = core.pick(inp.get("strategies"), ("mobile", "desktop"), ("mobile", "desktop"))
     categories = core.pick(inp.get("categories"), tuple(core.CATEGORY_PARAM), ("performance",))
-    key = (inp.get("apiKey") or "").strip()
+    key = (inp.get("apiKey") or "").strip() or os.environ.get("PAGESPEED_API_KEY", "").strip()
     if not key:
         return False, KEY_MISSING
     limiter = limiter or HostLimiter(INTERVAL)

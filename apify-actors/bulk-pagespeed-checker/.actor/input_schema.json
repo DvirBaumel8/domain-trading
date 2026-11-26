@@ -3,8 +3,7 @@
   "type": "object",
   "schemaVersion": 1,
   "required": [
-    "urls",
-    "apiKey"
+    "urls"
   ],
   "properties": {
     "urls": {
@@ -54,7 +53,7 @@
     "apiKey": {
       "title": "Google PageSpeed Insights API key",
       "type": "string",
-      "description": "Your own Google API key with the PageSpeed Insights API enabled. Required. It is never logged or written to the results.",
+      "description": "Optional. Your own Google API key with the PageSpeed Insights API enabled. If left empty, a default key is used. It is never logged or written to the results.",
       "editor": "textfield",
       "isSecret": true
     }
