@@ -24,7 +24,7 @@ from aivis.parse import match_name          # noqa: E402
 from aivis.niches import NICHES, get_niche  # noqa: E402
 from aivis.order import US_STATES, US_ONLY_MSG, normalize_website
 from aivis.uscities import is_us_place  # noqa: E402
-from site_config import BUSINESS_ADDRESS    # noqa: E402
+from site_config import BUSINESS_ADDRESS, SUPPORT_EMAIL    # noqa: E402
 import delivery                             # noqa: E402
 import products                             # noqa: E402
 import html as _html
@@ -50,7 +50,32 @@ LOCAL_ORDERS = os.environ.get("ORDERS_LOCAL_DIR") or os.path.join(HERE, "..", "p
 
 def render_page(raw):
     """Fill the {{BUSINESS_ADDRESS}} token of a static HTML page from site_config."""
-    return raw.replace(b"{{BUSINESS_ADDRESS}}", _html.escape(BUSINESS_ADDRESS).encode())
+    return render_addon_buttons(raw).replace(b"{{BUSINESS_ADDRESS}}", _html.escape(BUSINESS_ADDRESS).encode())
+
+
+ADDON_BUTTON = re.compile(r'<a class="btn ghost" data-pay="(payLinkMaps|payLinkListingsCheck|payLinkListings|payLinkContent|payLinkBundle)" href="#pricing">[^<]*</a>')
+ADDON_NAMES = {"payLinkMaps": "Google Maps Visibility Check", "payLinkListingsCheck": "Listings Consistency Check",
+               "payLinkListings": "Listings with fix pack",
+               "payLinkContent": "AI Content Pack", "payLinkBundle": "AI Visibility Bundle"}
+
+
+def waitlist_button(key):
+    name = ADDON_NAMES[key]
+    href = "mailto:" + SUPPORT_EMAIL + "?subject=" + urllib.parse.quote("AVC waitlist: " + name, safe="")
+    return f'<a class="btn ghost" href="{href}">{_html.escape(name)}: Coming soon - join waitlist</a>'
+
+
+def render_addon_buttons(raw):
+    """With ADDONS_CHECKOUT off, the add-on buy buttons become plain waitlist mailto links (no data-pay)."""
+    if products.addons_checkout_on():
+        return raw
+    return ADDON_BUTTON.sub(lambda m: waitlist_button(m.group(1)), raw.decode()).encode()
+
+
+def config_js():
+    """The served assets/config.js, generated: add-on checkout URLs only when ADDONS_CHECKOUT is on."""
+    cfg = {"brand": "AI Visibility Check", **products.visible_pay_links(), "contactEmail": SUPPORT_EMAIL, "apiBase": ""}
+    return ("window.AIVIS_CONFIG = " + json.dumps(cfg, indent=2) + ";\n").encode()
 
 
 def log(msg):
@@ -62,13 +87,22 @@ def clock():
 
 
 def client_ip(headers, peer):
-    """The client address: the entry the hosting proxy appended to X-Forwarded-For (the last one; earlier
-    entries can be written by the client), else the socket address. Only a valid IP address is used."""
-    xff = str((headers or {}).get("X-Forwarded-For") or "").split(",")[-1].strip()
-    try:
-        return str(ipaddress.ip_address(xff))
-    except ValueError:
-        return str(peer)
+    """The client address: CF-Connecting-IP if a valid IP, else the first valid X-Forwarded-For entry,
+    else the socket address. The last X-Forwarded-For entry is an internal address on this host."""
+    def valid(v):
+        try:
+            return str(ipaddress.ip_address(str(v).strip()))
+        except ValueError:
+            return None
+    h = headers or {}
+    ip = valid(h.get("CF-Connecting-IP") or "")
+    if ip:
+        return ip
+    for part in str(h.get("X-Forwarded-For") or "").split(","):
+        ip = valid(part)
+        if ip:
+            return ip
+    return str(peer)
 
 
 def prune_jobs(t=None):
@@ -844,6 +878,8 @@ def free_report_path(fid):
 
 
 def clean(d):
+    if not isinstance(d, dict):
+        raise ValueError(BAD_FORM_MSG)
     biz = str(d.get("business", "")).strip()[:120]
     city = str(d.get("city", "")).strip()[:60]
     niche = str(d.get("niche", "")).strip()
@@ -942,8 +978,10 @@ class H(http.server.BaseHTTPRequestHandler):
             self.send_header(k, v)
         super().end_headers()
 
-    def _send(self, code, ctype, body, private=False, robots="noindex, nofollow"):
+    def _send(self, code, ctype, body, private=False, robots="noindex, nofollow", no_store=False):
         self.send_response(code); self.send_header("Content-Type", ctype)
+        if no_store and not private:
+            self.send_header("Cache-Control", "no-store")
         if private:
             for k, v in (("X-Robots-Tag", robots), ("Cache-Control", "no-store"),
                          ("Referrer-Policy", "no-referrer")):
@@ -1014,6 +1052,8 @@ class H(http.server.BaseHTTPRequestHandler):
             if text is None:
                 return self._json(404, {"error": "not found"})
             return self._send(200, "text/html; charset=utf-8", text.encode(), private=True, robots="noindex")
+        if normalize_path(self.path) == "assets/config.js":
+            return self._send(200, "application/javascript; charset=utf-8", config_js(), private=False, no_store=True)
         f = public_file(self.path)
         if f is None:
             return self._json(404, {"error": "not found"})

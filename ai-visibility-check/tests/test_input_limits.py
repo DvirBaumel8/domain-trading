@@ -54,11 +54,22 @@ class BodyTests(Reset):
 
 class LimitTests(Reset):
     def test_client_ip_helper(self):
-        self.assertEqual(server.client_ip({"X-Forwarded-For": "1.2.3.4, 9.9.9.9"}, "10.0.0.1"), "9.9.9.9")
+        self.assertEqual(server.client_ip({"X-Forwarded-For": "1.2.3.4, 9.9.9.9"}, "10.0.0.1"), "1.2.3.4")
         self.assertEqual(server.client_ip({"X-Forwarded-For": "9.9.9.9"}, "10.0.0.1"), "9.9.9.9")
+        self.assertEqual(server.client_ip({"CF-Connecting-IP": "5.6.7.8", "X-Forwarded-For": "1.2.3.4, 10.1.1.1"}, "10.0.0.1"), "5.6.7.8")
+        self.assertEqual(server.client_ip({"CF-Connecting-IP": "bad", "X-Forwarded-For": "1.2.3.4, 10.1.1.1"}, "10.0.0.1"), "1.2.3.4")
+        self.assertEqual(server.client_ip({"CF-Connecting-IP": "x", "X-Forwarded-For": "y"}, "10.0.0.1"), "10.0.0.1")
         self.assertEqual(server.client_ip({}, "10.0.0.1"), "10.0.0.1")
         self.assertEqual(server.client_ip({"X-Forwarded-For": "not an ip"}, "10.0.0.1"), "10.0.0.1")
         self.assertEqual(server.client_ip(None, "10.0.0.1"), "10.0.0.1")
+
+    def test_first_forwarded_entries_get_separate_buckets(self):
+        server.FREE_RUN = False
+        for ip in ("7.7.7.7", "7.7.7.8"):
+            for i in range(5):
+                self.assertEqual(self.post("/api/check", OK, {"X-Forwarded-For": ip + ", 10.9.9.9"})[0], 200, (ip, i))
+        self.assertEqual(self.post("/api/check", OK, {"X-Forwarded-For": "7.7.7.7, 10.9.9.9"})[0], 429)
+        self.assertEqual(self.post("/api/check", OK, {"CF-Connecting-IP": "7.7.7.9", "X-Forwarded-For": "7.7.7.7, 10.9.9.9"})[0], 200)
 
     def test_sixth_check_in_an_hour_is_429(self):
         server.FREE_RUN = False
