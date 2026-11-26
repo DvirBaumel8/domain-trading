@@ -1,0 +1,483 @@
+{"domain":"podcastgo.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":20500,"last_bids":26,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"webclients.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":63500,"last_bids":39,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"jetcharge.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":24400,"last_bids":22,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"bigapplehead.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":13400,"last_bids":20,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"messler.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":14900,"last_bids":17,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"sunmedic.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":24100,"last_bids":12,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"uxclub.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":15900,"last_bids":18,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"medheart.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":40500,"last_bids":22,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"locallane.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":20500,"last_bids":11,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"imagebar.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":6400,"last_bids":13,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"bidgarage.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":30500,"last_bids":19,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"itsmyday.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":14100,"last_bids":18,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"mayahomecare.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":4000,"last_bids":8,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"rollingplanet.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":5500,"last_bids":7,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"sanlazaro.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":11700,"last_bids":10,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"crunchymom.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":45500,"last_bids":14,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"bedsales.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":16000,"last_bids":14,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"notalabs.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":20500,"last_bids":15,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"limesolutions.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":11600,"last_bids":7,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"yourownhouse.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":2600,"last_bids":5,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"investfind.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":4000,"last_bids":7,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"gshelper.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":21500,"last_bids":9,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"unitednotary.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":3300,"last_bids":5,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"sfgimd.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":30500,"last_bids":12,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"tekready.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":2100,"last_bids":5,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"booyafitness.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":5500,"last_bids":5,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"tickwire.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":4700,"last_bids":5,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"tokenmate.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":38000,"last_bids":10,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"vietmoney.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":6800,"last_bids":6,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"nubiotic.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":9400,"last_bids":12,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"mpmtikirva.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":30000,"last_bids":8,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"bellop.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":6000,"last_bids":8,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"atinyhouse.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":7100,"last_bids":11,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"streettime.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":7400,"last_bids":7,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"craftlock.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":2600,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"vendorplug.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":4900,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"passported.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":21500,"last_bids":9,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"weekendgirl.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":1000,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"animeaz.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":2700,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"dopment.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":1100,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"lunashield.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":4700,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"remarkdigital.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":4000,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"scarywood.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":2500,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"statecapacity.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":2700,"last_bids":4,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"talkstack.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":6000,"last_bids":5,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"vireup.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":14000,"last_bids":7,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"appforums.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":2700,"last_bids":5,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"cryptoguess.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":3300,"last_bids":5,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"hellonovel.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":3300,"last_bids":5,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"leadbite.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":4700,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"paleodesserts.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":1700,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"printedly.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":4700,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"infosyncworld.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":6500,"last_bids":13,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"maward.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":9300,"last_bids":18,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"ristio.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":1100,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"enpremium.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"ushouldknow.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"vinlove.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":1100,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"jafai.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"sppharma.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"rezeal.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":1100,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"nayagroup.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"aloeo.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"easycm.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":1100,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"hazeri.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"homevictoria.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"hitwebs.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"luxxewhite.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":19100,"last_bids":7,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"zionllc.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"bathup.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"sandrian.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"artminiatures.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"saasmode.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"bluemaritime.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":3300,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"mediamech.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"biblicalmen.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"hondamurah.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"josepiano.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"limekart.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"portfolify.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":14500,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"diznet.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"kyatrade.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"nadiif.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"refreshx.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":2700,"last_bids":4,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"tobytax.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":6500,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"welltreats.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"artforgrowth.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"beachnaturals.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":2600,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"concertland.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"evasource.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"hindhydraulic.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"hopzine.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"jfedor.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"nftkids.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"onlinejankari.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":1000,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"plannercover.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"ukicer.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":6500,"last_bids":5,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"wingsland.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":6100,"last_bids":14,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"advacto.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"aonetenthouse.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"appleshooter.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"aprilroses.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"bauccosquad.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"brandflakes.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":5000,"last_bids":7,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"bundld.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":5500,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"campmagnolia.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"chaosgym.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"claylandtile.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":8300,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"cryotexas.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":10500,"last_bids":8,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"danewesolko.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"designersnews.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"doubleshoot.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"eduyatra.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":3800,"last_bids":6,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"giftobox.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"goingooo.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"hpmbootcamp.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"incargonews.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"jenkart.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"khankudi.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"khcollective.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"livityfoods.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":6500,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"mafrashi.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"makemydress.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":3800,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"miluimnikim.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"pailort.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"posydon.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":2600,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"revvital.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"shipraamit.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":8300,"last_bids":6,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"sodolcomputer.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"solvglobal.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"superstages.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"thebrothersgs.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"wartabekasi.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"wearcrest.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"webrocketinc.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":13900,"last_bids":12,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"wikiaskme.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"williamdaysh.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"abortionbronx.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"agrigoods.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"aiforagile.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"alzenta.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"artistichoney.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"avgjoefinance.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":8300,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"bakedcbd.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"belajargame.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"betterinbali.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"bilgex.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"blakefreewell.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"blanclighting.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"bricoclick.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"bsscpatna.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":8300,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"caluzen.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"carbidepunch.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"caterhaus.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":3300,"last_bids":7,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"cheerrstothat.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"chinafilmbiz.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":8300,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"clawstrike.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"clicksetup.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"crpeptides.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"defendusarms.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"drexael.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"driftsleeves.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"easybookbali.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"easybuyng.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"echopointer.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":8200,"last_bids":11,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"echoworth.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"estucia.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"filterspotter.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"fonlarca.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":1500,"last_bids":4,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"frightgeist.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"getbrooklyn.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"gigsapp.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"goodbotox.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"hakimrugs.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"itemsgame.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"jakartarusk.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"jogjatshirt.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":1100,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"juiceylucys.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":8300,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"ldrvillage.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":6000,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"littlenude.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"londoncookss.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":1100,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"luvelora.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"maesrithai.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":30500,"last_bids":5,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"maisonavery.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"manxenergy.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"mmsphyschem.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":8300,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"noradune.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"oliverlester.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"opsclear.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"oxtave.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"passdoctor.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"paybybot.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"popnsip.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"prooftransfer.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"propini.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"publictivity.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":4500,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"rahacab.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"readerpicks.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"rexleys.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"righthandos.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"screenjolt.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"seatadda.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"seekhimnow.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"sermonaide.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"showmyfactory.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"sirqil.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"skywardsteps.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"starlightack.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":1100,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"sugardeep.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"supplyhorizon.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"thecaredx.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"thenextclub.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"tokoyoel.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"trybeluga.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"venuebooker.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"wisatanetra.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"wisesofttech.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"xhord.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"yogisbistro.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":8300,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"yumamwr.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":8300,"last_bids":3,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"yuwentmakmur.com","source":"auction","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":100,"last_bids":1,"seen_at":"2026-11-26T15:57:55+02:00","final":false,"reason":null}
+{"domain":"schulu.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"iciag.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"ressme.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"goritm.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"ecinos.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"xisre.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"arsociety.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"ardmarket.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"recoveryre.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"restorethe.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"hebap.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"evogl.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"ornoch.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"orkansas.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"acesel.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"coachwe.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"mregistration.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"sseei.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"concursei.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"xtota.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"angelaga.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"werbusiness.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"andersonstu.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"gbeef.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"krewed.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"ldack.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"ssmyr.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"arboards.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"gepant.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"eturcotte.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"forexmar.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"skohle.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"sterlingsp.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"velcla.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"rtfiv.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"nsimplicity.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"mshooting.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"pncle.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"alvalor.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"lambpr.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"yomass.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"gmcoa.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"inlala.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"sisapa.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"uklein.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"hogof.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"ilandei.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"joinqu.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"egrilling.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"figse.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"almcreative.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"ensbase.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"alytera.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"pottag.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"ulicit.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"ensnic.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"iramsey.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"andvapor.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"jamenter.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"louloup.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"tubeand.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"snackar.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"vegasfam.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"arvestllc.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"evisea.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"icanyc.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"armarathon.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"asterseven.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"mkidney.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"quaforte.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"znpla.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"dadepos.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"exoticbull.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"heyaki.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"mphorm.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"porterac.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"tzakr.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"yoexpo.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"deboeg.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"ericalen.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"abelcrop.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"artrever.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"ardprime.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"ecoursehelp.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"espacecowork.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"leancp.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"lelarab.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"noneblog.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"pollhere.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"sahaci.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"datplast.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"erbworld.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"heysv.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"ieltsclasses.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"lowaway.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"securingthe.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"ticterra.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"apartmentsnc.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"gitachi.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"isimyazi.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"mselfcare.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"okoori.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"reuzd.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"swalv.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"vanyca.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"ycodia.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"aveans.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"barmass.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"canoman.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"cepilgrimage.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"changind.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"commonand.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"eastskate.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"issuniversity.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"markusman.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"massagestl.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"pottake.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"renemaria.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"skohla.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"skydances.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"teemet.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"thingspic.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"tpturbo.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"younglig.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"afiski.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"christwh.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"escalatec.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"esunweb.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"etrepagny.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"floraler.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"healthcarethe.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"lodgingres.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"motwor.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"mycies.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"outnewyork.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"quindev.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"ssdeutschland.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"threebles.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"yogasap.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"askarep.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"chopinco.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"cnesia.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"dimuel.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"gdfoto.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"graficoh.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"hsfdc.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"iemembers.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"lineaplas.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"liorsol.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"mahholding.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"mensenn.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"myousei.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"nerfunds.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"norcape.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"productthe.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"serapiao.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"shopsfu.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"tbbai.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"turwall.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"uestcompany.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"vimedik.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"acefutbol.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"amasnacks.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"amoplan.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"applire.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"baoliy.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"besteblog.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"billieandco.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"bournenews.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"cacheuta.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"dsawp.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"dzmachine.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"eheartfailure.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"facproject.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"filatelisten.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"flowerprom.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"goodfeets.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"halowindow.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"handleu.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"iggconsult.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"isolconfort.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"jdallen.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"jdealz.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"latmentor.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"laurenmcm.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"luctel.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"macuira.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"ndndo.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"pumup.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"rupashah.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"seasidegarage.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"sistemanexus.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"sunnycut.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"svoci.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"tamaturi.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"theabbeys.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"urartgallery.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"vestrak.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"znamenacek.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"acostafilms.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"almadenh.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"alyssamaria.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"billsimpl.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"bmsites.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"braaifest.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"brandkan.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"cankayasut.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"cantondem.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"centennialna.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"centrallet.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"clubdetiropr.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"cnium.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"coleharmon.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"concienciayco.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"copayday.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"disposablepen.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"erbnyc.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"filmjoin.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"fininsti.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"forhappypaws.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"gelsocial.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"gepants.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"havasuauto.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"igmsco.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"indreostfold.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"isfamed.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"isuriz.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"jekemper.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"jubileerest.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"junctionad.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"juspur.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"katelynnicole.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"kdmagazine.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"kimamasa.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"knawan.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"koorogi.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"kuntke.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"laciocr.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"lauradye.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"liftupu.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"loveferment.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"mariusdan.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"neoscom.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"offfff.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"onkeyit.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"pigmentacija.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"pnwrep.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"replats.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"rocketronic.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"shtaxcpa.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"sobanheira.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"sobasc.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"sorsforditok.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"sourceaa.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"studiostc.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"talkertv.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"tenxre.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"thevatsalya.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"treyus.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"votrg.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}
+{"domain":"yawpo.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":null,"last_bids":null,"seen_at":null,"final":false,"reason":"not in the file"}
+{"domain":"yecofriendly.com","source":"closeout","logged_at":"2026-11-25T17:50:46+02:00","last_price_cents":500,"last_bids":0,"seen_at":"2026-11-26T16:03:05+02:00","final":false,"reason":null}

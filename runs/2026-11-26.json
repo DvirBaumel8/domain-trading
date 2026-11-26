@@ -1,0 +1,153 @@
+{
+  "date": "2026-11-26",
+  "kills": {
+    "read": 1660,
+    "unreadable_lines": 0
+  },
+  "files": {
+    "auction": {
+      "file_built_at": "2026-11-26T15:58:35+02:00",
+      "counts": {
+        "read": 95676,
+        "not_com": 57820,
+        "not_letters": 7294,
+        "too_long": 15186,
+        "unreadable": 0
+      },
+      "dropped": {
+        "no_bid": 15084,
+        "adult": 97,
+        "over_per_name": 8,
+        "over_total": 1
+      },
+      "checked": 186,
+      "logged": 182
+    },
+    "closeout": {
+      "file_built_at": "2026-11-26T16:03:05+02:00",
+      "counts": {
+        "read": 509756,
+        "not_com": 319129,
+        "not_letters": 46277,
+        "too_long": 69982,
+        "unreadable": 0
+      },
+      "dropped": {
+        "price": 44963,
+        "adult": 578,
+        "no_demand_sign": 28376,
+        "already_logged": 210
+      },
+      "checked": 241,
+      "logged": 241
+    }
+  },
+  "killed": [
+    {
+      "domain": "robertmasters.com",
+      "source": "auction",
+      "by": "history",
+      "evidence": [
+        {
+          "date": "2019-06-15",
+          "url": "https://robertmasters.com/2013/04/29/eros-undressed-into-the-heart-of-sex/"
+        },
+        {
+          "date": "2004-06-20",
+          "url": "http://robertmasters.com:80/ESSAY-pages/sex_is_Neither.htm"
+        },
+        {
+          "date": "2009-03-06",
+          "url": "http://www.robertmasters.com:80/Groupwork_Section/love-sex-spirituality-ashmar09.htm"
+        }
+      ]
+    },
+    {
+      "domain": "zippz.com",
+      "source": "auction",
+      "by": "history",
+      "evidence": [
+        {
+          "date": "2023-06-04",
+          "url": "https://zippz.com/best-free-latina-porn-sites-try-now/"
+        },
+        {
+          "date": "2023-08-23",
+          "url": "https://zippz.com/hottest-shemales-on-onlyfans-best-only-fans-nudes/"
+        },
+        {
+          "date": "2023-09-11",
+          "url": "https://zippz.com/mom-and-daughter-onlyfans-nude-start-onlyfans/"
+        },
+        {
+          "date": "2023-03-19",
+          "url": "https://zippz.com/moving-your-sex-life-towards-tall-products-a%c2%80%c2%94-supercar-dating-unites-millionaire-car-enthusiasts-online/"
+        },
+        {
+          "date": "2023-09-24",
+          "url": "https://zippz.com/only-fans-directory-best-only-fans-nudes/"
+        }
+      ]
+    },
+    {
+      "domain": "milesxpress.com",
+      "source": "auction",
+      "by": "history",
+      "evidence": [
+        {
+          "date": "2026-04-18",
+          "url": "https://milesxpress.com/1-casino-in-canada/"
+        },
+        {
+          "date": "2026-04-18",
+          "url": "https://milesxpress.com/100-canada-casino-free-keep-online-spin-winnings/"
+        },
+        {
+          "date": "2026-04-19",
+          "url": "https://milesxpress.com/100-secure-payout-the-same-day-online-casino-canada/"
+        },
+        {
+          "date": "2026-04-17",
+          "url": "https://milesxpress.com/20-bet-casino/"
+        },
+        {
+          "date": "2026-04-18",
+          "url": "https://milesxpress.com/20-casino-court-torquay/"
+        }
+      ]
+    },
+    {
+      "domain": "gaysocialites.com",
+      "source": "auction",
+      "by": "history",
+      "evidence": [
+        {
+          "date": "2010-01-15",
+          "url": "http://gaysocialites.com/2006/10/equality_same_sex_marriages_st.html"
+        },
+        {
+          "date": "2010-01-15",
+          "url": "http://gaysocialites.com/2006/10/equality_same_sex_marriages_st_1.html"
+        },
+        {
+          "date": "2010-01-15",
+          "url": "http://gaysocialites.com/2006/10/equality_same_sex_marriages_st_2.html"
+        },
+        {
+          "date": "2010-01-15",
+          "url": "http://gaysocialites.com/2006/10/equality_same_sex_marriages_st_3.html"
+        },
+        {
+          "date": "2010-01-15",
+          "url": "http://gaysocialites.com/2006/10/equality_same_sex_marriages_st_4.html"
+        }
+      ]
+    }
+  ],
+  "closes": 483,
+  "totals": {
+    "auctions": 649,
+    "closeouts": 906,
+    "with_last_price": 858
+  }
+}
