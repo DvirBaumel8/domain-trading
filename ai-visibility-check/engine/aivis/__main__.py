@@ -196,6 +196,9 @@ def main(argv=None):
     od.add_argument("--roster", default="", help="CSV of local business names (else NPPES if the niche has one)")
     od.add_argument("--dry-run", action="store_true", help="show plan, cost and key readiness; call nothing")
     od.add_argument("--out", default="orders"); od.set_defaults(fn=cmd_order)
+    sk = sub.add_parser("smoke", help="operator only: one minimal paid call per engine (never in CI)")
+    sk.add_argument("--engine", default="all", choices=["all", "openai", "perplexity", "gemini", "claude"])
+    sk.set_defaults(fn=lambda a: __import__("aivis.smoke", fromlist=["x"]).cmd_smoke(a))
     a = ap.parse_args(argv)
     a.fn(a)
 

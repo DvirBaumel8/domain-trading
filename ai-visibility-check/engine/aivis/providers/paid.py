@@ -52,7 +52,9 @@ class _PaidBase(Provider):
             with self._open(req, timeout=90) as r:
                 return json.loads(r.read().decode())
         except Exception as e:
-            raise ProviderError(f"{self.name} call failed: {type(e).__name__}") from None  # never echo headers
+            code = getattr(e, "code", None)
+            raise ProviderError(f"{self.name} call failed: {type(e).__name__}"
+                                + (f" HTTP {code}" if isinstance(code, int) else "")) from None  # never echo headers
 
 
 class OpenAIWebSearchProvider(_PaidBase):

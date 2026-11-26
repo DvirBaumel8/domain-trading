@@ -52,6 +52,8 @@ class Order:
     engines: list = field(default_factory=lambda: list(PAID_ENGINES))
     paid_ref: str = ""           # payment reference (Polar order id), filled by the operator
     competitors: list = field(default_factory=list)
+    target_reviews: int = None         # Google review counts, when the buyer gave them
+    competitor_reviews: list = None
 
     @staticmethod
     def from_dict(d):
@@ -132,7 +134,8 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
             names.append(c.strip())
             low.add(c.strip().lower())
     res = run_audit(get_niche(order.niche), order.city, order.business_name, names, providers,
-                    n_prompts=n, repeats=r, seed=seed, signals=site)
+                    n_prompts=n, repeats=r, seed=seed, signals=site,
+                    target_reviews=order.target_reviews, competitor_reviews=order.competitor_reviews)
     log.update({"finished": _dt.datetime.now().isoformat(timespec="seconds"),
                 "answers": res.score.total_answers, "errors": len(res.errors),
                 "spent_usd": round(guard.spent if guard else res.cost_usd, 4), "score": res.score.score})
