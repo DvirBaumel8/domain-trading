@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Post-push check for `apify-push`: the actor must be private and carry no pricing. GET-only.
+"""Check for `apify-push`: the price must be unchanged by the push and the run memory must be 256 MB. GET-only.
 
-Usage: apify_guard.py <actor-folder-name> ...   (token from APIFY_TOKEN, never printed)
-Fails (exit 1) if isPublic is true, any pricing info exists, or defaultRunOptions.memoryMbytes != 256. Prints id, name and build version,
-and writes them to the job summary plus a ready line for docs/requests/DOM-TO-GAVRIEL.md.
+Usage:
+  apify_guard.py [--allow-live] --snapshot FILE <actor-folder-name> ...   before the push: record isPublic and pricing
+  apify_guard.py [--allow-live] --before FILE <actor-folder-name> ...     after the push: compare, check memory
+(token from APIFY_TOKEN, never printed). Fails (exit 1) if the pricing differs from the snapshot or
+defaultRunOptions.memoryMbytes != 256. A public, already-priced actor passes when its pricing is unchanged.
+An actor that did not exist before the push counts as unpriced. Nothing is ever written to Apify.
+Prints id, name and build version, and writes them to the job summary plus a ready line for docs/requests/DOM-TO-GAVRIEL.md.
 """
 from __future__ import annotations
 
@@ -18,20 +22,29 @@ from zoneinfo import ZoneInfo
 
 BASE = "https://api.apify.com"
 ALLOWED = ("wayback-domain-history", "broken-link-auditor", "bulk-pagespeed-checker")
+LIVE = ("bulk-dns-email-auth-checker", "sitemap-url-extractor", "bulk-domain-availability-checker", "domain-checkup-report")
+
+
+def allowed_names(allow_live: bool = False) -> tuple:
+    """The 3 newer actors; the 4 older live ones only with an explicit flag."""
+    return ALLOWED + LIVE if allow_live else ALLOWED
 PRICE_KEY_HINTS = ("pric", "monetiz")
 TARGET_MEMORY_MB = 256
 
 
-def problems(actor: dict) -> list[str]:
-    """Reasons this actor is not private-and-unpriced (empty list = ok)."""
+def price_snapshot(actor: dict | None) -> dict:
+    """What the push must not change: isPublic and every pricing field. A missing actor is private and unpriced."""
+    actor = actor or {}
+    prices = {k: v for k, v in actor.items() if any(h in k.lower() for h in PRICE_KEY_HINTS) and v not in (None, False, [], {}, "")}
+    return {"isPublic": bool(actor.get("isPublic")), "pricing": prices}
+
+
+def problems(actor: dict, before: dict | None = None) -> list[str]:
+    """Reasons to fail (empty list = ok): pricing changed since `before` (none given = was unpriced), or memory is not 256."""
     out = []
-    if actor.get("isPublic") is True:
-        out.append("isPublic is true")
-    if actor.get("pricingInfos"):
-        out.append("pricingInfos is not empty")
-    for key, value in actor.items():
-        if key != "pricingInfos" and any(h in key.lower() for h in PRICE_KEY_HINTS) and value not in (None, False, [], {}, ""):
-            out.append(f"pricing field set: {key}")
+    was = (before if before is not None else price_snapshot(None))["pricing"]
+    if price_snapshot(actor)["pricing"] != was:
+        out.append("pricing changed by the push")
     memory = (actor.get("defaultRunOptions") or {}).get("memoryMbytes")
     if memory != TARGET_MEMORY_MB:
         out.append(f"defaultRunOptions.memoryMbytes is {memory}, expected {TARGET_MEMORY_MB}")
@@ -45,7 +58,7 @@ def build_version(actor: dict) -> str:
 
 
 def summary_line(actor: dict, now: datetime) -> str:
-    return (f"- {now:%Y-%m-%d %H:%M} IST (DOM): pushed PRIVATE, unpublished, no price: `{actor.get('name')}` "
+    return (f"- {now:%Y-%m-%d %H:%M} IST (DOM): pushed, visibility and price untouched: `{actor.get('name')}` "
             f"id `{actor.get('id')}` build `{build_version(actor)}`.")
 
 
@@ -68,15 +81,50 @@ def fetch(name: str, token: str, get_fn=get) -> dict:
     return get_fn(f"/v2/acts/{username}~{name}", token)
 
 
+def _missing(e: Exception) -> bool:
+    return isinstance(e, urllib.error.HTTPError) and e.code == 404
+
+
+def parse(argv: list[str]) -> tuple[bool, str | None, str | None, list[str]]:
+    allow_live, snap, before, names = False, None, None, []
+    it = iter(argv)
+    for a in it:
+        if a == "--allow-live":
+            allow_live = True
+        elif a == "--snapshot":
+            snap = next(it, None)
+        elif a == "--before":
+            before = next(it, None)
+        else:
+            names.append(a)
+    return allow_live, snap, before, names
+
+
 def main(argv: list[str], fetch_fn=fetch) -> int:
     token = os.environ.get("APIFY_TOKEN", "")
     if not token:
         print("APIFY_TOKEN is not set", file=sys.stderr)
         return 2
-    names = argv or list(ALLOWED)
-    if any(n not in ALLOWED for n in names):
+    allow_live, snap, before_file, names = parse(argv)
+    allowed = allowed_names(allow_live)
+    names = names or list(ALLOWED)
+    if any(n not in allowed for n in names):
         print("actor not in the allow-list", file=sys.stderr)
         return 2
+    if snap:  # before the push
+        shots = {}
+        for name in names:
+            try:
+                shots[name] = price_snapshot(fetch_fn(name, token))
+            except Exception as e:
+                if not _missing(e):
+                    print(f"{name}: GET failed ({type(e).__name__})", file=sys.stderr)
+                    return 1
+                shots[name] = price_snapshot(None)  # not on Apify yet: the push creates it, unpriced
+        Path(snap).write_text(json.dumps(shots, sort_keys=True))
+        print(f"snapshot saved for {len(shots)} actor(s)")
+        return 0
+    befores = json.loads(Path(before_file).read_text()) if before_file else {}
     now = datetime.now(ZoneInfo("Asia/Jerusalem"))
     lines, bad = [], 0
     for name in names:
@@ -86,19 +134,19 @@ def main(argv: list[str], fetch_fn=fetch) -> int:
             print(f"{name}: GET failed ({type(e).__name__})", file=sys.stderr)
             bad = 1
             continue
-        found = problems(actor)
+        found = problems(actor, befores.get(name))
         if found:
             print(f"{name}: FAIL: {'; '.join(found)}", file=sys.stderr)
             bad = 1
             continue
-        print(f"{name}: ok, private, no pricing (id {actor.get('id')}, build {build_version(actor)})")
+        print(f"{name}: ok, pricing unchanged, memory {TARGET_MEMORY_MB} MB (id {actor.get('id')}, build {build_version(actor)})")
         lines.append(summary_line(actor, now))
     if lines and not bad:
         text = "\n".join(lines) + "\n"
         summary = os.environ.get("GITHUB_STEP_SUMMARY")
         if summary:
             with open(summary, "a") as f:
-                f.write("### Pushed private\n\nAppend to `docs/requests/DOM-TO-GAVRIEL.md` (via PR):\n\n" + text)
+                f.write("### Pushed\n\nAppend to `docs/requests/DOM-TO-GAVRIEL.md` (via PR):\n\n" + text)
         Path("dom-to-gavriel-line.md").write_text(text)
     return bad
 

@@ -157,7 +157,7 @@ def test_crawl_sources_anchor_dedupe_and_external():
     assert rows["https://ex.com/gone"][0]["sources"] == [{"sourceUrl": "https://ex.com/a", "anchorText": "Gone"}]
     a_src = rows["https://ex.com/a"][0]["sources"]
     assert {"sourceUrl": "https://ex.com/", "anchorText": "First"} in a_src and len(a_src) == 2
-    assert rows["https://ex.com/"][0]["sources"] == [{"sourceUrl": "https://ex.com/a", "anchorText": "Home page"}]
+    assert rows["https://ex.com/"][0]["sources"] == []  # rows are pushed at once: later back-links are not listed
     _, rows2, _ = drive({"startUrls": ["https://ex.com/"], "mode": "crawl"}, h)
     assert "https://other.org/z" not in rows2
 

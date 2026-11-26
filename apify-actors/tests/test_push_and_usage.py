@@ -17,29 +17,67 @@ import apify_memory as memory  # noqa: E402
 NOW = datetime(2026, 11, 27, 6, 0, tzinfo=timezone.utc)
 MEM = {"defaultRunOptions": {"memoryMbytes": 256}}
 NEW = {"wayback-domain-history", "broken-link-auditor", "bulk-pagespeed-checker"}
+LIVE = ("bulk-dns-email-auth-checker", "sitemap-url-extractor", "bulk-domain-availability-checker", "domain-checkup-report")
 
 
-# ---- post-push guard
+# ---- price-unchanged guard
+PRICED = {"isPublic": True, "pricingInfos": [{"pricingModel": "PAY_PER_EVENT", "pricingPerEvent": {"x": 1}}], **MEM}
+
+
 def test_guard_ok_for_private_unpriced():
     assert guard.problems({"id": "a", "isPublic": False, "pricingInfos": [], **MEM}) == []
 
 
-def test_guard_fails_on_public():
-    assert guard.problems({"isPublic": True, **MEM})
+def test_guard_ok_for_public_priced_with_unchanged_pricing():
+    before = guard.price_snapshot(PRICED)
+    assert guard.problems(json.loads(json.dumps(PRICED)), before) == []
 
 
-@pytest.mark.parametrize("extra", [
-    {"pricingInfos": [{"pricingModel": "FREE"}]},
-    {"pricingInfos": [{"pricingModel": "PAY_PER_EVENT"}]},
-    {"actorPricing": {"x": 1}},
-])
-def test_guard_fails_on_any_pricing(extra):
-    assert guard.problems({"isPublic": False, **MEM, **extra})
+def test_guard_fails_when_memory_is_not_256():
+    assert guard.problems({"isPublic": False, "defaultRunOptions": {"memoryMbytes": 4096}})
+    assert guard.problems({"isPublic": False})
+    assert guard.problems(PRICED | {"defaultRunOptions": {"memoryMbytes": 512}}, guard.price_snapshot(PRICED))
+
+
+def test_guard_fails_when_pricing_changed_after_the_push():
+    before = guard.price_snapshot(PRICED)
+    after = PRICED | {"pricingInfos": [{"pricingModel": "FREE"}]}
+    assert guard.problems(after, before)
+    assert guard.problems(PRICED | {"actorPricing": {"x": 1}}, before)
+    # a priced actor with no snapshot counts as changed (it was unpriced as far as we know)
+    assert guard.problems(PRICED)
+    assert guard.problems({"isPublic": False, "pricingInfos": [{"pricingModel": "FREE"}], **MEM})
+
+
+def test_guard_main_snapshot_then_check(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("APIFY_TOKEN", "sekret-token")
+    monkeypatch.chdir(tmp_path)
+    snap = str(tmp_path / "b.json")
+    fetch = lambda n, t: {"id": "x", "name": n, **PRICED}  # noqa: E731
+    assert guard.main(["--snapshot", snap, "broken-link-auditor"], fetch_fn=fetch) == 0
+    assert guard.main(["--before", snap, "broken-link-auditor"], fetch_fn=fetch) == 0
+    changed = lambda n, t: {"id": "x", "name": n, **PRICED, "pricingInfos": []}  # noqa: E731
+    assert guard.main(["--before", snap, "broken-link-auditor"], fetch_fn=changed) == 1
+    out = capsys.readouterr()
+    assert "sekret-token" not in out.out + out.err
+
+
+def test_guard_snapshot_of_a_new_actor_is_unpriced(monkeypatch, tmp_path):
+    monkeypatch.setenv("APIFY_TOKEN", "t")
+    monkeypatch.chdir(tmp_path)
+
+    def missing(n, t):
+        raise _http404("x")
+    snap = str(tmp_path / "b.json")
+    assert guard.main(["--snapshot", snap, "wayback-domain-history"], fetch_fn=missing) == 0
+    ok = lambda n, t: {"id": "x", "name": n, "isPublic": False, "pricingInfos": [], **MEM}  # noqa: E731
+    assert guard.main(["--before", snap, "wayback-domain-history"], fetch_fn=ok) == 0
 
 
 def test_guard_main_fails_without_leaking_token(monkeypatch, capsys):
     monkeypatch.setenv("APIFY_TOKEN", "sekret-token")
-    assert guard.main(["broken-link-auditor"], fetch_fn=lambda n, t: {"id": "x", "name": n, "isPublic": True, **MEM}) == 1
+    assert guard.main(["broken-link-auditor"], fetch_fn=lambda n, t: {"id": "x", "name": n, "isPublic": True,
+                                                                      "defaultRunOptions": {"memoryMbytes": 4096}}) == 1
     out = capsys.readouterr()
     assert "sekret-token" not in out.out + out.err
 
@@ -74,19 +112,29 @@ def test_guard_fetch_does_not_mask_other_errors():
         guard.fetch("broken-link-auditor", "tok", get_fn=fake_get)
 
 
-def test_guard_rejects_old_actors(monkeypatch):
+def test_guard_rejects_old_actors_without_the_flag(monkeypatch):
     monkeypatch.setenv("APIFY_TOKEN", "t")
-    assert guard.main(["sitemap-url-extractor"], fetch_fn=lambda n, t: {}) == 2
+    for n in LIVE:
+        assert guard.main([n], fetch_fn=lambda n, t: {}) == 2
 
 
-def test_guard_allow_list_is_the_three_new():
-    assert set(guard.ALLOWED) == NEW
+def test_guard_accepts_old_actors_with_the_flag(monkeypatch, tmp_path):
+    monkeypatch.setenv("APIFY_TOKEN", "t")
+    monkeypatch.chdir(tmp_path)
+    ok = lambda n, t: {"id": "x", "name": n, "isPublic": True, **MEM}  # noqa: E731
+    for n in LIVE:
+        assert guard.main(["--allow-live", n], fetch_fn=ok) == 0  # accepted with the flag
+    assert set(guard.allowed_names(True)) == NEW | set(LIVE)
+
+
+def test_guard_allow_list_is_the_three_new_without_the_flag():
+    assert set(guard.ALLOWED) == NEW and set(guard.allowed_names()) == NEW
 
 
 # ---- push workflow (static)
 def read_workflow(name):
-    """Installed copy in .github/workflows first, then apify-actors/ci; fail if neither exists."""
-    for p in (ROOT.parent / ".github" / "workflows" / name, ROOT / "ci" / name):
+    """apify-actors/ci is the source of truth; the installed copy in .github/workflows is the fallback."""
+    for p in (ROOT / "ci" / name, ROOT.parent / ".github" / "workflows" / name):
         if p.is_file():
             return p.read_text()
     pytest.fail(f"workflow {name} not found in .github/workflows or apify-actors/ci")
@@ -102,9 +150,21 @@ def test_push_workflow_manual_only():
     assert "workflow_dispatch" in WF
 
 
-def test_push_workflow_allow_list_exactly_new_actors():
-    opts = set(re.findall(r"^\s+- ([\w-]+)\s*$", WF.split("options:")[1].split("permissions:")[0], re.M))
-    assert opts == NEW | {"all-new"}
+def test_push_workflow_old_actors_only_with_allow_live_flag():
+    opts = set(re.findall(r"^\s+- ([\w-]+)\s*$", WF.split("options:")[1].split("allow_live:")[0], re.M))
+    assert opts == NEW | {"all-new"} | set(LIVE)
+    flag = WF.split("allow_live:")[1].split("permissions:")[0]
+    assert "type: boolean" in flag and "default: false" in flag
+    resolve = WF.split("Resolve actor list")[1].split("Pytest first")[0]
+    assert 'ALLOW_LIVE" != "true"' in resolve and "exit 1" in resolve
+    # nothing is rebuilt on its own: still manual only, and the 4 older names are not in the plain `all-new` list
+    all_new = re.search(r"all-new\) echo \"ACTORS=([^\"]+)\"", resolve).group(1).split()
+    assert set(all_new) == NEW
+
+
+def test_push_workflow_snapshots_before_and_compares_after():
+    assert "--snapshot" in WF and "--before" in WF and WF.index("--snapshot") < WF.index("apify push") < WF.index("--before")
+    assert "apify_memory.py" in WF and "LIVE_FLAG" in WF
 
 
 def test_push_workflow_never_publishes_or_prices():
@@ -289,4 +349,4 @@ def test_memory_put_body_never_has_forbidden_fields():
 
 def test_push_workflow_sets_memory_before_guard():
     wf = (ROOT / "ci" / "apify-push.yml").read_text()
-    assert "apify_memory.py" in wf and wf.index("apify_memory.py") < wf.index("apify_guard.py")
+    assert "apify_memory.py" in wf and wf.index("apify_memory.py") < wf.index("--before")

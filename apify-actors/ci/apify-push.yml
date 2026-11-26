@@ -1,12 +1,12 @@
 name: apify-push
 
-# Manual only. Pushes the 3 NEW actors to Apify as PRIVATE, unpublished, unpriced. Never publishes, never sets prices or Store listing.
-# The 4 existing live actors are not allowed here. Each run needs Dvir's OK through Gavriel.
+# Manual only. Pushes a new build of an actor to Apify. Never publishes, never sets prices or the Store listing.
+# The 4 older live actors are allowed only with allow_live=true. Each run needs Dvir's OK through Gavriel.
 on:
   workflow_dispatch:
     inputs:
       actor:
-        description: Which new actor to push (private)
+        description: Which actor to rebuild (the 4 older live ones need allow_live)
         required: true
         type: choice
         options:
@@ -14,12 +14,21 @@ on:
           - broken-link-auditor
           - bulk-pagespeed-checker
           - all-new
+          - bulk-dns-email-auth-checker
+          - sitemap-url-extractor
+          - bulk-domain-availability-checker
+          - domain-checkup-report
+      allow_live:
+        description: Allow a rebuild of the 4 older live actors (default false)
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
-  push-private:
+  push:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,10 +41,15 @@ jobs:
       - name: Resolve actor list (allow-list)
         env:
           ACTOR: ${{ inputs.actor }}
+          ALLOW_LIVE: ${{ inputs.allow_live }}
         run: |
           case "$ACTOR" in
             wayback-domain-history|broken-link-auditor|bulk-pagespeed-checker) echo "ACTORS=$ACTOR" >> "$GITHUB_ENV" ;;
             all-new) echo "ACTORS=wayback-domain-history broken-link-auditor bulk-pagespeed-checker" >> "$GITHUB_ENV" ;;
+            bulk-dns-email-auth-checker|sitemap-url-extractor|bulk-domain-availability-checker|domain-checkup-report)
+              if [ "$ALLOW_LIVE" != "true" ]; then echo "older live actor: set allow_live=true"; exit 1; fi
+              echo "ACTORS=$ACTOR" >> "$GITHUB_ENV"
+              echo "LIVE_FLAG=--allow-live" >> "$GITHUB_ENV" ;;
             *) echo "actor not allowed"; exit 1 ;;
           esac
       - name: Pytest first (stop if red)
@@ -48,7 +62,11 @@ jobs:
           (cd apify-actors && python -m pytest -q tests)
       - name: Install Apify CLI
         run: npm install -g apify-cli
-      - name: apify push (private; the token stays in the environment)
+      - name: Record visibility and price before the push (GET only)
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: python apify-actors/tools/apify_guard.py $LIVE_FLAG --snapshot "$RUNNER_TEMP/before.json" $ACTORS
+      - name: apify push (the token stays in the environment)
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
         run: |
@@ -65,11 +83,11 @@ jobs:
       - name: Set run memory to 256 MB (apify push ignores actor.json defaultRunOptions)
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
-        run: python apify-actors/tools/apify_memory.py $ACTORS
-      - name: Post-push check (fails if public, priced or memory is not 256) and summary
+        run: python apify-actors/tools/apify_memory.py $LIVE_FLAG $ACTORS
+      - name: Post-push check (fails if the price changed or memory is not 256) and summary
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
-        run: python apify-actors/tools/apify_guard.py $ACTORS
+        run: python apify-actors/tools/apify_guard.py $LIVE_FLAG --before "$RUNNER_TEMP/before.json" $ACTORS
       - name: Keep the DOM-TO-GAVRIEL line
         uses: actions/upload-artifact@v4
         with:

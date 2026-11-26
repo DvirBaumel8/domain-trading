@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Post-push step: set defaultRunOptions.memoryMbytes = 256 on the 3 new actors.
+"""Post-push step: set defaultRunOptions.memoryMbytes = 256 on the pushed actors.
 
 `apify push` does not apply actor.json defaultRunOptions, so Apify keeps 4096.
-Usage: apify_memory.py <actor-folder-name> ...   (token from APIFY_TOKEN, never printed)
+Usage: apify_memory.py [--allow-live] <actor-folder-name> ...   (token from APIFY_TOKEN, never printed)
 Sends PUT /v2/acts/{id} with only {"defaultRunOptions": {...}}: the current run options are read
 first and only memoryMbytes is changed (build and timeout are kept). Never touches isPublic,
 categories, pricing or SEO text. Exit 1 on any failure, 2 on bad usage.
@@ -14,7 +14,7 @@ import os
 import sys
 import urllib.request
 
-from apify_guard import ALLOWED, BASE, fetch
+from apify_guard import ALLOWED, BASE, allowed_names, fetch
 
 TARGET_MB = 256
 
@@ -41,8 +41,9 @@ def main(argv: list[str], fetch_fn=fetch, put_fn=put) -> int:
     if not token:
         print("APIFY_TOKEN is not set", file=sys.stderr)
         return 2
-    names = argv or list(ALLOWED)
-    if any(n not in ALLOWED for n in names):
+    allow_live = "--allow-live" in argv
+    names = [a for a in argv if a != "--allow-live"] or list(ALLOWED)
+    if any(n not in allowed_names(allow_live) for n in names):
         print("actor not in the allow-list", file=sys.stderr)
         return 2
     bad = 0

@@ -52,7 +52,7 @@ The first URL works but goes through two redirects (a chain you may want to shor
 
 ## Monthly broken-link report
 
-Use **crawl** mode and schedule the run with Apify Schedules. The Actor follows links on the same site up to `maxDepth` and, for each broken URL, lists in `sources` the pages and anchor texts that link to it. Rows are pushed level by level while the crawl runs, so a run that is stopped keeps the rows it already has. A `sources` list includes the links found on the level after the URL, but not links found deeper in the crawl.
+Use **crawl** mode and schedule the run with Apify Schedules. The Actor follows links on the same site up to `maxDepth` and, for each broken URL, lists in `sources` the pages and anchor texts that link to it. Each row is pushed as soon as its URL is checked, so a run that is stopped or times out keeps every row it already has. A `sources` list holds the links found on earlier levels, not links found later in the crawl.
 
 ## Modes
 
