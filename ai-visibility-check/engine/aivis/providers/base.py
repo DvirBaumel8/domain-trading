@@ -23,6 +23,7 @@ class Answer:
     cost_usd: float = 0.0
     run: int = 0
     usage: dict = field(default_factory=dict)   # real vendor usage: input_tokens, output_tokens, searches, cost_usd
+    live: dict = field(default_factory=dict)    # live-display only (Suggestions HTML, citation links); never stored
 
 
 class Provider:

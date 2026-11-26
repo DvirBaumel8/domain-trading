@@ -4,7 +4,7 @@ python3 server.py [--port 8080] [--free-run]
 
 POST /api/check   free self-check. Instant answer from data/markets/*.json when we
                   have that niche+city; else, with --free-run, a short free run
-                  (Pollinations, 8 questions, $0) in the background; else the
+                  (Gemini search with an OpenAI fallback, 8 questions, monthly spend caps) in the background; else the
                   request is just saved. Requests go to the private orders store (leads/).
                   Limits per client address: 5 checks an hour, 3 free jobs at once (429 beyond).
 GET  /api/check/<id>  status of a background free run.
@@ -24,6 +24,7 @@ from aivis.parse import match_name          # noqa: E402
 from aivis.niches import NICHES, get_niche  # noqa: E402
 from aivis.order import US_STATES, US_ONLY_MSG, normalize_website, FREE_MIN_ANSWERS
 from aivis import names as names_mod
+from aivis import free_caps             # noqa: E402
 from aivis.uscities import is_us_place  # noqa: E402
 from site_config import BUSINESS_ADDRESS, SUPPORT_EMAIL    # noqa: E402
 import delivery                             # noqa: E402
@@ -48,6 +49,8 @@ FREE_PER_HOUR = 5           # free checks per client address per hour
 FREE_CONCURRENT = 3         # free jobs running at once per client address
 FREE_QUESTIONS = 8          # questions in one free run
 FAIL_MSG = "We could not get answers from the AI model right now. Please try again in a few minutes."
+UNAVAILABLE_MSG = "The free check is temporarily unavailable. Please try again later."
+LIVE_KEYS = ("names", "suggestions", "citations")    # shown once to the visitor who asked, never stored
 BYPASS_ENV = "AVC_TEST_BYPASS_TOKEN"
 BYPASS_HEADER = "X-AVC-Test-Token"
 BYPASS_MIN_LEN = 24
@@ -352,7 +355,7 @@ def alert(text):
 
 
 ALERT_LOCK = threading.RLock()
-ALERT_TITLES = {"free_check": "free check degraded", "new": "new order", "failed": "failed run", "blocked": "blocked run", "stuck": "stuck order",
+ALERT_TITLES = {"free_check": "free check degraded", "free_cap": "free check monthly cap reached", "new": "new order", "failed": "failed run", "blocked": "blocked run", "stuck": "stuck order",
                 "overdue": "overdue manual order", "unmatched": "unmatched payment", "held": "held payment",
                 "unknown_product": "unknown product payment", "webhook_failed": "webhook event failed"}
 
@@ -369,7 +372,7 @@ def alerts_configured():
     return github_alerts_on() or bool(os.environ.get("ORDER_ALERT_WEBHOOK_URL", "").strip())
 
 
-def alert_text(kind, oid="", status="", ptype="", ref=""):
+def alert_text(kind, oid="", status="", ptype="", ref="", detail=""):
     """-> (title, body). Only the internal order id, the status, the product type and (for a payment with
     no order) the opaque Polar order id and a reason code. Every value is checked against a fixed shape."""
     oid = oid if re.fullmatch(r"(ORD-\d{6}-[a-f0-9]{6}|MAN-[a-f0-9]{12})", oid or "") else ""
@@ -381,6 +384,10 @@ def alert_text(kind, oid="", status="", ptype="", ref=""):
     title = f"[AVC] {what} {subject} ({ptype})".replace("  ", " ")
     if kind == "free_check":
         title = f"[AVC] {what}"
+    if kind == "free_cap":
+        title = f"[AVC] {what} ({ref.replace('free-cap-', '')})"
+        detail = detail if re.fullmatch(r"[A-Za-z0-9 .;$:=-]{0,100}", detail or "") else ""
+        return title, "\n".join(["Reason: cap_reached"] + ([detail] if detail else []))
     if kind == "free_check":
         return title, "\n".join(([f"Status: {status}"] if status else []) + [f"Reason: {kind}"])
     lines = [f"Order: {oid}"] if oid else [f"Payment (opaque id): {ref}"]
@@ -402,12 +409,12 @@ def send_github_issue(title, body):
     return False
 
 
-def notify_event(kind, oid="", status="", ptype="", ref="", unique="", webhook=False):
+def notify_event(kind, oid="", status="", ptype="", ref="", unique="", webhook=False, detail=""):
     """One alert per event: the dedupe key (id + kind [+ window]) is stored create-only, so replays, resumes and
     sweeps never open a second issue. A failed GitHub call is logged by type, kept as pending and retried by the
     next sweep. Never raises."""
     try:
-        title, body = alert_text(kind, oid, status, ptype, ref)
+        title, body = alert_text(kind, oid, status, ptype, ref, detail)
         key = clean_ref("-".join(x for x in (oid or ref, kind, unique) if x), 120)
         if not key:
             return False
@@ -969,10 +976,11 @@ def fetch_roster(niche, city):
     return "ok", names
 
 
-def free_summary_line(answers, expected, reasons):
-    """One line for the logs: counts only, no user text."""
+def free_summary_line(answers, expected, reasons, masked=None):
+    """One line for the logs: counts and reason codes only, no user text. `masked` = failures a fallback hid."""
     bad = "".join(f" {k}={v}" for k, v in sorted(reasons.items()) if k != "ok")
-    return f"free_job answers={answers}/{expected}{bad}"
+    hid = "".join(f" {k}={v}" for k, v in sorted((masked or {}).items()))
+    return f"free_job answers={answers}/{expected}{bad}{hid}"
 
 
 def free_alert(status):
@@ -980,24 +988,82 @@ def free_alert(status):
     notify_event("free_check", ref="free-check", status=status, unique=now().strftime("%y%m%d%H"), webhook=True)
 
 
+def free_cap_alert(provider, month, spent, cap):
+    """First cap_reached of a provider in a month: one alert through the existing path (deduped by provider+month)."""
+    provider = re.sub(r"[^a-z]", "", str(provider))[:20]
+    month = re.sub(r"[^0-9-]", "", str(month))[:7]
+    notify_event("free_cap", ref=f"free-cap-{provider}", unique=month, webhook=True,
+                 detail=f"Provider {provider}; month {month}; estimated spend ${spent:.2f} of ${cap:.2f} cap")
+
+
+def _cap_load(provider, month):
+    return Store().get(f"caps/{provider}-{month}.json")[0]
+
+
+def _cap_save(provider, month, rec):
+    Store().put(f"caps/{provider}-{month}.json", rec, overwrite=True)    # counts and estimated USD only
+
+
+free_caps.install(free_caps.CapLedger(clock=lambda: clock(), load=_cap_load, save=_cap_save, on_cap=free_cap_alert))
+
+
+def free_refusal():
+    """The reason code when no free provider can take a new check, else None. Calls no vendor."""
+    try:
+        from aivis import order
+        pre = getattr(order.build_free_provider(), "preflight", None)
+        return pre() if pre else None
+    except Exception as e:
+        log("free preflight failed: " + type(e).__name__)
+        return None
+
+
+def free_page(answers, expected, named_in, note, partial):
+    """The stored free result: our own derived numbers only. No names, grounded text, Suggestions or citations."""
+    E = _html.escape
+    h = ["<!doctype html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+         "<title>Your free check</title><body style='font-family:system-ui,sans-serif;max-width:640px;margin:2em auto;padding:0 1em'>"
+         "<h1>Your free check</h1>", f"<p>{E(note)}</p>"]
+    if partial:
+        h.append(f"<p><b>{E(partial)}</b> Do not rely on these numbers.</p>")
+    else:
+        h.append(f"<p>Your business: {'named in %d of %d answers' % (named_in, answers) if named_in else 'not named'}.</p>")
+    h.append("<p><small>AI output, not verified. The names the AI gave, with their sources, are shown once on the page "
+             "where you ran the check and are not saved. Run the check again to see them again.</small></p>")
+    return "".join(h)
+
+
+def collect_live(records):
+    """Live-only extras from the answers: unique Suggestions snippets (unmodified) and citation links."""
+    sugg, cites, seen = [], [], set()
+    for ans, _, _ in records:
+        live = getattr(ans, "live", None) or {}
+        s_ = live.get("suggestions")
+        if isinstance(s_, str) and s_ and s_ not in sugg:
+            sugg.append(s_)
+        for c in live.get("citations") or []:
+            if c.get("url") not in seen:
+                seen.add(c["url"]); cites.append(dict(c))
+    return sugg[:8], cites[:12]
+
+
 def free_job(job_id, req):
-    from aivis.order import Order, run_order, AnswerShortfall
-    from aivis.report_pro import render
+    from aivis.order import Order, run_order, AnswerShortfall, FreeUnavailable
     tmp = tempfile.mkdtemp(prefix="free-")
-    reasons, answers, expected = {}, 0, FREE_QUESTIONS
+    reasons, masked, answers, expected = {}, {}, 0, FREE_QUESTIONS
     try:
         o = Order(order_id="FREE-" + job_id[:8], business_name=req["business"], city=req["city"],
                   niche=req["niche"], plan="free")
         register, roster = fetch_roster(get_niche(req["niche"]), req["city"])
-        note = "Free quick check: one AI model answering from memory, no web search, 8 questions."
+        note = "Free quick check: AI output with web search, 8 questions."
 
         def paint(r):
             got = r.score.total_answers
             part = f"Partial result: {got} of {expected} questions answered" if got < FREE_MIN_ANSWERS else ""
-            return render(r, sample=True, run_note=note, register=register, partial_note=part,
-                          names_asked=expected, names_min=FREE_MIN_ANSWERS)
+            return free_page(got, expected, sum(p.target_hits for p in r.score.providers), note, part)
         res, lg = run_order(o, mode="free", out_dir=tmp, render=paint, **({"roster": roster} if roster else {}))
         answers = res.score.total_answers
+        masked = (lg or {}).get("provider_failures") or {}
         reasons = (lg or {}).get("reasons") or (res.reason_counts() if hasattr(res, "reason_counts") else {})
         with open(os.path.join(tmp, o.order_id, "report.html"), encoding="utf-8") as fh:
             Store().put_text(free_report_path(o.order_id), fh.read())
@@ -1007,22 +1073,27 @@ def free_job(job_id, req):
         if records is not None:
             out["names"] = names_mod.from_records(records, req["business"], req["city"], register,
                                                  asked=expected, min_answers=FREE_MIN_ANSWERS)
+            out["suggestions"], out["citations"] = collect_live(records)
         if answers < FREE_MIN_ANSWERS:
             out.update({"status": "partial", "message": f"Partial result: {answers} of {expected} questions answered"})
         else:
             out.update({"status": "done", "named_in": sum(p.target_hits for p in res.score.providers)})
         finish_job(job_id, out)
     except Exception as e:  # never leak internals to the browser
-        if isinstance(e, AnswerShortfall):
-            reasons = dict(e.reasons)
+        if isinstance(e, FreeUnavailable):
+            reasons = {e.reason: 1}
+            finish_job(job_id, {"status": "unavailable", "message": UNAVAILABLE_MSG, "answers": 0, "expected": expected})
         else:
-            reasons = {"error": 1}
-        finish_job(job_id, {"status": "failed", "message": FAIL_MSG, "answers": 0, "expected": expected,
-                            "reasons": {k: v for k, v in reasons.items() if k != "ok"}})
+            if isinstance(e, AnswerShortfall):
+                reasons = dict(e.reasons)
+            else:
+                reasons = {"error": 1}
+            finish_job(job_id, {"status": "failed", "message": FAIL_MSG, "answers": 0, "expected": expected,
+                                "reasons": {k: v for k, v in reasons.items() if k != "ok"}})
         print("free job failed:", type(e).__name__, file=sys.stderr)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
-    print(free_summary_line(answers, expected, reasons), file=sys.stderr)
+    print(free_summary_line(answers, expected, reasons, masked), file=sys.stderr)
     if answers < FREE_MIN_ANSWERS:
         free_alert("failed" if answers == 0 else "partial")
 
@@ -1184,7 +1255,12 @@ class H(http.server.BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/check/([a-f0-9-]{36})", path)
         if m:
             prune_jobs()
-            return self._json(200, JOBS.get(m.group(1), {"status": "unknown"}))
+            with LOCK:
+                j = JOBS.get(m.group(1))
+                out = dict(j) if j is not None else {"status": "unknown"}
+                for k in LIVE_KEYS:         # the visitor who asked gets them once; nothing keeps them after that
+                    (j or {}).pop(k, None)
+            return self._json(200, out)
         if self._agency("GET"):
             return
         m = re.fullmatch(r"/(r|status)/(.*)", path)
@@ -1245,6 +1321,8 @@ class H(http.server.BaseHTTPRequestHandler):
                 req = clean(body)
                 ip = client_ip(self.headers, self.client_address[0])
                 r = instant(req)
+                if FREE_RUN and not r and free_refusal() == "cap_reached":     # the test token does not skip this
+                    return self._json(503, {"error": UNAVAILABLE_MSG})
                 bypass = bypass_ok(self.headers)
                 if bypass:
                     ip = "bypass"               # never counted against a real visitor's address

@@ -1,4 +1,5 @@
-"""Free, no-sign-up provider: Pollinations text API (https://text.pollinations.ai).
+"""EXPLICIT, NON-DEFAULT option (CLI only): never run automatically and never a fallback for the free check
+(the free check uses providers/free_search.py). Free, no-sign-up provider: Pollinations text API (https://text.pollinations.ai).
 
 Mode is 'model-memory': it answers from an LLM's training data with NO live
 web search, so it is not what a ChatGPT user sees (Paprik AI, Apr 2026: API

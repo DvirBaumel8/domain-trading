@@ -1,8 +1,10 @@
 """Customer orders: intake -> cost estimate -> capped run -> report files.
 
 Modes
-- 'free'  : Pollinations (no key, no cost, model memory only). For the free
-            self-check and for dry runs. Report is labelled accordingly.
+- 'free'  : the free self-check: Gemini with Google Search grounding, then OpenAI web_search as the fallback,
+            each with its own hard monthly spend cap (providers/free_search.py, free_caps.py, free_config.py).
+            It reads GEMINI_API_KEY / OPENAI_API_KEY but never unlocks paid mode. Pollinations (model memory,
+            no key) is an explicit option of the CLI only and is never run or used as a fallback here.
 - 'paid'  : OpenAI / Gemini / Claude with live web search.
             NEVER runs unless ALL hold: env AIVIS_ALLOW_PAID=1, the engine's
             API key is in env, and the estimated cost <= the order's cap.
@@ -27,7 +29,8 @@ from .niches import NICHES, get_niche
 from .parse import match_name
 from . import config
 from .uscities import is_us_place
-from .providers import REGISTRY, BudgetGuard, Business, MockProvider, PollinationsProvider, ProviderError
+from .providers import REGISTRY, BudgetGuard, Business, MockProvider, ProviderError
+from .providers.free_search import FreeSearchProvider
 
 PAID_ENGINES = config.PAID_ENGINES
 ENV_KEYS = config.ENV_KEYS
@@ -51,6 +54,18 @@ US_ONLY_MSG = ("This check covers US businesses only. Enter your city as 'City, 
 
 class OrderError(RuntimeError):
     pass
+
+
+class FreeUnavailable(OrderError):
+    """No free-check provider can take this check (caps hit or keys missing). `reason` is a reason code only."""
+    def __init__(self, reason):
+        super().__init__(f"free check unavailable: {reason}")
+        self.reason = reason
+
+
+def build_free_provider():
+    """The free check's provider chain (tests replace this)."""
+    return FreeSearchProvider()
 
 
 def city_is_us(city: str) -> bool:
@@ -151,7 +166,7 @@ def paid_readiness(engines) -> dict:
 
 def build_providers(order: Order, mode: str, cap_usd: float, roster=None, seed=0):
     if mode == "free":
-        return [PollinationsProvider()], None
+        return [build_free_provider()], None
     if mode == "mock":
         names = roster or [order.business_name]
         strength = {n: 1.0 + (zlib.crc32(n.encode()) % 7) for n in names}
@@ -247,6 +262,11 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
             log["site_error"] = site.error
             print(f"[operator] order {order.order_id}: website check failed ({site.error}); "
                   f"site findings skipped", file=sys.stderr)
+    if mode == "free":
+        for p in providers:
+            why = getattr(p, "preflight", lambda: None)()
+            if why:
+                raise FreeUnavailable(why)
     names = list(roster or [])
     for c in order.competitors:         # competitors the buyer watches are tracked by name
         c = c.strip()
@@ -254,11 +274,15 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
             continue                    # empty, the target itself, or already tracked
         names.append(c)
     try:
-        res = run_audit(get_niche(order.niche), order.city, order.business_name, names, providers,
-                        n_prompts=n, repeats=r, seed=seed, signals=site,
-                        target_reviews=order.target_reviews, competitor_reviews=order.competitor_reviews,
-                        real_cap_usd=cap_usd if mode == "paid" else None,
-                        fail_fast_after=FREE_FAIL_FAST_AFTER if mode == "free" else None)
+        try:
+            res = run_audit(get_niche(order.niche), order.city, order.business_name, names, providers,
+                            n_prompts=n, repeats=r, seed=seed, signals=site,
+                            target_reviews=order.target_reviews, competitor_reviews=order.competitor_reviews,
+                            real_cap_usd=cap_usd if mode == "paid" else None,
+                            fail_fast_after=FREE_FAIL_FAST_AFTER if mode == "free" else None)
+        finally:
+            for p in providers:             # free check: write the monthly counters once per check
+                getattr(p, "finish", lambda: None)()
     except SpendCapExceeded as e:       # same no-partial path as engine failures: nothing is written
         print(f"[operator] ALERT order {order.order_id}: real usage ${e.spent:.4f} went over the order cap "
               f"${e.cap:.2f}; run stopped, no report", file=sys.stderr)
@@ -267,6 +291,12 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
         raise err from None
     log["usage"] = usage_report(res.records)
     log["reasons"], log["expected"] = res.reason_counts(), n * r
+    masked = {}
+    for p in providers:
+        for vendor, rs in (getattr(p, "failures", None) or {}).items():
+            masked.update({f"{vendor}:{k}": v for k, v in rs.items()})
+    if masked:
+        log["provider_failures"] = masked      # reason codes per provider, including ones a fallback hid
     real_spent = log["usage"]["total"]["cost_usd"] if log["usage"]["calls"] else (guard.spent if guard else res.cost_usd)
     try:
         _check_answers(res, order, n * r, log)
@@ -282,6 +312,10 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
     if render:
         with open(os.path.join(folder, "report.html"), "w", encoding="utf-8") as f:
             f.write(render(res))
+    if mode == "free":      # grounded text and citations are never written, not even to the scratch folder
+        with open(os.path.join(folder, "order-log.json"), "w", encoding="utf-8") as f:
+            json.dump({k: v for k, v in log.items() if k != "usage"}, f, indent=1)
+        return res, log
     raw = [{"provider": a.provider, "mode": a.mode, "prompt": a.prompt, "intent": i, "repeat": a.run,
             "text": a.text, "citations": a.citations,
             "usage": a.usage, "mentions": [[m.raw, m.position, m.roster_name] for m in ms]} for a, ms, i in res.records]

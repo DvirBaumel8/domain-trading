@@ -38,16 +38,16 @@ class Base(til.Reset):
         shutil.rmtree(os.path.join(server.LOCAL_ORDERS, "alerts"), ignore_errors=True)
         shutil.rmtree(os.path.join(server.LOCAL_ORDERS, "leads"), ignore_errors=True)
         server.ROSTER_CACHE.clear()
-        self.saved_p, self.saved_ro, self.saved_now = order.PollinationsProvider, server.ROSTER_OPENER, server.now
+        self.saved_p, self.saved_ro, self.saved_now = order.build_free_provider, server.ROSTER_OPENER, server.now
         os.environ.pop("AVC_TEST_BYPASS_TOKEN", None)
 
     def tearDown(self):
-        order.PollinationsProvider, server.ROSTER_OPENER, server.now = self.saved_p, self.saved_ro, self.saved_now
+        order.build_free_provider, server.ROSTER_OPENER, server.now = self.saved_p, self.saved_ro, self.saved_now
         os.environ.pop("AVC_TEST_BYPASS_TOKEN", None)
         super().tearDown()
 
     def free(self, outcomes, niche="plumber", city="Denver, CO", jid="abcdef12-0000"):
-        order.PollinationsProvider = lambda: ScriptedProvider(outcomes)
+        order.build_free_provider = lambda: ScriptedProvider(outcomes)
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
             server.free_job(jid, dict(OK, niche=niche, city=city, business="Zed Co"))
@@ -89,10 +89,9 @@ class Degraded(Base):
         n = r["names"]
         self.assertEqual((n["heading"], n["based_on"], n["answers"]), (HEADING, "based on 1 of 8 answers", 8))
         self.assertTrue(all(x["answers"] <= 8 for x in n["names"]))
-        page = self.req("GET", r["report"])[1].decode()
-        self.assertIn(HEADING, page)
-        self.assertIn("based on 1 of 8 answers", page)
-        self.assertNotIn("1 of 1", page)
+        page = self.req("GET", r["report"])[1].decode()     # the stored page holds derived numbers only
+        self.assertIn("Partial result: 1 of 8 questions answered", page)
+        self.assertNotIn("Alpha Dental", page)
         self.assertIn("based_on", open(os.path.join(os.path.dirname(HERE), "site", "assets", "app.js")).read())
 
     def test_complete_run_has_no_based_on(self):
@@ -111,7 +110,7 @@ class Degraded(Base):
         self.assertIn("free_job answers=1/8 http_403=3 skipped_after_permanent_errors=4", err)
 
     def test_fail_fast_all_failed(self):
-        order.PollinationsProvider = lambda: ScriptedProvider(["!http_403"])
+        order.build_free_provider = lambda: ScriptedProvider(["!http_403"])
         r, err = self.free(["!http_403"], jid="abcdef12-0001")
         self.assertEqual((r["status"], r["answers"]), ("failed", 0))
         self.assertEqual(r["reasons"], {"http_403": 3, "skipped_after_permanent_errors": 5})
@@ -123,7 +122,7 @@ class Degraded(Base):
 
     def test_0_of_8_fails_clearly_and_request_is_saved(self):
         server.FREE_RUN = True
-        order.PollinationsProvider = lambda: ScriptedProvider(["!rate_limited"])
+        order.build_free_provider = lambda: ScriptedProvider(["!rate_limited"])
         import threading
         orig = server.free_job
         done = threading.Event()
@@ -193,9 +192,8 @@ class NamesShown(Base):
         rows = {x["name"]: x["match"] for x in r["names"]["names"]}
         self.assertEqual(rows, {"Alpha Dental": "matches a real listing", "Beta Smiles": "not found in the official register"})
         self.assertEqual(r["names"]["named_in"], 8)
-        page = self.req("GET", r["report"])[1].decode()
-        self.assertIn(HEADING, page)
-        self.assertIn("not found in the official register", page)
+        self.assertEqual(r["names"]["heading"], HEADING)
+        self.assertNotIn("Alpha Dental", self.req("GET", r["report"])[1].decode())   # names are live only
 
     def test_roster_failure_still_returns_result(self):
         self.roster(fail=True)
@@ -203,7 +201,7 @@ class NamesShown(Base):
         self.assertEqual(r["status"], "done")
         self.assertEqual(r["names"]["register_note"], "could not verify names")
         self.assertTrue(all(x["match"] == "" for x in r["names"]["names"]))
-        self.assertIn("could not verify names", self.req("GET", r["report"])[1].decode())
+        self.assertNotIn("Alpha Dental", self.req("GET", r["report"])[1].decode())
 
     def test_roster_cached_per_niche_and_city(self):
         calls = self.roster()
@@ -216,25 +214,25 @@ class NamesShown(Base):
         r, _ = self.free([NAMES] * 8, niche="personal_injury_lawyer")
         self.assertEqual(calls, [])
         self.assertEqual(r["names"]["register_note"], "no official register available for this type, names not verified")
-        self.assertIn(HEADING, self.req("GET", r["report"])[1].decode())
+        self.assertEqual(r["names"]["heading"], HEADING)
+        self.assertNotIn("Alpha Dental", self.req("GET", r["report"])[1].decode())
 
     def test_no_names_message(self):
         r, _ = self.free(["I'm not sure any businesses exist here."] * 8)
         self.assertEqual(r["names"]["names"], [])
-        self.assertIn("The AI did not name any businesses in its answers.", self.req("GET", r["report"])[1].decode())
+        self.assertEqual(r["names"]["empty_note"], "The AI did not name any businesses in its answers.")
 
     def test_hostile_names_escaped_in_report(self):
         r, _ = self.free(["1. **<img src=x onerror=alert(1)>**\n2. **Gamma Plumbing**"] * 8)
         page = self.req("GET", r["report"])[1].decode()
-        self.assertNotIn("<img src=x", page)
-        self.assertIn("&lt;img src=x", page)
+        self.assertNotIn("img src=x", page)         # never stored; the live names are escaped by app.js (esc)
+        self.assertIn("img src=x", json.dumps(r["names"]))
+        self.assertIn("esc(x.name)", open(os.path.join(os.path.dirname(HERE), "site", "assets", "app.js")).read())
 
     def test_unmatched_names_never_called_competitors(self):
         self.roster()
         r, _ = self.free([NAMES] * 8, niche="dentist")
-        page = self.req("GET", r["report"])[1].decode()
-        sec = page[page.index(HEADING):]
-        self.assertNotIn("competitor", sec.lower())
+        self.assertNotIn("competitor", json.dumps(r["names"]).lower())
         self.assertEqual(r["names"]["matched_count"], 1)
 
     def test_instant_path_exposes_names_and_keeps_counts(self):
