@@ -22,6 +22,7 @@ from aivis.parse import match_name          # noqa: E402
 from aivis.niches import NICHES, get_niche  # noqa: E402
 from aivis.order import US_STATES, US_ONLY_MSG, normalize_website  # noqa: E402
 from site_config import BUSINESS_ADDRESS    # noqa: E402
+import delivery                             # noqa: E402
 import html as _html
 
 DATA = os.path.join(HERE, "data")
@@ -143,6 +144,42 @@ class Store:
             return False
         raise RuntimeError(f"orders store write failed ({st})")
 
+    def put_text(self, path, text):
+        """Store a text file (report.html etc.), replacing any older copy."""
+        if not self.remote:
+            f = os.path.join(LOCAL_ORDERS, path)
+            os.makedirs(os.path.dirname(f), exist_ok=True)
+            with LOCK, open(f, "w", encoding="utf-8") as fh:
+                fh.write(text)
+            return
+        payload = {"message": "order data", "content": base64.b64encode(text.encode()).decode()}
+        _, sha = self.get_raw(path)
+        if sha:
+            payload["sha"] = sha
+        st, _ = http_call(urllib.request.Request(self._url(path), data=json.dumps(payload).encode(), method="PUT",
+                                                 headers={**self._hdr(), "Content-Type": "application/json"}))
+        if st not in (200, 201):
+            raise RuntimeError(f"orders store write failed ({st})")
+
+    def get_raw(self, path):
+        """-> (text, sha) or (None, None)."""
+        if not self.remote:
+            f = os.path.join(LOCAL_ORDERS, path)
+            if not os.path.isfile(f):
+                return None, None
+            with open(f, encoding="utf-8") as fh:
+                return fh.read(), None
+        st, body = http_call(urllib.request.Request(self._url(path), headers=self._hdr()))
+        if st == 404:
+            return None, None
+        if st != 200:
+            raise RuntimeError(f"orders store read failed ({st})")
+        j = json.loads(body)
+        return base64.b64decode(j["content"]).decode("utf-8"), j["sha"]
+
+    def get_text(self, path):
+        return self.get_raw(path)[0]
+
 
 def alert(text):
     url = os.environ.get("ORDER_ALERT_WEBHOOK_URL", "").strip()
@@ -201,6 +238,15 @@ def mark_paid(store, oid, ref):
     return True
 
 
+def start_delivery(store, oid, lead=""):
+    try:
+        delivery.on_paid(store, oid, alert, lead)
+    except Exception as e:      # a delivery problem must never fail the webhook
+        log("delivery start failed: " + type(e).__name__)
+        if lead:
+            alert(lead)
+
+
 def handle_polar(headers, body):
     """-> (http status, json). Verifies, dedupes, marks paid, alerts."""
     if not verify_polar(os.environ.get("POLAR_WEBHOOK_SECRET", ""), headers, body):
@@ -221,7 +267,7 @@ def handle_polar(headers, body):
             oid = (store.get(f"index/{email_key(email)}.json")[0] or {}).get("order_id", "")
             paid = bool(oid) and mark_paid(store, oid, ref)
         if paid:
-            alert(f"Order {oid} PAID (Polar {ref})")
+            start_delivery(store, oid, f"Order {oid} PAID (Polar {ref})")
             res = {"status": "paid", "order_id": oid}
         else:
             if email:   # payment arrived before the intake form: remember it
@@ -238,18 +284,21 @@ def handle_polar(headers, body):
 def new_order(d, req):
     store = Store()
     oid = "ORD-" + datetime.date.today().strftime("%y%m%d") + "-" + uuid.uuid4().hex[:6]
+    token = delivery.new_token()
     intake = {"order_id": oid, "business_name": req["business"], "city": req["city"],
               "niche": req["niche"], "email": req["email"], "website": req["website"],
-              "plan": "check", "paid_ref": str(d.get("paid_ref", ""))[:60], "paid": False,
+              "token": token, "plan": "check", "paid_ref": str(d.get("paid_ref", ""))[:60], "paid": False,
               "competitors": [c.strip()[:120] for c in str(d.get("competitors", "")).split(",") if c.strip()][:5]}
     store.put(f"orders/{oid}.json", intake)
+    delivery.register_token(store, oid, token)
     if req["email"]:
         store.put(f"index/{email_key(req['email'])}.json", {"order_id": oid}, overwrite=True)
         pay, _ = store.get(f"payments/{email_key(req['email'])}.json")
         if pay:
             mark_paid(store, oid, pay.get("ref", ""))
+            start_delivery(store, oid)
     alert(f"New order {oid}")
-    return oid
+    return oid, token
 
 
 def slug(niche, city):
@@ -318,8 +367,12 @@ class H(http.server.BaseHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(b)
 
-    def _send(self, code, ctype, body):
+    def _send(self, code, ctype, body, private=False):
         self.send_response(code); self.send_header("Content-Type", ctype)
+        if private:
+            for k, v in (("X-Robots-Tag", "noindex, nofollow"), ("Cache-Control", "no-store"),
+                         ("Referrer-Policy", "no-referrer")):
+                self.send_header(k, v)
         self.send_header("Content-Length", str(len(body))); self.end_headers()
         if self.command != "HEAD":
             self.wfile.write(body)
@@ -341,10 +394,21 @@ class H(http.server.BaseHTTPRequestHandler):
         if path in ("/health", "/healthz"):
             return self._json(200, {"ok": True})
         if path == "/robots.txt":
-            return self._send(200, "text/plain", b"User-agent: *\nAllow: /\nDisallow: /data/\nDisallow: /api/\n")
+            return self._send(200, "text/plain", b"User-agent: *\nAllow: /\nDisallow: /data/\nDisallow: /api/\nDisallow: /r/\nDisallow: /status/\n")
         m = re.fullmatch(r"/api/check/([a-f0-9-]{36})", path)
         if m:
             return self._json(200, JOBS.get(m.group(1), {"status": "unknown"}))
+        m = re.fullmatch(r"/(r|status)/(.*)", path)
+        if m:
+            try:
+                st = Store()
+                page = (delivery.report_html if m.group(1) == "r" else delivery.status_page)(st, m.group(2))
+            except Exception as e:
+                print("error:", type(e).__name__, file=sys.stderr)
+                page = None
+            if page is None:
+                return self._json(404, {"error": "not found"})
+            return self._send(200, "text/html; charset=utf-8", page.encode(), private=True)
         m = re.fullmatch(r"/free/(FREE-[a-f0-9]{8})", path)
         if m:
             p = os.path.join(DATA, "free-checks", m.group(1), "report.html")
@@ -387,8 +451,8 @@ class H(http.server.BaseHTTPRequestHandler):
                 return self._json(200, {"status": "saved"})
             if self.path == "/api/intake":
                 d = json.loads(self._body() or b"{}")
-                oid = new_order(d, clean(d))
-                return self._json(200, {"status": "received", "order_id": oid})
+                oid, token = new_order(d, clean(d))
+                return self._json(200, {"status": "received", "order_id": oid, "status_url": "/status/" + token})
             return self._json(404, {"error": "not found"})
         except ValueError as e:
             return self._json(400, {"error": str(e)})
