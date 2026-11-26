@@ -1,11 +1,9 @@
 """Broken Link Auditor: the Apify adapter."""
 from __future__ import annotations
 
-import httpx
 from apify import Actor
 
-from .core import UA
-from .runner import run
+from .runner import make_client, run
 
 
 async def main() -> None:
@@ -19,8 +17,9 @@ async def main() -> None:
             await Actor.push_data(row)
             return False
 
-        async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers={'User-Agent': UA}) as client:
-            ok, msg = await run(inp, client=client, push=push, set_status=Actor.set_status_message)
+        async with make_client() as client:
+            ok, msg = await run(inp, client=client, push=push, set_status=Actor.set_status_message,
+                                 debug_log=Actor.log.info)
         if not ok:
             await Actor.fail(status_message=msg)
             return

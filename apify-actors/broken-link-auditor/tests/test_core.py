@@ -206,3 +206,180 @@ def test_normalize():
     assert core.normalize_url("EX.com/a#b") == "https://ex.com/a"
     assert core.normalize_url("/x", "https://ex.com/a/b") == "https://ex.com/x"
     assert core.normalize_url("javascript:void(0)", "https://ex.com/") is None
+
+
+# ---- BLA-1..4 ----
+import socket  # noqa: E402
+import ssl  # noqa: E402
+
+from src import polite  # noqa: E402
+
+
+def drive_with(inp, handler, **kw):
+    pushed = []
+
+    async def push(row, charge):
+        pushed.append((row, charge))
+        return False
+
+    async def status(_):
+        return None
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler), follow_redirects=False) as c:
+            return await runner.run(inp, client=c, push=push, set_status=status, sleep=nosleep,
+                                    limiter=HostLimiter(0, sleep=nosleep), **kw)
+    return asyncio.run(go()), pushed
+
+
+def test_make_client_does_not_follow_redirects():
+    c = runner.make_client()
+    assert c.follow_redirects is False
+    asyncio.run(c.aclose())
+
+
+def test_mock_301_gives_redirect_chain_of_one():
+    def h(req):
+        if req.url.path == "/robots.txt":
+            return httpx.Response(404)
+        if req.url.path == "/old":
+            return httpx.Response(301, headers={"location": "https://ex.com/new"})
+        return httpx.Response(200, headers={"content-type": "text/html"}, text="ok")
+    _, pushed = drive_with({"startUrls": ["https://ex.com/old"]}, h)
+    row = pushed[0][0]
+    assert row["category"] == "redirect" and len(row["redirectChain"]) == 1 and row["finalUrl"] == "https://ex.com/new"
+
+
+def test_eleven_hops_is_a_redirect_loop():
+    def h(req):
+        if req.url.path == "/robots.txt":
+            return httpx.Response(404)
+        n = int(req.url.path.strip("/") or 0)
+        return httpx.Response(301, headers={"location": f"/{n + 1}"})
+    _, pushed = drive_with({"startUrls": ["https://ex.com/0"]}, h)
+    assert pushed[0][0]["redirectLoop"] is True
+
+
+def test_retry_only_on_timeout_and_connect_error():
+    def run_with(exc, status=None):
+        calls = []
+
+        def h(req):
+            calls.append(1)
+            if status:
+                return httpx.Response(status)
+            raise exc
+        async def go():
+            async with httpx.AsyncClient(transport=httpx.MockTransport(h)) as c:
+                try:
+                    return await polite.request(c, "GET", "https://ex.com/", sleep=nosleep, retries=2,
+                                                retry_on=runner.RETRY_ON, retry_status=())
+                except polite.FetchError:
+                    return None
+        asyncio.run(go())
+        return len(calls)
+    assert run_with(httpx.ConnectTimeout("t")) == 3
+    assert run_with(httpx.ConnectError("c")) == 3
+    assert run_with(httpx.TooManyRedirects("r")) == 1
+    assert run_with(httpx.ReadError("r")) == 1
+    assert run_with(None, status=503) == 1
+    assert run_with(None, status=429) == 1
+
+
+def test_default_policy_still_retries_429_and_5xx_and_http_errors():
+    for status in (429, 500, 503):
+        calls = []
+
+        def h(req):
+            calls.append(1)
+            return httpx.Response(status)
+
+        async def go():
+            async with httpx.AsyncClient(transport=httpx.MockTransport(h)) as c:
+                return await polite.request(c, "GET", "https://ex.com/", sleep=nosleep, retries=2)
+        assert asyncio.run(go()).status_code == status and len(calls) == 3
+    calls = []
+
+    def h2(req):
+        calls.append(1)
+        raise httpx.ReadError("x")
+
+    async def go2():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(h2)) as c:
+            try:
+                await polite.request(c, "GET", "https://ex.com/", sleep=nosleep, retries=2)
+            except polite.FetchError:
+                pass
+    asyncio.run(go2())
+    assert len(calls) == 3
+
+
+def test_list_mode_runs_with_concurrency_above_one():
+    active = {"now": 0, "max": 0}
+
+    async def go():
+        async def handler(req):
+            return httpx.Response(200, headers={"content-type": "text/plain"})
+        pushed = []
+
+        class T(httpx.AsyncBaseTransport):
+            async def handle_async_request(self, req):
+                if req.url.path == "/robots.txt":
+                    return httpx.Response(404)
+                active["now"] += 1
+                active["max"] = max(active["max"], active["now"])
+                await asyncio.sleep(0.01)
+                active["now"] -= 1
+                return httpx.Response(200, headers={"content-type": "text/plain"})
+
+        async def push(row, charge):
+            pushed.append(row)
+            return False
+
+        async def status(_):
+            return None
+        async with httpx.AsyncClient(transport=T()) as c:
+            await runner.run({"startUrls": [f"https://ex.com/{i}" for i in range(6)], "maxConcurrency": 4, "respectRobots": False},
+                             client=c, push=push, set_status=status, limiter=HostLimiter(0, sleep=nosleep))
+        return pushed
+    rows = asyncio.run(go())
+    assert len(rows) == 6 and active["max"] > 1
+
+
+def _chained(outer, inner):
+    outer.__cause__ = inner
+    return outer
+
+
+def test_error_reason_mapping():
+    assert runner.error_reason(_chained(httpx.ConnectError("x"), socket.gaierror(-2, "Name or service not known"))) == "dns_failure"
+    assert runner.error_reason(_chained(httpx.ConnectError("x"), ConnectionRefusedError())) == "connection_refused"
+    assert runner.error_reason(httpx.ConnectTimeout("x")) == "connect_timeout"
+    assert runner.error_reason(_chained(httpx.ConnectError("x"), ssl.SSLError("bad"))) == "tls_error"
+    assert runner.error_reason(httpx.ReadError("x")) == "other"
+    assert runner.error_reason(httpx.ReadTimeout("x")) == "other"
+    assert runner.error_reason(None) == "other"
+
+
+def test_error_row_has_plain_reason_and_is_uncharged():
+    def h(req):
+        if req.url.path == "/robots.txt":
+            return httpx.Response(404)
+        raise _chained(httpx.ConnectError("x"), ConnectionRefusedError())
+    _, pushed = drive_with({"startUrls": ["https://ex.com/a"]}, h)
+    row, charge = pushed[0]
+    assert row["category"] == "error" and row["error"] == "connection_refused" and charge is False
+
+
+def test_debug_network_is_opt_in_and_logs_no_path_headers_or_bodies():
+    def h(req):
+        if req.url.path == "/robots.txt":
+            return httpx.Response(404)
+        raise _chained(httpx.ConnectError("x"), socket.gaierror(-2, "Name or service not known"))
+    url = "https://ex.com/secret/path?token=abc"
+    off, on = [], []
+    drive_with({"startUrls": [url]}, h, debug_log=off.append)
+    drive_with({"startUrls": [url], "debugNetwork": True}, h, debug_log=on.append)
+    assert off == [] and on
+    text = " ".join(on)
+    assert "ex.com" in text and "dns_failure" in text and "secret" not in text and "token" not in text

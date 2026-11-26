@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import asyncio
+import socket
+import ssl
 import time
 from datetime import datetime, timezone
 
@@ -9,23 +11,64 @@ import httpx
 
 from . import core
 from .polite import FetchError, HostLimiter, request
+from urllib.parse import urlsplit
 
 REDIRECT_CODES = (301, 302, 303, 307, 308)
 GET_FALLBACK = (403, 405, 501)
 MAX_BODY = 2 * 1024 * 1024
+# Retry only on timeouts and connect errors; never on HTTP status, TooManyRedirects or read errors.
+RETRY_ON = (httpx.TimeoutException, httpx.ConnectError)
+DNS_HINTS = ("name or service not known", "nodename nor servname", "temporary failure in name resolution",
+             "no address associated", "getaddrinfo", "name resolution")
+
+
+def make_client(timeout: float = 20) -> httpx.AsyncClient:
+    """The one place the client is built. Redirects are followed by the runner (chain, loop, finalUrl), never by httpx."""
+    return httpx.AsyncClient(timeout=timeout, follow_redirects=False, headers={"User-Agent": core.UA})
+
+
+def error_reason(exc: BaseException | None) -> str:
+    """A plain reason for a failed request: dns_failure, connection_refused, connect_timeout, tls_error or other."""
+    chain, e = [], exc
+    while e is not None and e not in chain:
+        chain.append(e)
+        e = e.__cause__ or e.__context__
+    if any(isinstance(e, httpx.ConnectTimeout) for e in chain):
+        return "connect_timeout"
+    if any(isinstance(e, ssl.SSLError) for e in chain) or any("ssl" in str(e).lower() and "certificate" in str(e).lower() for e in chain):
+        return "tls_error"
+    if any(isinstance(e, ConnectionRefusedError) for e in chain):
+        return "connection_refused"
+    if any(isinstance(e, socket.gaierror) or any(h in str(e).lower() for h in DNS_HINTS) for e in chain):
+        return "dns_failure"
+    return "other"
 
 
 class Auditor:
-    def __init__(self, client, limiter, sleep, respect_robots, clock=time.monotonic):
+    def __init__(self, client, limiter, sleep, respect_robots, clock=time.monotonic, debug_log=None):
         self.client, self.limiter, self.sleep, self.respect, self.clock = client, limiter, sleep, respect_robots, clock
+        self.debug_log = debug_log
         self._robots: dict[str, tuple] = {}
+
+    async def _req(self, method, url, **kw):
+        def on_error(attempt, exc):
+            # Connect details only: host, attempt, reason, exception classes. No path, query, headers or bodies.
+            if self.debug_log:
+                chain, e = [], exc
+                while e is not None and e not in chain:
+                    chain.append(type(e).__name__)
+                    e = e.__cause__ or e.__context__
+                self.debug_log(f"network debug: host={urlsplit(url).netloc} attempt={attempt + 1} "
+                               f"reason={error_reason(exc)} chain={'>'.join(chain)}")
+        return await request(self.client, method, url, limiter=self.limiter, sleep=self.sleep,
+                             retry_on=RETRY_ON, retry_status=(), on_error=on_error, **kw)
 
     async def robots(self, url):
         o = core.origin(url)
         if o not in self._robots:
             parser, text = None, ""
             try:
-                r = await request(self.client, "GET", o + "/robots.txt", limiter=self.limiter, sleep=self.sleep, retries=1)
+                r = await self._req("GET", o + "/robots.txt", retries=1)
                 if r.status_code == 200:
                     text = r.text
                     parser = core.parse_robots(text)
@@ -37,12 +80,12 @@ class Auditor:
     async def _probe(self, url, want_body):
         if not want_body:
             try:
-                r = await request(self.client, "HEAD", url, limiter=self.limiter, sleep=self.sleep)
+                r = await self._req("HEAD", url)
                 if r.status_code not in GET_FALLBACK:
                     return r
             except FetchError:
                 pass  # empty or broken HEAD answer: try GET once
-        return await request(self.client, "GET", url, limiter=self.limiter, sleep=self.sleep)
+        return await self._req("GET", url)
 
     async def check(self, url: str, want_body: bool = False) -> tuple[dict, str | None]:
         row = {"url": url, "category": "error", "statusCode": None, "finalUrl": None, "redirectChain": [],
@@ -74,7 +117,7 @@ class Auditor:
                     continue
                 break
         except FetchError as e:
-            row["error"] = str(e)
+            row["error"] = error_reason(e.__cause__)
             resp = None
         row["responseTimeMs"] = int((self.clock() - start) * 1000)
         row["finalUrl"] = cur
@@ -106,7 +149,7 @@ class Auditor:
                 continue
             seen_maps.add(sm)
             try:
-                r = await request(self.client, "GET", sm, limiter=self.limiter, sleep=self.sleep)
+                r = await self._req("GET", sm)
             except FetchError:
                 continue
             if r.status_code != 200:
@@ -119,7 +162,7 @@ class Auditor:
         return urls
 
 
-async def run(inp: dict, *, client, push, set_status, sleep=asyncio.sleep, limiter=None) -> tuple[bool, str]:
+async def run(inp: dict, *, client, push, set_status, sleep=asyncio.sleep, limiter=None, debug_log=None) -> tuple[bool, str]:
     inp = inp or {}
     raw = inp.get("startUrls") or []
     starts = []
@@ -137,7 +180,8 @@ async def run(inp: dict, *, client, push, set_status, sleep=asyncio.sleep, limit
     max_depth = max(0, int(3 if inp.get("maxDepth") is None else inp["maxDepth"]))
     check_ext = bool(inp.get("checkExternal"))
     conc = max(1, min(20, int(inp.get("maxConcurrency") or 5)))
-    aud = Auditor(client, limiter or HostLimiter(0.2), sleep, inp.get("respectRobots", True) is not False)
+    aud = Auditor(client, limiter or HostLimiter(0.2), sleep, inp.get("respectRobots", True) is not False,
+                  debug_log=debug_log if inp.get("debugNetwork") is True else None)
     sem = asyncio.Semaphore(conc)
     state = {"done": 0, "stop": False, "uncharged": 0}
     seen: set[str] = set()
@@ -199,12 +243,12 @@ async def run(inp: dict, *, client, push, set_status, sleep=asyncio.sleep, limit
                 rows[u]["sources"] = sources.get(u, [])
                 await emit(rows[u])
 
-    for s in starts:
+    if mode == "list":
+        await check_list(starts)  # one call, so maxConcurrency applies across all start URLs
+    for s in ([] if mode == "list" else starts):
         if state["stop"] or len(seen) >= max_pages:
             break
-        if mode == "list":
-            await check_list([s])
-        elif mode == "sitemap":
+        if mode == "sitemap":
             await check_list(await aud.sitemap_urls(s, max_pages))
         else:
             await crawl(s)
