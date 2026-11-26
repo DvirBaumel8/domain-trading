@@ -109,3 +109,58 @@ def passes_filters(entry: dict, include: re.Pattern | None, exclude: re.Pattern 
         if not lm or lm < since:
             return False
     return True
+
+
+def normalize_start(raw) -> str | None:
+    """A start URL or bare host as https/http URL text, or None when it cannot be a website or sitemap address."""
+    if not isinstance(raw, str):
+        return None
+    s = raw.strip()
+    if not s or re.search(r'\s', s):
+        return None
+    if '://' not in s:
+        if re.match(r'^[a-z][a-z0-9+.-]*:', s, re.I) and not re.match(r'^[^/]*\.[^/]*:\d+(/|$)', s):
+            return None  # mailto:, javascript:, data: ...
+        s = 'https://' + s
+    p = urlparse(s)
+    host = p.hostname or ''
+    if p.scheme.lower() not in ('http', 'https') or not re.fullmatch(r'[a-z0-9-]+(\.[a-z0-9-]+)+|\[[0-9a-f:.]+\]', host.lower().rstrip('.')):
+        return None
+    return s
+
+
+def valid_modified_since(text: str) -> bool:
+    """Empty is fine; otherwise YYYY-MM-DD or a full ISO date-time."""
+    from datetime import datetime
+    t = (text or '').strip()
+    if not t:
+        return True
+    if not re.match(r'^\d{4}-\d{2}-\d{2}', t):
+        return False
+    try:
+        datetime.fromisoformat(t[:10] if len(t) == 10 else t.replace('Z', '+00:00'))
+    except ValueError:
+        return False
+    return True
+
+
+def failure_reason(exc: BaseException) -> str:
+    """Plain words for a failed request, never the URL."""
+    import socket
+    import ssl
+    chain, e = [], exc
+    while e is not None and e not in chain:
+        chain.append(e)
+        e = e.__cause__ or e.__context__
+    text = ' '.join(str(c).lower() for c in chain)
+    if any(isinstance(c, socket.gaierror) for c in chain) or any(h in text for h in ('name or service not known', 'nodename nor servname', 'name resolution', 'no address associated', 'getaddrinfo')):
+        return 'dns lookup failed'
+    if any(isinstance(c, ssl.SSLError) for c in chain):
+        return 'tls error'
+    if any(isinstance(c, ConnectionRefusedError) for c in chain):
+        return 'connection refused'
+    if any(isinstance(c, ConnectionResetError) for c in chain):
+        return 'connection reset'
+    if 'timeout' in type(exc).__name__.lower():
+        return 'timeout'
+    return type(exc).__name__

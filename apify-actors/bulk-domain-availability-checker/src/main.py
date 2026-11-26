@@ -9,7 +9,8 @@ import httpx
 from apify import Actor
 
 from .doh import DohResolver
-from .core import parked_hint, generate_candidates, index_bootstrap, normalize_domain, parse_rdap, rdap_base_for
+from .core import (TLD_LIST_URL, bundled_tlds, generate_candidates, index_bootstrap, is_charged, is_valid_tld_list,
+                   normalize_domain, parked_hint, parse_rdap, parse_tld_list, rdap_base_for, should_push)
 
 BOOTSTRAP_URL = 'https://data.iana.org/rdap/dns.json'
 UA = 'Mozilla/5.0 (compatible; ApifyDomainAvailability/0.1; +https://apify.com)'
@@ -78,11 +79,63 @@ async def rdap_lookup(client: httpx.AsyncClient, throttle: HostThrottle, base: s
     return None, None, locals().get('err', 'RDAP retries exhausted')
 
 
+async def load_tlds(client: httpx.AsyncClient) -> set[str]:
+    """IANA TLD list, fetched once per run; the copy bundled in the Actor is the fallback."""
+    try:
+        r = await client.get(TLD_LIST_URL)
+        tlds = parse_tld_list(r.text) if r.status_code == 200 else set()
+        if is_valid_tld_list(tlds):
+            return tlds
+    except Exception as e:  # noqa: BLE001
+        Actor.log.warning(f'IANA TLD list unavailable ({type(e).__name__}); using the bundled copy.')
+    return bundled_tlds()
+
+
+async def check_domain(domain: str, kw: str | None, *, resolver: DohResolver, client: httpx.AsyncClient,
+                       throttle: HostThrottle, bootstrap: dict, valid_tlds: set[str], lookup_registered: bool) -> dict:
+    """Build one result row (no pushing, no charging)."""
+    row = dict(domain=domain, tld=domain.rsplit('.', 1)[-1], length=len(domain.split('.')[0]),
+               keyword=kw, available=None, status='unknown', method='dns', hasDns=None,
+               nameservers=[], registrar=None, createdDate=None, expiryDate=None,
+               domainAgeYears=None, rdapStatus=[], parkedOrForSale=None, error=None)
+    if row['tld'] not in valid_tlds:
+        row.update(status='invalid_tld', error=f".{row['tld']} is not a TLD in the IANA root zone list")
+        row['checkedAt'] = datetime.now(timezone.utc).isoformat(timespec='seconds')
+        return row
+    dstate, ns = await dns_check(resolver, domain)
+    row['hasDns'] = dstate == 'has_ns' if dstate != 'error' else None
+    row['nameservers'] = ns
+    row['parkedOrForSale'] = parked_hint(ns)
+    need_rdap = dstate in ('nxdomain', 'no_ns', 'error') or lookup_registered
+    if dstate == 'has_ns':
+        row.update(available=False, status='registered')
+    base = rdap_base_for(domain, bootstrap) if need_rdap else None
+    if need_rdap and base:
+        code, info, err = await rdap_lookup(client, throttle, base, domain)
+        if code == 404 and dstate != 'has_ns':
+            row.update(available=True, status='available', method='rdap')
+        elif code == 200:
+            info.pop('rdapNameservers', None)
+            row.update(info)
+            row.update(available=False, status='registered', method='rdap')
+        elif dstate != 'has_ns':
+            row['error'] = err or 'RDAP inconclusive'
+    elif need_rdap and not base and dstate != 'has_ns':
+        if dstate == 'nxdomain':
+            row.update(available=None, status='likely_available', method='dns')
+            row['error'] = 'No RDAP server for this TLD - DNS says the name does not exist, but the registry could not confirm it. Verify at a registrar'
+        else:
+            row['error'] = 'No RDAP server for this TLD and no DNS answer'
+    row['checkedAt'] = datetime.now(timezone.utc).isoformat(timespec='seconds')
+    return row
+
+
 async def main() -> None:
     async with Actor:
         inp = await Actor.get_input() or {}
         max_domains = int(inp.get('maxDomains') or 5000)
         only_available = bool(inp.get('onlyAvailable'))
+        include_likely = bool(inp.get('includeLikelyAvailable'))
         lookup_registered = bool(inp.get('lookupRegistered'))
         concurrency = max(1, min(50, int(inp.get('concurrency') or 20)))
 
@@ -118,11 +171,12 @@ async def main() -> None:
                 bootstrap = {}
             for tld, url in EXTRA_RDAP.items():
                 bootstrap.setdefault(tld, url)
+            valid_tlds = await load_tlds(client)
             resolver = DohResolver(client)
             throttle = HostThrottle(RDAP_MIN_INTERVAL)
             sem = asyncio.Semaphore(concurrency)
             stop = asyncio.Event()
-            counts = {'available': 0, 'registered': 0, 'unknown': 0}
+            counts = {'available': 0, 'likely_available': 0, 'registered': 0, 'unknown': 0, 'invalid_tld': 0}
             done = 0
 
             async def check(domain: str, kw: str | None):
@@ -130,51 +184,30 @@ async def main() -> None:
                 async with sem:
                     if stop.is_set():
                         return
-                    row = dict(domain=domain, tld=domain.rsplit('.', 1)[-1], length=len(domain.split('.')[0]),
-                               keyword=kw, available=None, status='unknown', method='dns', hasDns=None,
-                               nameservers=[], registrar=None, createdDate=None, expiryDate=None,
-                               domainAgeYears=None, rdapStatus=[], parkedOrForSale=None, error=None)
-                    dstate, ns = await dns_check(resolver, domain)
-                    row['hasDns'] = dstate == 'has_ns' if dstate != 'error' else None
-                    row['nameservers'] = ns
-                    row['parkedOrForSale'] = parked_hint(ns)
-                    need_rdap = dstate in ('nxdomain', 'no_ns', 'error') or lookup_registered
-                    if dstate == 'has_ns':
-                        row.update(available=False, status='registered')
-                    base = rdap_base_for(domain, bootstrap) if need_rdap else None
-                    if need_rdap and base:
-                        code, info, err = await rdap_lookup(client, throttle, base, domain)
-                        if code == 404 and dstate != 'has_ns':
-                            row.update(available=True, status='available', method='rdap')
-                        elif code == 200:
-                            info.pop('rdapNameservers', None)
-                            row.update(info)
-                            row.update(available=False, status='registered', method='rdap')
-                        elif dstate != 'has_ns':
-                            row['error'] = err or 'RDAP inconclusive'
-                    elif need_rdap and not base and dstate != 'has_ns':
-                        if dstate == 'nxdomain':
-                            row.update(available=True, status='available', method='dns')
-                            row['error'] = 'No RDAP server for this TLD - DNS-only result, verify at a registrar'
-                        else:
-                            row['error'] = 'No RDAP server for this TLD and no DNS answer'
-                    row['checkedAt'] = datetime.now(timezone.utc).isoformat(timespec='seconds')
+                    row = await check_domain(domain, kw, resolver=resolver, client=client, throttle=throttle,
+                                             bootstrap=bootstrap, valid_tlds=valid_tlds, lookup_registered=lookup_registered)
                     counts[row['status']] = counts.get(row['status'], 0) + 1
                     done += 1
-                    if only_available and row['status'] != 'available':
+                    if row['status'] == 'invalid_tld':
+                        invalid.append(domain)
+                    if not should_push(row, only_available, include_likely):
                         return
-                    res = await Actor.push_data(row, charged_event_name='result')
-                    if res is not None and getattr(res, 'event_charge_limit_reached', False):
-                        Actor.log.info('Spending limit reached - stopping.')
-                        stop.set()
+                    if is_charged(row):
+                        res = await Actor.push_data(row, charged_event_name='result')
+                        if res is not None and getattr(res, 'event_charge_limit_reached', False):
+                            Actor.log.info('Spending limit reached - stopping.')
+                            stop.set()
+                    else:
+                        await Actor.push_data(row)  # invalid TLD: returned, never charged
                     if done % 200 == 0:
                         await Actor.set_status_message(f'Checked {done}/{len(items)} - {counts}')
 
             await asyncio.gather(*(check(d, k) for d, k in items))
             if invalid:
-                # Not pushed to the dataset, so users are never charged for bad input lines.
+                # Not charged, so users are never billed for bad input lines.
                 await Actor.set_value('INVALID_INPUTS', invalid[:5000])
                 Actor.log.warning(f'{len(invalid)} invalid inputs skipped (saved to key-value store as INVALID_INPUTS).')
-            msg = f"Done: {done} checked - {counts['available']} available, {counts['registered']} registered, {counts['unknown']} unknown."
+            msg = (f"Done: {done} checked - {counts['available']} available, {counts['likely_available']} likely available, "
+                   f"{counts['registered']} registered, {counts['unknown']} unknown, {counts['invalid_tld']} invalid TLD.")
             Actor.log.info(msg)
             await Actor.set_status_message(msg)

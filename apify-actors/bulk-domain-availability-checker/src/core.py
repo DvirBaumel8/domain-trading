@@ -2,6 +2,7 @@
 from __future__ import annotations
 import re
 from datetime import datetime, timezone
+from pathlib import Path
 
 LABEL_RE = re.compile(r'^(?!-)[a-z0-9-]{1,63}(?<!-)$')
 
@@ -127,3 +128,32 @@ def parked_hint(nameservers) -> str | None:
             if label and (ns == key or ns.endswith('.' + key)):
                 return label
     return None
+
+
+TLD_LIST_URL = 'https://data.iana.org/TLD/tlds-alpha-by-domain.txt'
+BUNDLED_TLDS = Path(__file__).with_name('iana_tlds.txt')
+
+
+def parse_tld_list(text: str) -> set[str]:
+    """Parse the IANA tlds-alpha-by-domain.txt format (comment lines start with #)."""
+    return {l.strip().lower() for l in (text or '').splitlines() if l.strip() and not l.startswith('#')}
+
+
+def bundled_tlds() -> set[str]:
+    return parse_tld_list(BUNDLED_TLDS.read_text())
+
+
+def is_valid_tld_list(tlds: set[str]) -> bool:
+    return len(tlds) >= 500 and 'com' in tlds
+
+
+def should_push(row: dict, only_available: bool, include_likely: bool) -> bool:
+    """Which rows reach the dataset. With onlyAvailable, only 'available' (plus 'likely_available' if asked)."""
+    if not only_available:
+        return True
+    return row.get('status') == 'available' or (include_likely and row.get('status') == 'likely_available')
+
+
+def is_charged(row: dict) -> bool:
+    """Invalid-TLD rows are returned but never charged."""
+    return row.get('status') != 'invalid_tld'

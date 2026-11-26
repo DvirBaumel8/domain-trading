@@ -61,7 +61,7 @@ def test_sync_store_meta_sends_only_text_keys():
     name = "sitemap-url-extractor"
     assert m.sync(name, "ID1", "tok", http) == []
     put = [c for c in calls if c[0] == "PUT"][0]
-    assert set(put[2]) <= set(m.TEXT_KEYS)
+    assert set(put[2]) <= set(m.TEXT_KEYS) | {"exampleRunInput"}
     assert not {"pricingInfos", "isPublic", "isDeprecated", "pricingModel"} & set(put[2])
 
 
@@ -106,3 +106,31 @@ def test_actor_version_is_major_minor(name):
     """Apify CLI rejects anything but MAJOR.MINOR (0-99 each), e.g. 0.1.0 fails the push."""
     version = json.loads((ROOT / name / ".actor" / "actor.json").read_text())["version"]
     assert re.fullmatch(r"(?:[0-9]|[1-9][0-9])\.(?:[0-9]|[1-9][0-9])", version), f"{name}: version {version!r} is not MAJOR.MINOR"
+
+
+@pytest.mark.parametrize("name", ACTORS)
+def test_example_run_input_equals_prefill(name):
+    m = _load_sync()
+    schema = json.loads((ROOT / name / ".actor" / "input_schema.json").read_text())
+    prefill = {k: v["prefill"] for k, v in schema["properties"].items() if "prefill" in v}
+    ex = m.example_run_input(name)
+    assert prefill and json.loads(ex["body"]) == prefill and ex["contentType"].startswith("application/json")
+    for req in schema.get("required", []):
+        assert req in prefill, f"{name}: required input {req} has no prefill"
+
+
+def test_sync_store_meta_sends_example_run_input_and_detects_difference():
+    m = _load_sync()
+    put = []
+    store = {}
+
+    def http(method, path, token, body=None):
+        if method == "PUT":
+            put.append(body)
+            store.update(body)
+        return dict(store)
+    assert m.sync("sitemap-url-extractor", "ID1", "tok", http) == []
+    assert json.loads(put[0]["exampleRunInput"]["body"]) == json.loads(m.example_run_input("sitemap-url-extractor")["body"])
+    assert set(put[0]) == set(m.TEXT_KEYS) | {"exampleRunInput"}
+    assert "exampleRunInput" in m.sync("sitemap-url-extractor", "ID1", "tok",
+                                       lambda me, p, t, b=None: dict(store, exampleRunInput={"body": '{"helloWorld": 123}'}))

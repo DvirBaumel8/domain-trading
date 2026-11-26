@@ -1,91 +1,131 @@
-## Bulk DNS & Email Auth Checker (SPF, DMARC)
+# Cold-Email List Pre-Check: DMARC, SPF & MX in Bulk
 
-Check the **email deliverability DNS of hundreds or thousands of domains in one run**. For each domain you get **MX records and the email provider**, **SPF** (the `all` policy and lookup count), **DMARC** policy, **DKIM** keys on common selectors, **MTA-STS**, **BIMI**, nameservers, a **parked or for-sale** flag, a **0–100 email-auth score**, and **plain-English issues** to fix.
+Pre-send check for cold-email lead lists: paste a list of prospect domains and find which ones have no DMARC or no MX before you send. It is also a bulk email-auth audit (SPF, DKIM, DMARC, MX) for agencies.
 
-You pay **per domain checked**. Current prices per 1,000 results, including any plan discounts, are on the **Pricing** tab. The Apify Free plan includes monthly Store credit you can use for a first test — open the Pricing tab to see how far that credit goes at today's rates.
+**Returns** one row per domain: `domain`, `resolves`, `mx`, `emailProvider`, `spf`, `spfAll`, `dmarc`, `dmarcPolicy`, `dmarcRua`, `dkimSelectorsFound`, `mtaSts`, `bimi`, `emailScore` (0-100), `issues` (plain English), plus `ns`, `a`, `aaaa`, `caa`, `parkedOrForSale`, `error`, `checkedAt`.
 
-Paste domains, URLs or emails and click Start. No API keys are required.
+**Cost:** pay per result, one result per domain checked. See the Pricing tab for current prices.
 
-![Sample output from Bulk DNS & Email Auth Checker](https://api.apify.com/v2/key-value-stores/dNe1hFUAqsMnqLOYE/records/dns-output.png)
+```json
+{ "domains": ["example.com", "https://www.example.org/pricing", "jane@example.net"] }
+```
 
-## Use cases
+## Use it on a lead list (CSV in)
 
-- Cold-email and outbound teams cleaning or scoring a lead list before sending.
-- Agencies auditing client domains after a migration or a new email provider.
-- MSPs and IT admins checking SPF, DKIM and DMARC across many customer domains.
-- Security or vendor-review teams confirming that a partner domain publishes a strict DMARC policy.
-- Enriching a company list with "which email provider do they use?".
+You do not need to clean the list first. Copy the column of domains, website URLs or email addresses from your CSV or spreadsheet and paste it into **Domains, URLs or emails**, one entry per line. URLs and emails are reduced to the domain and duplicates are checked once.
 
-## Features
+```text
+example.com
+https://www.example.org/pricing
+jane@example.net
+```
 
-- 📬 **MX and provider detection**: Google Workspace, Microsoft 365, Zoho, Proton, Proofpoint, Mimecast, Barracuda, GoDaddy, Fastmail, Amazon SES, plus null MX ("accepts no email") detection.
-- 🛡️ **SPF analysis**: the record, its `all` policy (`-all`, `~all`, `?all`, `+all`), an approximate count of DNS lookups against the 10-lookup limit, duplicate records, and the deprecated `ptr` mechanism.
-- 🔐 **DMARC analysis**: policy (`none`, `quarantine`, `reject`), `rua` report address, `pct`, and duplicate records.
-- ✍️ **DKIM discovery**: tests 17 common selectors by default (google, selector1/2, k1, s1, mandrill, sendgrid, zoho…), follows CNAMEs, treats empty `p=` keys as revoked, and spots wildcard DKIM records. Add your own selectors.
-- ➕ **Extras**: MTA-STS, BIMI, A/AAAA, CAA and nameservers, plus parking and marketplace detection (Afternic, Sedo, Dan.com…).
-- 🧮 **Score and issues**: one number to sort by, with readable fixes such as "DMARC policy is p=none, so spoofed mail is still delivered".
-- 🧾 **Flexible input**: domains, URLs or email addresses, one per line.
-- 🌐 **Reliable**: uses DNS-over-HTTPS resolvers (Cloudflare, with Google as fallback), so it needs no UDP and no API keys. Checks follow the official [SPF (RFC 7208)](https://datatracker.ietf.org/doc/html/rfc7208) and [DMARC (RFC 7489)](https://datatracker.ietf.org/doc/html/rfc7489) specifications.
-
-## How to use it
-
-1. Paste domains, websites or email addresses into **Domains, URLs or emails**.
-2. Optional: add your email provider's DKIM selectors if a known domain shows no key.
-3. Click **Start**, then export the dataset or call the Actor from the API.
-
-### Output example (real result, abridged)
+From the API, send the same column as a JSON array. This is the whole input:
 
 ```json
 {
-  "domain": "stripe.com",
-  "emailProvider": "Google Workspace",
-  "mx": [{"priority": 10, "host": "aspmx.l.google.com"}],
-  "spfAll": "~all",
-  "spfLookups": 3,
-  "dmarcPolicy": "reject",
-  "dmarcRua": "mailto:dmarc-reports@stripe.com",
-  "dkimSelectorsFound": ["google", "s1", "s2", "mandrill"],
-  "mtaSts": false,
-  "bimi": false,
-  "emailScore": 80,
-  "issues": []
+  "domains": ["example.com", "https://www.example.org/pricing", "jane@example.net"],
+  "includeRecords": false
 }
 ```
 
-## How the score works
+Then export the dataset as CSV or Excel and filter: `mx` empty means no MX record, `dmarc` empty means no DMARC record, `resolves` false means the domain does not exist in DNS.
+
+### Example output (illustrative, abridged, made-up reserved domains)
+
+Two rows as the Actor builds them from a test zone. Real results depend on each domain's live DNS.
+
+```json
+[
+  {
+    "domain": "lead-one.example",
+    "resolves": true,
+    "mx": [{ "priority": 10, "host": "mail.lead-one.example" }],
+    "emailProvider": "Other / self-hosted",
+    "spfAll": "~all",
+    "dmarc": null,
+    "dmarcPolicy": null,
+    "dkimSelectorsFound": [],
+    "emailScore": 20,
+    "issues": [
+      "No DMARC record - spoofed mail from this domain is not blocked and you get no reports.",
+      "No DKIM key found on common selectors (add your provider's selector to check)."
+    ]
+  },
+  {
+    "domain": "lead-two.example",
+    "resolves": true,
+    "mx": [],
+    "emailProvider": null,
+    "spfAll": "-all",
+    "dmarcPolicy": "reject",
+    "emailScore": 60,
+    "issues": ["No MX records - the domain cannot receive email."]
+  }
+]
+```
+
+## How to read the score
+
+`emailScore` adds up what the Actor finds in DNS, capped at 100:
 
 | Signal | Points |
 |---|---|
-| SPF `-all` / `~all` / `?all` or missing `all` / `+all` or broken | 25 / 20 / 8 / 0 |
-| DMARC `reject` / `quarantine` / `none` / missing | 35 / 28 / 12 / 0 |
-| DKIM key found on a tested selector | 25 |
-| MTA-STS present | 8 |
-| BIMI present | 7 |
+| SPF ends in `-all` / `~all` / `?all` or has no `all` / `+all` | 25 / 20 / 8 / 0 |
+| No SPF record, or more than one SPF record | 0 |
+| DMARC policy `reject` / `quarantine` / `none` | 35 / 28 / 12 |
+| No DMARC record, no valid `p=`, or more than one DMARC record | 0 |
+| A DKIM key found on a tested selector | 25 |
+| MTA-STS record present | 8 |
+| BIMI record present | 7 |
 
-DKIM is reported only for the selectors tested. A domain can sign with a selector that isn't on the list. Add it to **DKIM selectors to test**.
+The score does not depend on MX: a domain with no MX is flagged in `issues`, not in the score. A DKIM key is looked up only on the selectors you test; a domain can sign with another one. A domain that does not exist in DNS gets 0. The score describes DNS records; it is not a prediction of inbox placement.
 
-## How much does it cost?
+## Who it's for
 
-You pay **per domain checked** (the `result` event on the Pricing tab), plus a small start fee. There are no monthly fees and no third-party API keys to buy.
+- Lead-gen agencies checking a prospect list before a campaign goes out.
+- Cold-email senders who want to drop or flag domains that cannot receive mail.
+- Deliverability consultants auditing the SPF, DKIM and DMARC setup of many client domains.
+- IT admins and MSPs reviewing customer domains in one pass.
 
-Because prices can change, this page does not hard-code a per-1,000 figure. Open the **Pricing** tab for the live rate and any Bronze, Silver or Gold discounts. As a rule of thumb, Apify's Free plan monthly credit is enough to run a first test of several hundred to a few thousand domains at typical rates.
+This Actor reports DNS records and issues. It does not improve deliverability and does not guarantee inbox placement.
 
-## API, scheduling and export
+## What it checks
 
-Run this Actor from [Apify Console](https://console.apify.com), from the [API](https://docs.apify.com/api/v2#/reference/actors/run-collection/run-actor) (`looped_kite/bulk-dns-email-auth-checker`), or from a language client. Schedule runs in Apify Console, and export results as JSON, CSV, Excel or HTML. You can also connect a webhook, Slack, Make, Zapier, n8n or Google Sheets.
+- **MX and provider**: MX records, a null MX (the domain says it accepts no email) and the provider guessed from the MX host (for example Google Workspace, Microsoft 365, Zoho, Proofpoint).
+- **SPF**: the record, its `all` policy, an approximate count of DNS-lookup mechanisms against the limit of 10, multiple records and the deprecated `ptr` mechanism.
+- **DMARC**: policy (`none`, `quarantine`, `reject`), `rua` report address, `pct` and multiple records.
+- **DKIM**: looks for a key on 17 common selectors by default (you can change the list), follows CNAMEs, treats an empty `p=` as revoked and flags wildcard DKIM records.
+- **Extras**: MTA-STS, BIMI, A, AAAA and CAA records, nameservers and a parked or for-sale hint from the nameservers.
+
+It reads public DNS only (DNS over HTTPS, Cloudflare with Google as fallback). It does not send email and does not contact any mail server.
+
+## Input
+
+| Field | Meaning |
+|---|---|
+| `domains` (required) | Domains, website URLs or email addresses, one per line |
+| `dkimSelectors` | DKIM selectors to test (default: 17 common ones) |
+| `includeRecords` | Also return A, AAAA and CAA records (default on) |
+| `concurrency` | Parallel lookups, 1-30 (default 10) |
+| `maxDomains` | Safety cap, 1-100000 (default 10000) |
+
+Lines that are not a domain are skipped. If nothing valid is left, the run stops with a message and charges nothing.
 
 ## FAQ
 
 **Does it send emails or touch mail servers?** No. It only reads public DNS records.
 
-**Can I monitor my domains?** Yes. Schedule a daily run and add a webhook or Slack alert when the score drops or new issues appear.
+**Why does a big brand show "No DKIM key found"?** It probably uses a selector that is not on the list. Add that selector to **DKIM selectors to test** and run again.
 
-**Why does a big brand show "No DKIM key found"?** It probably uses a custom selector, such as Google's dated selectors. Add that selector to the list and run again.
+**Can I run it on a schedule?** Yes, with Apify Schedules. Webhooks and the API are available as for any Actor.
 
-**What happens if I leave the Domains field empty?** The run does not start. Add at least one domain, URL or email address.
+## Other Actors by the same author
 
-## Other tools from this developer
+- Sitemap URL Extractor: every page URL from a website's sitemaps.
+- Bulk Domain Availability Checker: DNS plus official RDAP registry checks.
+- Domain Checkup Report: registration, DNS, safety and for-sale signals for a domain.
 
-- [Sitemap URL Extractor](https://apify.com/looped_kite/sitemap-url-extractor) — every page URL from a website's sitemaps.
-- [Bulk Domain Availability Checker](https://apify.com/looped_kite/bulk-domain-availability-checker) — DNS plus official RDAP registry checks.
-- [Domain Checkup Report](https://apify.com/looped_kite/domain-checkup-report) — registration, DNS, safety, for-sale signals, and a 0–100 score.
+## Permissions
+
+This Actor needs only limited permissions: it reads its input and writes to its own default dataset.

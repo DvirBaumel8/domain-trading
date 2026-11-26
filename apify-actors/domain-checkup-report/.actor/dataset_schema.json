@@ -3,53 +3,315 @@
   "fields": {
     "type": "object",
     "properties": {
-      "domain": { "type": ["string", "null"], "description": "Normalized domain name" },
-      "tld": { "type": ["string", "null"], "description": "Top-level domain" },
-      "registered": { "type": ["boolean", "null"], "description": "true = registered, false = available, null = unknown" },
-      "status": { "type": ["string", "null"], "description": "registered | available | unknown" },
-      "createdDate": { "type": ["string", "null"], "description": "Registration date (YYYY-MM-DD from RDAP)" },
-      "domainAgeYears": { "type": ["number", "null"], "description": "Domain age in years" },
-      "expiryDate": { "type": ["string", "null"], "description": "Expiration date (YYYY-MM-DD from RDAP)" },
-      "daysUntilExpiry": { "type": ["integer", "null"], "description": "Days remaining until expiry" },
-      "registrar": { "type": ["string", "null"], "description": "Registrar name (from RDAP)" },
-      "rdapStatus": { "type": ["array", "null"], "description": "EPP status codes from RDAP" },
-      "rdapSource": { "type": ["string", "null"], "description": "rdap | dns-only | no-rdap-server" },
-      "hasA": { "type": ["boolean", "null"], "description": "Has A (IPv4) record" },
-      "hasMx": { "type": ["boolean", "null"], "description": "Has non-null MX record" },
-      "hasNs": { "type": ["boolean", "null"], "description": "Has NS records" },
-      "aRecords": { "type": ["array", "null"], "description": "IPv4 A records" },
-      "mxRecords": { "type": ["array", "null"], "description": "MX records with priority and host" },
-      "nameservers": { "type": ["array", "null"], "description": "Authoritative nameservers" },
-      "nameserverProvider": { "type": ["string", "null"], "description": "Detected DNS / nameserver provider" },
-      "emailProvider": { "type": ["string", "null"], "description": "Detected email host from MX" },
-      "isParkedOrForSale": { "type": ["boolean", "null"], "description": "Detected parked or for-sale listing" },
-      "parkedOrForSaleReason": { "type": ["string", "null"], "description": "Why the domain was flagged as parked or for sale" },
-      "forSaleUrl": { "type": ["string", "null"], "description": "Marketplace or landing page URL if for sale" },
-      "askingPrice": { "type": ["string", "null"], "description": "Visible asking / Buy-It-Now price if found on landing page" },
-      "httpStatus": { "type": ["integer", "null"], "description": "HTTP status code of landing page" },
-      "httpsValid": { "type": ["boolean", "null"], "description": "Whether HTTPS connected with a valid TLS certificate" },
-      "finalUrl": { "type": ["string", "null"], "description": "Final resolved HTTP/HTTPS URL" },
-      "pageTitle": { "type": ["string", "null"], "description": "HTML title of landing page" },
-      "hasSpf": { "type": ["boolean", "null"], "description": "Has SPF (v=spf1) record" },
-      "spfPolicy": { "type": ["string", "null"], "description": "SPF all mechanism (-all, ~all, ?all, +all, redirect)" },
-      "hasDmarc": { "type": ["boolean", "null"], "description": "Has DMARC (v=dmarc1) record" },
-      "dmarcPolicy": { "type": ["string", "null"], "description": "DMARC p= policy (reject, quarantine, none)" },
-      "safetyStatus": { "type": ["string", "null"], "description": "not_flagged | flagged_malware_or_phishing | not_checked" },
-      "safetyDetail": { "type": ["string", "null"], "description": "Human-readable safety check detail" },
-      "safetySource": { "type": ["string", "null"], "description": "Safety source used (or null if not checked)" },
-      "trademarkRisk": { "type": ["string", "null"], "description": "high | possible | none_detected" },
-      "trademarkMatches": { "type": ["array", "null"], "description": "Matched tokens from built-in famous-brands list" },
-      "trademarkNote": { "type": ["string", "null"], "description": "Trademark check note and legal disclaimer" },
-      "score": { "type": ["integer", "null"], "description": "Overall domain checkup score (0-100)" },
-      "scoreReasons": { "type": ["array", "null"], "description": "Plain-English factors behind the score" },
-      "summary": { "type": ["string", "null"], "description": "One-line plain-English checkup summary" },
-      "error": { "type": ["string", "null"], "description": "Non-fatal lookup error or note" },
-      "checkedAt": { "type": ["string", "null"], "description": "UTC ISO timestamp" }
-    }
+      "domain": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Normalized domain name"
+      },
+      "tld": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Top-level domain"
+      },
+      "registered": {
+        "type": [
+          "boolean",
+          "null"
+        ],
+        "description": "true = registered, false = available, null = unknown"
+      },
+      "status": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "registered | available | unknown"
+      },
+      "createdDate": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Registration date (YYYY-MM-DD from RDAP)"
+      },
+      "domainAgeYears": {
+        "type": [
+          "number",
+          "null"
+        ],
+        "description": "Domain age in years"
+      },
+      "expiryDate": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Expiration date (YYYY-MM-DD from RDAP)"
+      },
+      "daysUntilExpiry": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "description": "Days remaining until expiry"
+      },
+      "registrar": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Registrar name (from RDAP)"
+      },
+      "rdapStatus": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "description": "EPP status codes from RDAP"
+      },
+      "rdapSource": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "rdap | dns-only | no-rdap-server"
+      },
+      "hasA": {
+        "type": [
+          "boolean",
+          "null"
+        ],
+        "description": "Has A (IPv4) record"
+      },
+      "hasMx": {
+        "type": [
+          "boolean",
+          "null"
+        ],
+        "description": "Has non-null MX record"
+      },
+      "hasNs": {
+        "type": [
+          "boolean",
+          "null"
+        ],
+        "description": "Has NS records"
+      },
+      "aRecords": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "description": "IPv4 A records"
+      },
+      "mxRecords": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "description": "MX records with priority and host"
+      },
+      "nameservers": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "description": "Authoritative nameservers"
+      },
+      "nameserverProvider": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Detected DNS / nameserver provider"
+      },
+      "emailProvider": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Detected email host from MX"
+      },
+      "isParkedOrForSale": {
+        "type": [
+          "boolean",
+          "null"
+        ],
+        "description": "Detected parked or for-sale listing"
+      },
+      "parkedOrForSaleReason": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Why the domain was flagged as parked or for sale"
+      },
+      "forSaleUrl": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Marketplace or landing page URL if for sale"
+      },
+      "askingPrice": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Visible asking / Buy-It-Now price if found on landing page"
+      },
+      "httpStatus": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "description": "HTTP status code of landing page"
+      },
+      "httpsValid": {
+        "type": [
+          "boolean",
+          "null"
+        ],
+        "description": "Whether HTTPS connected with a valid TLS certificate"
+      },
+      "finalUrl": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Final resolved HTTP/HTTPS URL"
+      },
+      "pageTitle": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "HTML title of landing page"
+      },
+      "hasSpf": {
+        "type": [
+          "boolean",
+          "null"
+        ],
+        "description": "Has SPF (v=spf1) record"
+      },
+      "spfPolicy": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "SPF all mechanism (-all, ~all, ?all, +all, redirect)"
+      },
+      "hasDmarc": {
+        "type": [
+          "boolean",
+          "null"
+        ],
+        "description": "Has DMARC (v=dmarc1) record"
+      },
+      "dmarcPolicy": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "DMARC p= policy (reject, quarantine, none)"
+      },
+      "safetyStatus": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "not_flagged | flagged_malware_or_phishing | not_checked"
+      },
+      "safetyDetail": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Human-readable safety check detail"
+      },
+      "safetySource": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Safety source used (or null if not checked)"
+      },
+      "trademarkRisk": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "high | possible | none_detected"
+      },
+      "trademarkMatches": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "description": "Matched tokens from built-in famous-brands list"
+      },
+      "trademarkNote": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Trademark check note and legal disclaimer"
+      },
+      "score": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "description": "Overall checkup score 0-100 (see scoreReasons for every point added or removed)"
+      },
+      "scoreReasons": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "description": "Plain-English factors behind the score"
+      },
+      "summary": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "One-line plain-English checkup summary"
+      },
+      "error": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Note or failure detail (for example no RDAP server for the TLD, or a lookup that failed); null if none"
+      },
+      "checkedAt": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "UTC ISO timestamp"
+      }
+    },
+    "required": [
+      "domain",
+      "tld",
+      "status",
+      "score",
+      "scoreReasons",
+      "summary",
+      "error",
+      "checkedAt"
+    ]
   },
   "views": {
     "overview": {
-      "title": "Overview",
+      "title": "Due diligence",
       "transformation": {
         "fields": [
           "domain",
@@ -58,6 +320,7 @@
           "domainAgeYears",
           "registrar",
           "expiryDate",
+          "daysUntilExpiry",
           "isParkedOrForSale",
           "askingPrice",
           "safetyStatus",
@@ -68,17 +331,42 @@
       "display": {
         "component": "table",
         "properties": {
-          "domain": { "label": "Domain" },
-          "score": { "label": "Score" },
-          "status": { "label": "Status" },
-          "domainAgeYears": { "label": "Age (yrs)" },
-          "registrar": { "label": "Registrar" },
-          "expiryDate": { "label": "Expiry" },
-          "isParkedOrForSale": { "label": "Parked / For Sale" },
-          "askingPrice": { "label": "Asking Price" },
-          "safetyStatus": { "label": "Safety" },
-          "trademarkRisk": { "label": "TM Risk" },
-          "summary": { "label": "Summary" }
+          "domain": {
+            "label": "Domain"
+          },
+          "score": {
+            "label": "Score"
+          },
+          "status": {
+            "label": "Status"
+          },
+          "domainAgeYears": {
+            "label": "Age (yrs)"
+          },
+          "registrar": {
+            "label": "Registrar"
+          },
+          "expiryDate": {
+            "label": "Expiry"
+          },
+          "daysUntilExpiry": {
+            "label": "Days to expiry"
+          },
+          "isParkedOrForSale": {
+            "label": "Parked / for sale"
+          },
+          "askingPrice": {
+            "label": "Asking price"
+          },
+          "safetyStatus": {
+            "label": "Safety"
+          },
+          "trademarkRisk": {
+            "label": "Trademark hint"
+          },
+          "summary": {
+            "label": "Summary"
+          }
         }
       }
     }

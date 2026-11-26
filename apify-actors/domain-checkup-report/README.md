@@ -1,17 +1,14 @@
-## Domain Checkup Report: DNS, Safety & Score
+# Domain Due Diligence Report: Check a Domain Before You Buy
 
-Get a **complete, single-row due-diligence report** for any domain name (any TLD). Paste domains, URLs or email addresses and get **registration age, registrar, expiry, DNS and provider, parked or for-sale detection with a visible asking price, SPF/DMARC email auth, a Cloudflare Security DNS safety check, a lightweight trademark-risk hint, and a transparent 0–100 score** with plain-English reasons.
+Due diligence before you buy a domain: paste domains, URLs or emails and get one report row per domain with its age, registrar, expiry, DNS, for-sale signals, email auth and safety check.
 
-You pay **per domain report**. Current prices per 1,000 reports, including any plan discounts, are on the **Pricing** tab. Invalid input lines are skipped and never charged. The Apify Free plan includes monthly Store credit you can use for a first test — open the Pricing tab to see how far it goes at today's rates.
+**Returns** one row per domain: `domain`, `status`, `createdDate`, `domainAgeYears`, `expiryDate`, `daysUntilExpiry`, `registrar`, `rdapStatus`, DNS facts (`hasA`, `hasMx`, `hasNs`, `nameservers`, `nameserverProvider`, `emailProvider`), for-sale signals (`isParkedOrForSale`, `parkedOrForSaleReason`, `forSaleUrl`, `askingPrice`), landing page (`httpStatus`, `httpsValid`, `finalUrl`, `pageTitle`), email auth (`hasSpf`, `spfPolicy`, `hasDmarc`, `dmarcPolicy`), `safetyStatus`, a `trademarkRisk` hint, a 0-100 `score` with `scoreReasons`, and a one-line `summary`.
 
-![Sample output from Domain Checkup Report](https://api.apify.com/v2/key-value-stores/dNe1hFUAqsMnqLOYE/records/checkup-output.png)
+**Cost:** pay per result, one result (a report) per domain. Lines that are not a domain are never charged. See the Pricing tab for current prices.
 
-## Use cases
-
-- Domain buyers checking age, registrar, expiry and whether a name is listed for sale, before they bid.
-- Brand and legal-adjacent reviews that need a quick safety and trademark-hint pass (not a substitute for a real trademark search).
-- Agencies or analysts scoring a list of names on DNS, email auth and landing-page signals.
-- Portfolio reviews: schedule a run and watch expiry dates, parking and safety flags.
+```json
+{ "domains": ["example.com", "google.com"], "lookupRdap": true, "fetchLandingPage": true }
+```
 
 ## What each report includes
 
@@ -28,7 +25,7 @@ You pay **per domain report**. Current prices per 1,000 reports, including any p
   - Queries **Cloudflare Security DNS (`1.1.1.2` / `security.cloudflare-dns.com`)** for malware/phishing filtering, plus HTTPS TLS certificate validity check.
   - Honest reporting: reports `"not_flagged"`, `"flagged_malware_or_phishing"`, or `"not_checked"` (for example when a domain does not resolve), never overclaiming universal safety.
 - **Trademark-Risk Hint (Honest Heuristic)**:
-  - Flags exact tokens or substrings matching a small built-in list of ~130 famous global brands, with an explicit disclaimer that this is **not** a trademark search and **not** legal advice.
+  - Flags exact tokens or substrings matching a small built-in list of well-known brand names, with an explicit disclaimer that this is **not** a trademark search and **not** legal advice.
 - **0–100 Checkup Score & Plain-English Summary**:
   - Transparent additive scoring across registration/age, DNS/HTTPS, email auth, safety, parking, and brand-token risk, with every point explained in `scoreReasons` and a one-line `summary`.
 
@@ -38,79 +35,58 @@ You pay **per domain report**. Current prices per 1,000 reports, including any p
 2. Leave **Look up registration details** and **Inspect landing page** on for a full report.
 3. Click **Start**, then export the dataset or call the Actor from the API.
 
-## Input example
+Lines that are not a domain (for example a string without a TLD) are skipped, saved to `INVALID_INPUTS` in the key-value store and **not charged**.
+
+### Example output (illustrative, abridged)
+
+A made-up domain parked at a marketplace. A real run returns the live facts of your domain.
 
 ```json
 {
-  "domains": [
-    "google.com",
-    "mineunited.com",
-    "example.com",
-    "quietbluefalcon9912.com"
-  ],
-  "lookupRdap": true,
-  "fetchLandingPage": true
-}
-```
-
-Invalid input lines (for example malformed strings without a TLD) are skipped, saved to `INVALID_INPUTS` in the key-value store, and **not charged**.
-
-## Output example
-
-```json
-{
-  "domain": "mineunited.com",
-  "tld": "com",
+  "domain": "parked-name.example",
+  "tld": "example",
   "registered": true,
   "status": "registered",
   "createdDate": "2020-08-19",
   "domainAgeYears": 6.27,
   "expiryDate": "2027-08-19",
-  "daysUntilExpiry": 267,
-  "registrar": "GoDaddy.com, LLC",
+  "registrar": "Example Registrar, Inc.",
   "nameserverProvider": "Afternic (listed for sale)",
   "isParkedOrForSale": true,
-  "parkedOrForSaleReason": "Nameservers indicate Afternic (listed for sale); Landing page redirects to GoDaddy / Afternic (forsale.godaddy.com)",
-  "forSaleUrl": "https://forsale.godaddy.com/forsale/mineunited.com",
-  "askingPrice": "$1,488",
+  "parkedOrForSaleReason": "Nameservers indicate Afternic (listed for sale)",
   "httpsValid": true,
   "hasSpf": false,
   "hasDmarc": false,
   "safetyStatus": "not_flagged",
   "trademarkRisk": "none_detected",
-  "score": 45,
-  "summary": "mineunited.com is registered (6.27 yrs old, GoDaddy.com, LLC), parked/for sale ($1,488), no SPF/DMARC, not flagged by Cloudflare Security DNS (score 45/100)."
+  "score": 45
 }
 ```
 
-## How much does it cost?
-
-You pay **per domain report** (the `report` event on the Pricing tab), plus a small start fee. Bad input lines are skipped and never charged, and runs respect your maximum spending limit.
-
-Because prices can change, this page does not hard-code a per-1,000 figure. Open the **Pricing** tab for the live rate and any Bronze, Silver or Gold discounts. Apify's Free plan monthly credit is enough for a first test of a typical handful of domains at usual rates.
-
-## API, scheduling and export
-
-Run this Actor from [Apify Console](https://console.apify.com), from the [API](https://docs.apify.com/api/v2#/reference/actors/run-collection/run-actor) (`looped_kite/domain-checkup-report`), or from a language client. Schedule runs in Apify Console, and export results as JSON, CSV, Excel or HTML. You can also connect a webhook, Slack, Make, Zapier, n8n or Google Sheets.
-
 ## FAQ
 
-**Is the trademark flag a real trademark search?** No. It is a small built-in list of well-known brand tokens only, and it is not legal advice. Always run a proper USPTO/WIPO search before you buy or use a name.
+**Is the trademark flag a real trademark search?** No. It is a small built-in list of well-known brand tokens only, and it is not legal advice. Always run a proper trademark search before you buy or use a name.
 
 **Is a "not_flagged" safety status a guarantee the site is safe?** No. It only means Cloudflare Security DNS did not flag the domain at check time. A domain can also be `"not_checked"` if it does not resolve.
 
+**Does it tell me a fair price?** No. It shows the asking price only when the domain's own page displays one.
+
 **Do I need API keys?** No. The Actor uses public DNS-over-HTTPS, official RDAP registries, and the domain's own landing page.
 
-**Can I schedule portfolio checks?** Yes. Use Apify Schedules and send the dataset or a webhook to email, Slack or a spreadsheet.
+**Can I schedule portfolio checks?** Yes, with Apify Schedules.
 
-**What happens if I leave Domains empty?** The run does not start. Add at least one domain, URL or email address.
+**What happens if I leave Domains empty?** The run stops with a message. Add at least one domain, URL or email address.
 
-## Pricing & Fair Use
+## Data sources and fair use
 
-All data comes from public, terms-clean DNS-over-HTTPS resolvers ([Cloudflare 1.1.1.1](https://developers.cloudflare.com/1.1.1.1/) and [1.1.1.2 Security DNS](https://developers.cloudflare.com/1.1.1.1/setup/#1112), Google Public DNS), [IANA-listed RDAP](https://www.iana.org/assignments/rdap-dns/rdap-dns.xhtml) registries (throttled to ~3 req/s per registry), and direct HTTP checks of the domain's own landing page. Trademark flags are a simple built-in famous-brand check only and do not constitute legal advice.
+DNS answers come from public DNS-over-HTTPS resolvers ([Cloudflare 1.1.1.1](https://developers.cloudflare.com/1.1.1.1/), [1.1.1.2 Security DNS](https://developers.cloudflare.com/1.1.1.1/setup/#1112) and Google Public DNS), registration data from [IANA-listed RDAP](https://www.iana.org/assignments/rdap-dns/rdap-dns.xhtml) registries (throttled to about 3 requests per second per registry), and the landing page from a direct HTTP request to the domain itself. Trademark flags are a simple built-in famous-brand check only.
 
-## Other tools from this developer
+## Other Actors by the same author
 
-- [Bulk DNS & Email Auth Checker](https://apify.com/looped_kite/bulk-dns-email-auth-checker) — SPF, DKIM, DMARC, MX, and a 0–100 email-auth score.
-- [Sitemap URL Extractor](https://apify.com/looped_kite/sitemap-url-extractor) — every page URL from a website's sitemaps.
-- [Bulk Domain Availability Checker](https://apify.com/looped_kite/bulk-domain-availability-checker) — DNS plus official RDAP registry checks.
+- Bulk DNS & Email Auth Checker: SPF, DKIM, DMARC and MX for many domains.
+- Bulk Domain Availability Checker: DNS plus official RDAP registry checks.
+- Sitemap URL Extractor: every page URL from a website's sitemaps.
+
+## Permissions
+
+This Actor needs only limited permissions: it reads its input and writes to its own default dataset. It also saves an `INVALID_INPUTS` record in its own default key-value store.

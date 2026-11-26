@@ -6,13 +6,14 @@ import re
 import httpx
 from apify import Actor
 
-from .core import COMMON_PATHS, looks_like_sitemap, parse_sitemap, passes_filters, site_root, sitemaps_from_robots
+from .core import (COMMON_PATHS, failure_reason, looks_like_sitemap, normalize_start, valid_modified_since, parse_sitemap, passes_filters, site_root, sitemaps_from_robots)
 
 UA = 'Mozilla/5.0 (compatible; ApifySitemapExtractor/0.1; +https://apify.com)'
 MAX_BYTES = 60 * 1024 * 1024
 
 
 async def fetch(client: httpx.AsyncClient, url: str) -> tuple[int | None, bytes]:
+    last = None
     for attempt in range(3):
         try:
             r = await client.get(url)
@@ -20,8 +21,11 @@ async def fetch(client: httpx.AsyncClient, url: str) -> tuple[int | None, bytes]
                 await asyncio.sleep(2 * (attempt + 1))
                 continue
             return r.status_code, r.content[:MAX_BYTES]
-        except httpx.HTTPError:
+        except httpx.HTTPError as e:
+            last = e
             await asyncio.sleep(1 + attempt)
+    if last is not None:
+        Actor.log.warning(f'{url}: could not connect ({failure_reason(last)})')
     return None, b''
 
 
@@ -55,9 +59,22 @@ async def check_status(client, url: str) -> tuple[int | None, str | None]:
 async def main() -> None:
     async with Actor:
         inp = await Actor.get_input() or {}
-        starts = [s.strip() for s in inp.get('startUrls') or [] if isinstance(s, str) and s.strip()]
+        since_raw = inp.get('modifiedSince')
+        if since_raw is not None and not valid_modified_since(str(since_raw)):
+            await Actor.fail(status_message='modifiedSince must look like 2026-01-31')
+            return
         # accept the Apify requestListSources shape too
-        starts += [s['url'] for s in inp.get('startUrls') or [] if isinstance(s, dict) and s.get('url')]
+        raw = [s if isinstance(s, str) else (s.get('url') if isinstance(s, dict) else None) for s in inp.get('startUrls') or []]
+        starts, invalid = [], []
+        for r in raw:
+            if r is None or (isinstance(r, str) and not r.strip()):
+                continue
+            n = normalize_start(r)
+            (starts if n else invalid).append(n or str(r))
+        starts = list(dict.fromkeys(starts))
+        if invalid:
+            await Actor.set_value('INVALID_INPUTS', invalid[:5000])  # never pushed to the dataset, so never charged
+            Actor.log.warning(f'{len(invalid)} invalid start URL(s) skipped (saved to INVALID_INPUTS, not charged).')
         if not starts:
             await Actor.fail(status_message='Add at least one website or sitemap URL.')
             return
@@ -89,7 +106,8 @@ async def main() -> None:
                     seen_maps.add(sm)
                     code, body = await fetch(client, sm)
                     if code != 200:
-                        Actor.log.warning(f'{sm}: HTTP {code}')
+                        if code is not None:  # a failed connection was already logged by fetch()
+                            Actor.log.warning(f'{sm}: HTTP {code}')
                         continue
                     kind, items = parse_sitemap(body)
                     if kind == 'index':

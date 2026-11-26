@@ -1,6 +1,6 @@
 {
   "actorOutputSchemaVersion": 1,
-  "title": "Bulk PageSpeed & Core Web Vitals Checker output",
+  "title": "Core Web Vitals Checker output",
   "properties": {
     "results": {
       "type": "string",
