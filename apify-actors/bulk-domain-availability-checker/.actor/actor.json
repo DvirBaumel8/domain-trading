@@ -2,7 +2,7 @@
   "actorSpecification": 1,
   "name": "bulk-domain-availability-checker",
   "title": "Check 1,000 Startup Name Ideas at Once (DNS + RDAP)",
-  "description": "Check 1,000 startup-name ideas at once: names x TLDs, a fast DNS pre-check and a confirmation from the registry's RDAP server. Per domain: available or registered, registrar, creation and expiry dates, and a parked or for-sale flag. Unknown TLDs are rejected, never reported as available. Paste domains or keywords. Export CSV, Excel or JSON, or run from the API.",
+  "description": "Check 1,000 startup-name ideas at once: names x TLDs, a fast DNS pre-check and RDAP registry confirmation. Per domain: available or registered, registrar, creation and expiry dates, parked or for-sale flag. Unknown TLDs are rejected, never reported as available. Export CSV, Excel or JSON.",
   "version": "0.1",
   "buildTag": "latest",
   "meta": {

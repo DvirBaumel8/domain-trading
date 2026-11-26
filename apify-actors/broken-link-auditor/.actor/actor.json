@@ -2,7 +2,7 @@
   "actorSpecification": 1,
   "name": "broken-link-auditor",
   "title": "Site Migration QA: Check Old URLs Redirect to Live Pages",
-  "description": "Site migration QA: check that every old URL redirects to a live page. Paste old URLs, a sitemap or a site address and get the final status, the 301/302 redirect chain, redirect loops and 404s for each URL. In crawl mode it also reports the page and anchor text that link to each broken URL, so you can run it monthly as a broken-link report.",
+  "description": "Site migration QA: check that every old URL redirects to a live page. Paste old URLs, a sitemap or a site address and get the final status, 301/302 chain, redirect loops and 404s per URL. Crawl mode also reports the page and anchor text that link to each broken URL.",
   "version": "0.1",
   "buildTag": "latest",
   "meta": {

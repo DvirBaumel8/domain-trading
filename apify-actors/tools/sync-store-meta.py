@@ -15,6 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BASE = "https://api.apify.com"
 TEXT_KEYS = ("title", "description", "seoTitle", "seoDescription")
+MAX_DESCRIPTION = 300  # Apify rejects a longer Store description
 ACTOR_IDS = {
     "domain-checkup-report": "Hfr4MI0LjpkjEYXcA",
     "bulk-dns-email-auth-checker": "VnrYq91nbRYrRMmS1",
@@ -54,8 +55,11 @@ def _request(method: str, path: str, token: str, body: dict | None = None) -> di
 
 
 def sync(name: str, actor_id: str, token: str, http=_request) -> list[str]:
-    """Returns the keys that differ after the PUT (empty list = ok)."""
+    """Returns the keys that differ after the PUT (empty list = ok). Raises ValueError, before any HTTP call, if the description is over 300 characters."""
     want = text_payload(json.loads((ROOT / name / ".actor" / "actor.json").read_text()))
+    desc = want.get("description", "")
+    if len(desc) > MAX_DESCRIPTION:  # validate before any HTTP call
+        raise ValueError(f"{name}: description is {len(desc)} characters, max {MAX_DESCRIPTION}")
     example = example_run_input(name)
     body = dict(want, exampleRunInput=example) if example else want
     http("PUT", f"/v2/actors/{actor_id}", token, body)

@@ -174,3 +174,24 @@ def test_requirements_unchanged_and_no_pillow():
 def test_sync_store_meta_text_keys_and_ids_unchanged():
     text = (ROOT / "tools" / "sync-store-meta.py").read_text()
     assert 'TEXT_KEYS = ("title", "description", "seoTitle", "seoDescription")' in text
+
+
+LIVE_DESCRIPTIONS = {
+    "sitemap-url-extractor": "Get every URL of a site for an SEO or AI audit, or to feed a crawler. Finds sitemaps from robots.txt, follows indexes and .gz files, and returns each URL with lastmod, priority, hreflang and an optional HTTP status. Filter by regex or date. Export CSV, Excel or JSON, or use the API.",
+    "bulk-dns-email-auth-checker": "Pre-send check for cold-email lead lists: see which prospect domains have no DMARC or MX. Also a bulk email-auth audit: SPF, DKIM, DMARC, MX and provider per domain, a 0-100 score and plain-English issues. Paste domains, URLs or emails. Public DNS, no API keys. Export CSV, Excel or JSON.",
+    "bulk-domain-availability-checker": "Check 1,000 startup-name ideas at once: names x TLDs, a fast DNS pre-check and RDAP registry confirmation. Per domain: available or registered, registrar, creation and expiry dates, parked or for-sale flag. Unknown TLDs are rejected, never reported as available. Export CSV, Excel or JSON.",
+    "domain-checkup-report": "Due diligence before you buy a domain: a one-row report with registration age, registrar and expiry (RDAP), DNS and provider, for-sale signals with asking price, SPF/DMARC, a Cloudflare Security DNS check, a trademark-risk hint and a 0-100 score. No API keys. Export JSON, CSV or Excel.",
+    "broken-link-auditor": "Site migration QA: check that every old URL redirects to a live page. Paste old URLs, a sitemap or a site address and get the final status, 301/302 chain, redirect loops and 404s per URL. Crawl mode also reports the page and anchor text that link to each broken URL.",
+    "bulk-pagespeed-checker": "Core Web Vitals for every page in your sitemap, as CSV. Give a list of URLs and get Lighthouse category scores, lab metrics and, when Google has them, real-user Core Web Vitals for mobile and desktop. Uses the official Google PageSpeed Insights API v5. Export CSV, Excel or JSON.",
+}
+ALL_ACTORS = sorted(p.parent.parent.name for p in ROOT.glob("*/.actor/actor.json"))
+
+
+@pytest.mark.parametrize("name", ALL_ACTORS)
+def test_description_length_1_to_300(name):
+    assert 1 <= len(load(name, "actor.json")["description"]) <= 300
+
+
+@pytest.mark.parametrize("name", IN_SCOPE)
+def test_description_matches_live_store_text(name):
+    assert load(name, "actor.json")["description"] == LIVE_DESCRIPTIONS[name]

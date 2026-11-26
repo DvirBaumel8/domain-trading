@@ -65,6 +65,39 @@ def test_sync_store_meta_sends_only_text_keys():
     assert not {"pricingInfos", "isPublic", "isDeprecated", "pricingModel"} & set(put[2])
 
 
+def _sync_with_description(m, monkeypatch, tmp_path, n):
+    d = tmp_path / "sitemap-url-extractor" / ".actor"
+    d.mkdir(parents=True)
+    src = ROOT / "sitemap-url-extractor" / ".actor"
+    actor = json.loads((src / "actor.json").read_text())
+    actor["description"] = "x" * n
+    (d / "actor.json").write_text(json.dumps(actor))
+    (d / "input_schema.json").write_text((src / "input_schema.json").read_text())
+    monkeypatch.setattr(m, "ROOT", tmp_path)
+    calls, store = [], {}
+
+    def http(method, path, token, body=None):
+        calls.append(method)
+        if method == "PUT":
+            store.update(body)
+        return dict(store)
+
+    return calls, lambda: m.sync("sitemap-url-extractor", "ID1", "tok", http)
+
+
+def test_sync_store_meta_rejects_301_char_description_before_http(monkeypatch, tmp_path):
+    calls, run = _sync_with_description(_load_sync(), monkeypatch, tmp_path, 301)
+    with pytest.raises(ValueError):
+        run()
+    assert calls == []
+
+
+def test_sync_store_meta_allows_300_char_description(monkeypatch, tmp_path):
+    calls, run = _sync_with_description(_load_sync(), monkeypatch, tmp_path, 300)
+    assert run() == []
+    assert calls == ["PUT", "GET"]
+
+
 def test_sync_store_meta_detects_difference():
     m = _load_sync()
     assert m.sync("sitemap-url-extractor", "ID1", "tok", lambda me, p, t, b=None: {"title": "other"}) != []

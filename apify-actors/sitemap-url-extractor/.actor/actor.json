@@ -2,7 +2,7 @@
   "actorSpecification": 1,
   "name": "sitemap-url-extractor",
   "title": "Sitemap URL Extractor: Every URL of a Site for Audits",
-  "description": "Get every URL of a site for an SEO or AI audit, or to feed a crawler. Finds the sitemaps from robots.txt, follows sitemap indexes and .gz files, and returns each page URL with lastmod, priority, hreflang and an optional HTTP status. Filter by regex or date. Step 1 before a broken-link check or a PageSpeed run. Export CSV, Excel or JSON, or run from the API.",
+  "description": "Get every URL of a site for an SEO or AI audit, or to feed a crawler. Finds sitemaps from robots.txt, follows indexes and .gz files, and returns each URL with lastmod, priority, hreflang and an optional HTTP status. Filter by regex or date. Export CSV, Excel or JSON, or use the API.",
   "version": "0.1",
   "buildTag": "latest",
   "meta": {
