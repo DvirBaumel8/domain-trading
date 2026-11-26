@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 from datetime import datetime
 from pathlib import Path
@@ -44,10 +45,23 @@ def summary_line(actor: dict, now: datetime) -> str:
             f"id `{actor.get('id')}` build `{build_version(actor)}`.")
 
 
-def fetch(name: str, token: str) -> dict:
-    req = urllib.request.Request(f"{BASE}/v2/acts/me~{name}", headers={"Authorization": f"Bearer {token}", "Accept": "application/json"})
+def get(path: str, token: str) -> dict:
+    req = urllib.request.Request(f"{BASE}{path}", headers={"Authorization": f"Bearer {token}", "Accept": "application/json"})
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.loads(r.read())["data"]
+
+
+def fetch(name: str, token: str, get_fn=get) -> dict:
+    """Resolve by `me~name`; on 404 use `<username>~name` with the username from /v2/users/me."""
+    try:
+        return get_fn(f"/v2/acts/me~{name}", token)
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
+    username = get_fn("/v2/users/me", token).get("username")
+    if not username:
+        raise LookupError("no username from /v2/users/me")
+    return get_fn(f"/v2/acts/{username}~{name}", token)
 
 
 def main(argv: list[str], fetch_fn=fetch) -> int:

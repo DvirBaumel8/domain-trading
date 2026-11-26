@@ -42,6 +42,36 @@ def test_guard_main_fails_without_leaking_token(monkeypatch, capsys):
     assert "sekret-token" not in out.out + out.err
 
 
+def _http404(url):
+    import urllib.error
+    return urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+
+
+def test_guard_fetch_falls_back_to_username_on_404():
+    calls = []
+
+    def fake_get(path, token):
+        calls.append(path)
+        if path.startswith("/v2/acts/me~"):
+            raise _http404(path)
+        if path == "/v2/users/me":
+            return {"username": "someuser"}
+        return {"id": "x", "isPublic": False}
+
+    assert guard.fetch("broken-link-auditor", "tok", get_fn=fake_get)["id"] == "x"
+    assert calls == ["/v2/acts/me~broken-link-auditor", "/v2/users/me", "/v2/acts/someuser~broken-link-auditor"]
+
+
+def test_guard_fetch_does_not_mask_other_errors():
+    import urllib.error
+
+    def fake_get(path, token):
+        raise urllib.error.HTTPError(path, 500, "boom", {}, None)
+
+    with pytest.raises(urllib.error.HTTPError):
+        guard.fetch("broken-link-auditor", "tok", get_fn=fake_get)
+
+
 def test_guard_rejects_old_actors(monkeypatch):
     monkeypatch.setenv("APIFY_TOKEN", "t")
     assert guard.main(["sitemap-url-extractor"], fetch_fn=lambda n, t: {}) == 2
