@@ -41,7 +41,7 @@ def go(name, order, fail=None, env_patch=None, cap=8.0, roster=None, patch_open=
     except Exception as e: r.update(outcome="CRASH", err=traceback.format_exc()[-700:])
     os.environ.clear(); os.environ.update(saved); urllib.request.urlopen = fake_apis.REAL_URLOPEN
     res_all[name] = r; print(json.dumps(r, indent=1)[:900], flush=True)
-O = lambda oid, **k: Order(**{**dict(order_id=oid, business_name="DrainMaster", city="Columbus, OH", niche="plumber", plan="check", paid_ref="x"), **k})
+O = lambda oid, **k: Order(**{**dict(order_id=oid, business_name="DrainMaster", city="Columbus, OH", niche="plumber", plan="check", paid_ref="x", paid=True), **k})
 go("A_no_scheme_website", O("F-A", website="drainmasterohio.com"))
 go("B_openai_always_401", O("F-B"), fail={"api.openai.com": 401})
 go("C_all_vendors_down", O("F-C"), fail={"api.openai.com": 500, "api.perplexity.ai": 500, "generativelanguage.googleapis.com": 429, "api.anthropic.com": 529})
@@ -49,7 +49,7 @@ go("D_gemini_garbage_json", O("F-D"), fail={"generativelanguage.googleapis.com":
 go("E_allow_paid_unset", O("F-E"), env_patch={"AIVIS_ALLOW_PAID": None})
 go("F_missing_anthropic_key", O("F-F"), env_patch={"ANTHROPIC_API_KEY": None})
 go("G_cap_too_low", O("F-G"), cap=3.0)
-go("H_unpaid_order_flag", O("F-H", paid_ref=""))   # CLI never reads 'paid'
+go("H_unpaid_order_flag", O("F-H", paid_ref="", paid=False))   # CLI never reads 'paid'
 go("I_html_in_name", O("F-I", business_name="Smith & Sons <b>Plumbing</b> \"Pros\""))
 go("J_no_competitors_plumber", O("F-J"))
 go("K_competitor_same_as_target_case", O("F-K", competitors=["drainmaster", "DRAINMASTER LLC"]))

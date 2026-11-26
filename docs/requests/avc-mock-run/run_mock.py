@@ -77,7 +77,7 @@ for s in SAMPLES:
     except SystemExit as e: rec["steps"]["engine"] = f"SystemExit {e}"
     except Exception as e: rec["steps"]["engine"] = "CRASH " + traceback.format_exc()
     rec["steps"]["engine_seconds"] = round(time.time() - t, 1); rec["steps"]["fake_api_calls"] = len(fake_apis.CALLS)
-    rec["steps"]["fake_calls_by_vendor"] = {v: sum(1 for c in fake_apis.CALLS if c[0] == v) for v in ("openai", "perplexity", "gemini", "claude")}
+    rec["steps"]["fake_calls_by_vendor"] = {v: sum(1 for c in fake_apis.CALLS if c[0] == v) for v in ("openai", "gemini", "claude")}
     try: rec["order_log"] = json.loads(buf.getvalue())
     except Exception: rec["cli_stdout"] = buf.getvalue()[-500:]
     rec["order_id"] = oid; rec["pool_size"] = len(pool)
