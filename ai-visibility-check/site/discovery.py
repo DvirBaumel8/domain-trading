@@ -1,6 +1,6 @@
 """Search/AI discoverability: sitemap, llms.txt, JSON-LD, FAQ and one landing page per trade.
 
-Everything here is built at request time from one place: the PRODUCTS and FAQ constants below
+Everything here is built at request time from products.py (names, prices), the FAQ constant below
 and the NICHES registry. Nothing reads a file named by a request; trade slugs are an allow-list.
 """
 import html as _html
@@ -14,45 +14,92 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "engine"))
 from aivis.niches import NICHES         # noqa: E402
 from aivis.prompts import generate_prompts  # noqa: E402
+sys.path.insert(0, HERE)
+import products                         # noqa: E402
 
-# One-time products as listed on Polar (USD, whole dollars). Schema and tests read this table.
-PRODUCTS = (
-    {"name": "AI Visibility Check", "price": 149,
-     "description": "Asks ChatGPT, Gemini and Claude local-business questions for your trade and city and records who is named."},
-    {"name": "Google Maps Visibility Check", "price": 149,
-     "description": "Review of your Google Maps profile with a map-visibility baseline."},
-    {"name": "Listings Consistency Audit", "price": 249,
-     "description": "Check of the directories AI assistants read, listed, wrong or missing, with an ordered checklist."},
-    {"name": "AI Content Pack", "price": 249,
-     "description": "Site crawl, a priority table, page rewrites and ready-to-paste structured data."},
-    {"name": "AI Visibility Bundle", "price": 397,
-     "description": "The AI Visibility Check, Maps check, Listings audit and Content Pack together."},
-)
-CHECK_PRICE = PRODUCTS[0]["price"]
+# Names and prices come ONLY from products.py (the Polar map). This table holds wording, keyed by order type.
+# The Maps line is the visible table's wording and must not be stronger than it ("once we have access").
+DESCRIPTIONS = {
+    "base": "Whether ChatGPT, Gemini or Claude name you; who they name instead; a prioritized fix list.",
+    "maps": "Name, address, phone, categories, services and description checked; 4 posts; a map-visibility "
+            "baseline once we have access.",
+    "listings": "17 directories AI assistants read: listed, wrong or missing, plus an ordered checklist.",
+    "content": "Full-site crawl, a priority table, rewrites for 5 pages, and ready-to-paste structured data.",
+    "bundle": "AI Visibility Check + Google Maps Visibility Check + Listings Consistency Audit + AI Content Pack.",
+}
+PRODUCT_ORDER = ("base", "maps", "listings", "content", "bundle")
+CHECK_PRICE = products.TYPES["base"]["price_usd"]
+BASE_NAME = products.TYPES["base"]["name"]
 COMING_SOON_PLANS = ("Visibility", "Growth", "Dominate")   # monthly plans: never get an offer in the schema
 
-# Visible FAQ and FAQPage JSON-LD are both generated from this list (plain text answers).
+
+def addon_offers_enabled():
+    """The ONE switch for every add-on checkout link and add-on `offers` entry on discovery and city pages.
+    False until the ADDONS_CHECKOUT helper exists on main (do not invent a second flag here). When it
+    does, return that helper's value here and nothing else changes."""
+    return False
+
+
+def product_list():
+    """[{type, name, price, description}] from products.py, in display order."""
+    return [{"type": t, "name": products.TYPES[t]["name"], "price": products.TYPES[t]["price_usd"],
+             "description": DESCRIPTIONS[t]} for t in PRODUCT_ORDER]
+
+
+def offer_types():
+    """Order types that may carry a price or an offer on the pages built here."""
+    return PRODUCT_ORDER if addon_offers_enabled() else ("base",)
+
+
+def pay_keys():
+    """config.js buy-button keys that the pages built here may use."""
+    allowed = set(offer_types())
+    return [k for k, t in products.PAY_KEYS.items() if t in allowed]
+
+
+# Visible FAQ (home page) and the FAQPage JSON-LD are both generated from this list (plain text answers).
+# Every claim is one the pages already make (index.html, refunds.html).
 FAQ = (
-    ("What does the AI Visibility Check do?",
-     "We ask ChatGPT, Gemini and Claude the questions customers in your trade and city might ask, count how often "
-     "your business is named, list who is named instead, and check those names against official registers where we can."),
+    ("Can you guarantee that ChatGPT will recommend my business?",
+     "No, and nobody honestly can. AI assistants change their answers constantly. We measure how often you're named, "
+     "show you what the businesses being named have in common, and help you fix what's in your control. "
+     "Then we re-measure with the same questions."),
+    ("Is this what I'd see if I asked ChatGPT myself?",
+     "Close, but not identical. Answers vary by person, location and time \u2014 identical lists repeat in under 1% of "
+     "runs (SparkToro, January 2026). That's why we ask many questions several times and report a rate with a range, "
+     "instead of one screenshot."),
+    ("Which AI assistants do you check?",
+     "The paid report checks ChatGPT, Gemini and Claude with their web-search features turned on. The free quick check "
+     "uses one AI model answering from memory only, so treat it as a first look."),
+    ("What do the fixes involve?",
+     "Mostly the basics AI assistants read: complete and consistent profiles on the sites they cite for your trade "
+     "(Google, Yelp, Healthgrades, Avvo and so on), clear service and city information on your website, and honest "
+     "review requests to real customers. Studies link these to being named; none prove a guaranteed effect, and we say "
+     "which evidence is stronger."),
+    ("Do you post fake reviews or spam forums?",
+     "Never. Fake reviews are illegal under the FTC's rule, and undisclosed forum posting backfires. We only work with "
+     "real customers and truthful content."),
+    ("Are you affiliated with OpenAI, Google or Anthropic?",
+     "No. We're an independent service. Product names belong to their owners."),
+    ("What do you do with my data?",
+     "We use your business details to run your check and your email to identify your order. We don't sell data. "
+     "See the privacy policy."),
     ("What do I get, and when?",
-     "A written report with how often each assistant names you, who is named instead, and a prioritized fix list. "
-     "It is delivered in 2 business days."),
+     "A one-page report: how often you're named, who's named instead, the likely reasons, and a prioritized fix list. "
+     "The AI Visibility Check is delivered in 2 business days."),
     ("What does it cost?",
-     f"The AI Visibility Check is ${CHECK_PRICE}, one time, in US dollars, paid at checkout through Polar."),
+     f"The AI Visibility Check is ${CHECK_PRICE}, one time, in US dollars, paid at checkout."),
     ("Are the monthly plans available?",
-     "Not yet. The Visibility, Growth and Dominate monthly plans are coming soon and cannot be bought today."),
+     "Not yet. The Visibility, Growth and Dominate monthly plans are coming soon: use \u201cComing soon - join "
+     "waitlist\u201d under a plan and we will tell you when it opens."),
     ("Which businesses is it for?",
      "US businesses only. Enter a US city and state, such as Austin, TX."),
-    ("Can you promise that an AI assistant will recommend my business?",
-     "No. AI answers change from one ask to the next, so we report how often you are named, with a range. "
-     "We never promise a ranking."),
     ("What is the refund policy?",
-     "If we do not email you the report within 5 business days after we have both your payment and a completed intake "
-     "form, you get a full refund. We do not refund a delivered report only because an assistant still does not name "
-     "your business. See the refund policy for the full text."),
+     "If we do not deliver within 5 business days after we have both your payment and a completed intake form, "
+     "you get a full refund. We do not refund a delivered report solely because an AI assistant still does not name "
+     "your business. See the refund policy."),
 )
+_FAQ_LINKS = (("privacy policy", "/privacy.html"), ("refund policy", "/refunds.html"))
 
 PUBLIC_PAGES = ("/", "/agency.html", "/sample-report.html", "/privacy.html", "/terms.html", "/refunds.html")
 
@@ -105,6 +152,14 @@ def trades():
     return out
 
 
+def trade_slug_for_niche(key):
+    """Trade-page slug of a niche key (as in the market cache), or None when that niche has no trade page."""
+    for s, n in trades():
+        if n.key == key:
+            return s
+    return None
+
+
 def trade_by_slug(slug):
     for s, n in trades():
         if s == slug:
@@ -150,16 +205,32 @@ def home_jsonld(origin=""):
         org["url"] = origin + "/"
     if cfg["contactEmail"]:
         org["contactPoint"] = {"@type": "ContactPoint", "contactType": "customer support", "email": cfg["contactEmail"]}
-    products = [{"@type": "Product", "name": p["name"], "description": p["description"],
-                 "brand": {"@type": "Brand", "name": cfg["brand"]},
-                 "offers": {"@type": "Offer", "price": str(p["price"]), "priceCurrency": "USD",
-                            "availability": "https://schema.org/InStock"}} for p in PRODUCTS]
-    return _ld_script({"@context": "https://schema.org", "@graph": [org, *products, faq_ld()]})
+    priced = offer_types()
+    items = []
+    for p in product_list():
+        item = {"@type": "Product", "name": p["name"], "description": p["description"],
+                "brand": {"@type": "Brand", "name": cfg["brand"]}}
+        if p["type"] in priced:           # add-ons carry no offer or price while the add-on switch is off
+            item["offers"] = {"@type": "Offer", "price": str(p["price"]), "priceCurrency": "USD",
+                              "availability": "https://schema.org/InStock"}
+        items.append(item)
+    return _ld_script({"@context": "https://schema.org", "@graph": [org, *items, faq_ld()]})
+
+
+def _faq_answer_html(a):
+    out = _html.escape(a)
+    for text, href in _FAQ_LINKS:
+        out = out.replace(text, f'<a href="{href}">{text}</a>', 1)
+    return out
+
+
+def faq_items_html():
+    return "".join(f"<details><summary>{_html.escape(q)}</summary><p>{_faq_answer_html(a)}</p></details>" for q, a in FAQ)
 
 
 def faq_section_html():
-    items = "".join(f"<details><summary>{_html.escape(q)}</summary><p>{_html.escape(a)}</p></details>" for q, a in FAQ)
-    return f'<section id="common-questions"><div class="wrap"><h2>Common questions</h2>{items}</div></section>'
+    """The one FAQ block of the home page ("Honest answers"); FAQPage JSON-LD is built from the same FAQ."""
+    return f'<section id="faq"><div class="wrap"><h2>Honest answers</h2>{faq_items_html()}</div></section>'
 
 
 def trades_section_html(prefix="/"):
@@ -184,8 +255,13 @@ def fill_tokens(raw, origin=""):
 
 
 # ---- sitemap / llms.txt ---------------------------------------------------------------------------
+def city_paths():
+    import cities                       # lazy: cities imports this module
+    return cities.public_paths()
+
+
 def sitemap_xml(origin=""):
-    paths = list(PUBLIC_PAGES) + trade_paths()
+    paths = list(PUBLIC_PAGES) + trade_paths() + city_paths()
     urls = "".join(f"<url><loc>{_xml(origin + p)}</loc></url>" for p in paths)
     return ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
             + urls + "</urlset>\n")
@@ -211,8 +287,12 @@ def llms_txt(origin=""):
              f"- [For agencies]({o}/agency.html): white-label reports", "",
              "## Trades"]
     lines += [f"- [AI visibility for {n.plural}]({o}/for/{s})" for s, n in trades()]
+    cp = city_paths()
+    if cp:
+        import cities
+        lines += ["", "## City snapshots (dated, not rankings)"] + [f"- [{t}]({o}{p})" for p, t in cities.public_entries()]
     lines += ["", "## Help",
-              f"- [Common questions]({o}/#common-questions)",
+              f"- [Honest answers (FAQ)]({o}/#faq)",
               f"- [Refund policy]({o}/refunds.html)",
               f"- [Terms]({o}/terms.html)",
               f"- [Privacy]({o}/privacy.html)", ""]
@@ -240,7 +320,7 @@ def trade_page(slug, origin=""):
         {"@type": "BreadcrumbList", "itemListElement": [
             {"@type": "ListItem", "position": 1, "name": "Home", "item": f"{origin}/"},
             {"@type": "ListItem", "position": 2, "name": title, "item": url}]}]}
-    faq = "".join(f"<details><summary>{e(q)}</summary><p>{e(a)}</p></details>" for q, a in FAQ)
+    faq = faq_items_html()
     cap = e(plural)
     page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -258,7 +338,7 @@ def trade_page(slug, origin=""):
 <header class="hero"><div class="wrap"><div>
 <h1>{e(title)}</h1>
 <p class="lead">When customers ask ChatGPT, Gemini or Claude for {cap} in their city, the assistant names a few businesses. The AI Visibility Check measures whether yours is one of them, and who is named instead.</p>
-<p><a class="btn" data-pay="payLinkCheck" href="{e(pay, quote=True)}">Buy the AI Visibility Check — ${CHECK_PRICE}</a> &nbsp; <a class="btn ghost" href="/#check">Run a free quick check</a></p>
+<p><a class="btn" data-pay="payLinkCheck" href="{e(pay, quote=True)}">Buy the {e(BASE_NAME)} — ${CHECK_PRICE}</a> &nbsp; <a class="btn ghost" href="/#check">Run a free quick check</a></p>
 </div></div></header>
 <section><div class="wrap">
 <h2>What the check does for {cap}</h2>
@@ -270,15 +350,15 @@ def trade_page(slug, origin=""):
 <ul><li>How often each assistant names your business, with a range</li><li>Who is named instead, and how often</li><li>Names that match no registered business</li><li>Likely reasons and a prioritized fix list, with the strength of evidence behind each fix</li></ul>
 <p>The report is delivered in 2 business days. It is a measurement, not a ranking promise. <a href="/sample-report.html">See the sample report</a>.</p>
 <h3>Price</h3>
-<p>${CHECK_PRICE}, one time, in US dollars. <a class="btn" data-pay="payLinkCheck" href="{e(pay, quote=True)}">Buy the AI Visibility Check</a> &nbsp; <a href="/#check">or run the free quick check first</a>.</p>
+<p>${CHECK_PRICE}, one time, in US dollars. <a class="btn" data-pay="payLinkCheck" href="{e(pay, quote=True)}">Buy the {e(BASE_NAME)}</a> &nbsp; <a href="/#check">or run the free quick check first</a>.</p>
 <p class="small">US businesses only. See the <a href="/refunds.html">refund policy</a>.</p>
 </div></section>
-<section id="common-questions"><div class="wrap"><h2>Common questions</h2>{faq}</div></section>
+<section id="faq"><div class="wrap"><h2>Honest answers</h2>{faq}</div></section>
 <footer><div class="wrap">
 <p>© 2026 Dvir Baumel · {e(cfg['contactEmail'])} · <span class="addr">{{{{BUSINESS_ADDRESS}}}}</span></p>
 <p><a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · <a href="/refunds.html">Refunds</a> · <a href="/">Home</a> · Not affiliated with OpenAI, Google or Anthropic.</p>
 </div></footer>
-<script src="/assets/config.js"></script><script src="/assets/app.js"></script>
+<script src="/assets/ref.js"></script><script src="/assets/config.js"></script><script src="/assets/app.js"></script>
 </body></html>
 """
     return page.encode()

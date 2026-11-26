@@ -847,6 +847,13 @@ def free_report_path(fid):
     return f"free/{fid}/report.html"
 
 
+def save_line(path, obj):
+    """Append one JSON line to a local file under DATA. Only the page-hit log uses it (no requests, no leads)."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with LOCK, open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(obj) + "\n")
+
+
 def clean(d):
     biz = str(d.get("business", "")).strip()[:120]
     city = str(d.get("city", "")).strip()[:60]
@@ -1002,13 +1009,16 @@ class H(http.server.BaseHTTPRequestHandler):
             page = discovery.trade_page(m.group(1), self._origin()) if m else None
             if page is None:
                 return self._json(404, {"error": "not found"})
+            refs.record_page(self.path, path, DATA, save_line)
             return self._send(200, "text/html; charset=utf-8", render_page(page, self._origin()), cache=True)
         r = cities.route(path, self.headers)
         if r:
             st, ctype, body = r
             if st != 200:
                 return self._json(404, {"error": "not found"})
-            return self._send(200, ctype, render_page(body) if ctype.startswith("text/html") else body)
+            if ctype.startswith("text/html"):          # /city and /city/<slug>, not card.svg
+                refs.record_page(self.path, path, DATA, save_line)
+            return self._send(200, ctype, render_page(body, self._origin()) if ctype.startswith("text/html") else body)
         m = re.fullmatch(r"/api/check/([a-f0-9-]{36})", path)
         if m:
             prune_jobs()

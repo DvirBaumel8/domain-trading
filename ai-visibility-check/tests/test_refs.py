@@ -15,6 +15,12 @@ def lines(path):
         return [json.loads(x) for x in f if x.strip()]
 
 
+def leads(store):
+    """Lead records of a local private store, oldest first."""
+    d = os.path.join(store, "leads")
+    return [json.load(open(os.path.join(d, f), encoding="utf-8")) for f in sorted(os.listdir(d))] if os.path.isdir(d) else []
+
+
 class CleanRefTests(unittest.TestCase):
     def test_valid(self):
         self.assertEqual(refs.clean_ref("producthunt"), "producthunt")
@@ -36,7 +42,7 @@ class Fixture(ts.Base):
         self._orders = server.LOCAL_ORDERS
         server.LOCAL_ORDERS = os.path.join(self.tmp, "orders-store")
         self.hits = os.path.join(self.tmp, "ref-hits.jsonl")
-        self.reqs = os.path.join(self.tmp, "requests.jsonl")
+        self.reqs = os.path.join(self.tmp, "requests.jsonl")     # the old public log: must never come back
 
     def tearDown(self):
         server.DATA, server.LOCAL_ORDERS = self._data, self._orders
@@ -92,14 +98,16 @@ class CheckTests(Fixture):
             self.assertEqual(st, 200)
             self.assertNotIn(b"producthunt", body.lower())
             out[name] = body
-        recs = lines(self.reqs)
-        self.assertEqual([r["ref"] for r in recs], ["", "producthunt", "", ""])
+        self.assertFalse(os.path.exists(self.reqs))           # requests go to the private store, not the data folder
+        recs = leads(server.LOCAL_ORDERS)
+        self.assertEqual(len(recs), 4)
+        self.assertEqual(sorted(r["ref"] for r in recs), ["", "", "", "producthunt"])
         self.assertEqual(out["none"], out["valid"])
         keys = set(recs[0])
         for r in recs:
             self.assertEqual(set(r), keys)
-        self.assertEqual({k: v for k, v in recs[0].items() if k not in ("at", "ref")},
-                         {k: v for k, v in recs[1].items() if k not in ("at", "ref")})
+        self.assertEqual(len({json.dumps({k: v for k, v in r.items() if k not in ("at", "ref")}, sort_keys=True)
+                              for r in recs}), 1)
 
     def test_instant_has_ref(self):
         src = os.path.join(self._data, "markets")
@@ -111,7 +119,8 @@ class CheckTests(Fixture):
         st, body = self.post("/api/check", {**CHECK, "ref": "abc"})
         self.assertEqual(json.loads(body)["status"], "instant")
         self.assertNotIn(b"abc", body)
-        self.assertEqual(lines(self.reqs)[0]["ref"], "abc")
+        self.assertFalse(os.path.exists(self.reqs))
+        self.assertEqual([r["ref"] for r in leads(server.LOCAL_ORDERS)], ["abc"])
 
 
 class IntakeTests(Fixture):
@@ -142,71 +151,110 @@ class IntakeTests(Fixture):
 
 
 def make_fixture(root):
-    d, o = os.path.join(root, "data"), os.path.join(root, "orders-dir")
-    os.makedirs(d); os.makedirs(os.path.join(o, "orders"))
+    """A data dir (page hits) and a private store dir with leads/ and orders/ (old, recent, no-ref, bad files)."""
+    d, st = os.path.join(root, "data"), os.path.join(root, "store")
+    os.makedirs(d); os.makedirs(os.path.join(st, "leads")); os.makedirs(os.path.join(st, "orders"))
     now = datetime.datetime(2026, 11, 26, 12, 0, tzinfo=datetime.timezone.utc)
     ago = lambda days: (now - datetime.timedelta(days=days)).isoformat(timespec="seconds")
     with open(os.path.join(d, "ref-hits.jsonl"), "w") as f:
         for r, t in [("ph", 1), ("ph", 2), ("ph", 20), ("blog", 3)]:
             f.write(json.dumps({"at": ago(t), "ref": r, "path": "/"}) + "\n")
         f.write("not json\n[1]\n" + json.dumps({"at": "garbage", "ref": "ph"}) + "\n")
-    with open(os.path.join(d, "requests.jsonl"), "w") as f:
-        for r, t in [("ph", 1), ("", 1), ("", 2), ("ph", 30), ("junk@x.co", 1)]:
-            f.write(json.dumps({"at": ago(t), "ref": r, "business": "Secret Biz LLC", "email": "leak@example.com",
-                                "ip": "9.9.9.9"}) + "\n")
-        f.write(json.dumps({"at": ago(1), "business": "Old Line"}) + "\n{bad\n")
+    pii = {"business": "Secret Biz LLC", "email": "leak@example.com", "ip": "9.9.9.9", "city": "Secretville, TX"}
+    def lead(name, **kw):
+        with open(os.path.join(st, "leads", name + ".json"), "w") as f:
+            json.dump({**pii, **kw}, f)
+    # dated by the stamp in the file name
+    lead("261125-100000-aaaaaaaa", ref="ph")
+    lead("261125-110000-bbbbbbbb", ref="")
+    lead("261124-110000-cccccccc")                          # no ref key at all
+    lead("261027-100000-dddddddd", ref="ph")                # old
+    lead("261125-120000-eeeeeeee", ref="junk@x.co")         # invalid ref counts as none
+    lead("nodate", at=ago(1), ref="blog")                   # no stamp in the name: the record's own time
+    lead("baddate", at="garbage", ref="ph")                 # undated: skipped
+    with open(os.path.join(st, "leads", "261126-100000-ffffffff.json"), "w") as f:
+        f.write("{")                                        # bad file: skipped
     def order(oid, **kw):
-        with open(os.path.join(o, "orders", oid + ".json"), "w") as f:
+        with open(os.path.join(st, "orders", oid + ".json"), "w") as f:
             json.dump({"order_id": oid, "business_name": "Secret Biz LLC", "email": "leak@example.com", **kw}, f)
     order("ORD-261125-aaaaaa", ref="ph")
     order("ORD-261126-bbbbbb")
     order("ORD-261001-cccccc", ref="ph")
     order("ORD-261001-dddddd", ref="blog", created_at=ago(1))      # created_at wins over the id date
     order("ORD-bad-eeeeee", ref="ph")
-    with open(os.path.join(o, "orders", "ORD-261126-ffffff.json"), "w") as f:
+    with open(os.path.join(st, "orders", "ORD-261126-ffffff.json"), "w") as f:
         f.write("{")
-    return d, o, now
+    return d, st, now
 
 
 class CountTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
-        self.d, self.o, self.now = make_fixture(self.tmp)
+        self.d, self.st, self.now = make_fixture(self.tmp)
 
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def test_table(self):
-        r = ref_counts.collect(self.d, self.o, 7, self.now)
-        self.assertEqual(r["rows"], [("ph", 2, 1, 1), ("blog", 1, 0, 1), ("(none)", 0, 4, 1)])
+        r = ref_counts.collect(self.d, self.st, 7, self.now)
+        # (ref, page hits, free-check requests, orders)
+        self.assertEqual(r["rows"], [("ph", 2, 1, 1), ("blog", 1, 1, 1), ("(none)", 0, 3, 1)])
         text = ref_counts.format_table(r)
-        for bad in ("leak@example.com", "Secret Biz", "9.9.9.9", "junk"):
-            self.assertNotIn(bad, text)
+        self.assertEqual(text.splitlines()[:3], ["Referral counts, last 7 days (UTC)",
+                                                 "ref     page hits  free-check requests  orders",
+                                                 "------  ---------  -------------------  ------"])
         self.assertNotIn("n/a", text)
+        self.assertNotIn("Note:", text)
+        for bad in ("leak@example.com", "Secret", "9.9.9.9", "junk", "x.co", "ORD-", "token"):
+            self.assertNotIn(bad, text)
 
     def test_days(self):
-        r = ref_counts.collect(self.d, self.o, 90, self.now)
-        self.assertEqual(r["rows"][0], ("ph", 3, 2, 2))
-        r = ref_counts.collect(self.d, self.o, 1, self.now)
-        self.assertEqual({x[0]: x[1:] for x in r["rows"]}, {"ph": (1, 1, 1), "(none)": (0, 3, 1), "blog": (0, 0, 1)})
+        r = ref_counts.collect(self.d, self.st, 90, self.now)
+        self.assertEqual({x[0]: x[1:] for x in r["rows"]}, {"ph": (3, 2, 2), "blog": (1, 1, 1), "(none)": (0, 3, 1)})
+        r = ref_counts.collect(self.d, self.st, 1, self.now)
+        self.assertEqual({x[0]: x[1:] for x in r["rows"]}, {"ph": (1, 0, 1), "blog": (0, 1, 1), "(none)": (0, 1, 1)})
 
-    def test_missing_orders_dir(self):
+    def test_missing_folders_print_na(self):
         r = ref_counts.collect(self.d, os.path.join(self.tmp, "nope"), 7, self.now)
-        self.assertFalse(r["orders_available"])
+        self.assertFalse(r["orders_available"]); self.assertFalse(r["leads_available"])
         text = ref_counts.format_table(r)
         self.assertIn("n/a", text)
-        self.assertIn("--orders-dir", text)
-        self.assertEqual(r["rows"][0][:3], ("ph", 2, 1))
+        self.assertIn("--store-dir", text)
+        self.assertIn("private orders repo", text)
+        self.assertEqual([row[:2] for row in r["rows"]], [("ph", 2), ("blog", 1)])
+        self.assertEqual([row[2:] for row in r["rows"]], [(None, None)] * 2)
+        # one folder present, the other missing: only that column is n/a
+        shutil.rmtree(os.path.join(self.st, "orders"))
+        r = ref_counts.collect(self.d, self.st, 7, self.now)
+        self.assertTrue(r["leads_available"]); self.assertFalse(r["orders_available"])
+        self.assertEqual(r["rows"][0], ("ph", 2, 1, None))
+        # no data dir file: the page-hit column is n/a
+        r = ref_counts.collect(os.path.join(self.tmp, "nodata"), self.st, 7, self.now)
+        self.assertFalse(r["hits_available"])
+        self.assertIn("ref-hits.jsonl", ref_counts.format_table(r))
+
+    def test_empty_but_present_folders_count_zero(self):
+        empty = os.path.join(self.tmp, "empty")
+        os.makedirs(os.path.join(empty, "leads")); os.makedirs(os.path.join(empty, "orders"))
+        r = ref_counts.collect(self.d, empty, 7, self.now)
+        self.assertTrue(r["leads_available"] and r["orders_available"])
+        self.assertEqual(r["rows"], [("ph", 2, 0, 0), ("blog", 1, 0, 0)])
 
     def test_cli(self):
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            self.assertEqual(ref_counts.main(["--data-dir", self.d, "--orders-dir", self.o]), 0)
+            self.assertEqual(ref_counts.main(["--data-dir", self.d, "--store-dir", self.st]), 0)
         self.assertIn("ph", out.getvalue())
-        for bad in (["--days", "0"], ["--days", "91"], ["--days", "x"]):
+        for bad in (["--days", "0"], ["--days", "91"], ["--days", "x"], ["--orders-dir", "x"]):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as cm:
                 ref_counts.main(bad)
             self.assertEqual(cm.exception.code, 2)
+
+    def test_default_store_dir_is_the_server_default(self):
+        src = open(os.path.join(SITE, "ref_counts.py"), encoding="utf-8").read()
+        self.assertIn('os.environ.get("ORDERS_LOCAL_DIR") or os.path.join(HERE, "..", "private-orders")', src)
+        for word in ("urllib", "http.client", "import requests", "api.github.com", "socket", "subprocess"):
+            self.assertNotIn(word, src)
 
 
 class ClientScriptTests(unittest.TestCase):

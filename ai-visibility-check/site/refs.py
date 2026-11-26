@@ -31,12 +31,12 @@ def hit_path(file_path, root):
     return "/" if rel == "index.html" else "/" + rel
 
 
-def record_hit(target, file_path, root, data_dir, save_line):
-    """Log one page hit when the target carries a valid ref. Never raises."""
+def record_page(target, path, data_dir, save_line):
+    """Log one page hit for a PUBLIC path (already validated by the route) when the target carries a valid ref.
+    Never raises. Stores {at, ref, path} only: no IP, user agent or headers."""
     try:
         ref = ref_from_target(target)
-        path = hit_path(file_path, root)
-        if not ref or not path:
+        if not ref or not path or len(path) > MAX_PATH or not path.startswith("/"):
             return False
         at = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
         save_line(data_dir.rstrip("/\\") + "/" + HITS_FILE, {"at": at, "ref": ref, "path": path})
@@ -45,3 +45,8 @@ def record_hit(target, file_path, root, data_dir, save_line):
         import sys
         print("ref hit not logged:", type(e).__name__, file=sys.stderr)
         return False
+
+
+def record_hit(target, file_path, root, data_dir, save_line):
+    """Static HTML file served from `root`: log a hit for its public path. Never raises."""
+    return record_page(target, hit_path(file_path, root), data_dir, save_line)

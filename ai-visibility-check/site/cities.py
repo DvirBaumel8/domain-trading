@@ -5,13 +5,15 @@ The slug map is built from the validated cache files; a request path is only eve
 that map and never used to open a file. Nothing here reads requests.jsonl, ref-hits.jsonl,
 free-checks/ or any orders folder. Every number is computed from the cache file (or is the $149 price).
 """
-import datetime, html, json, os, re, urllib.parse
+import datetime, html, json, os, re, sys, urllib.parse
 from xml.sax.saxutils import escape as _xml_escape
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import discovery                                       # noqa: E402  (origin helper, trade slugs)
 MARKETS_DIR = os.path.join(HERE, "data", "markets")   # tests point this at a temp folder
 
-SHOW_NAMES = True      # one switch: False removes every business name from the pages and the card
+SHOW_NAMES = False     # one switch; False (shipped) keeps every business name off the pages and the card
 TOP_N = 5
 PRICE = "$149"
 SITE_NAME = "AI Visibility Check"
@@ -114,22 +116,17 @@ def load_markets(directory=None):
     return out
 
 
-def public_paths():
-    """Valid public city paths, for the sitemap / llms.txt (empty list when there are no valid markets)."""
+def public_entries():
+    """[(path, link text)] of the valid city pages, for the sitemap / llms.txt (empty when no valid market)."""
     ms = load_markets()
-    return (["/city"] + [f"/city/{s}" for s in sorted(ms)]) if ms else []
+    if not ms:
+        return []
+    return [("/city", "City snapshots of AI answers")] + [(f"/city/{s}", headline(ms[s])) for s in sorted(ms)]
 
 
-def public_base(headers, environ=None):
-    """Origin for canonical and share URLs: AIVIS_PUBLIC_BASE_URL, else the (validated) Host header."""
-    env = (environ if environ is not None else os.environ).get("AIVIS_PUBLIC_BASE_URL", "").strip().rstrip("/")
-    if re.fullmatch(r"https?://[A-Za-z0-9.-]+(:\d+)?", env):
-        return env
-    host = (headers.get("Host") or "").strip()
-    if not re.fullmatch(r"[A-Za-z0-9.-]{1,100}(:\d{1,5})?", host):
-        host = "localhost"
-    proto = "https" if (headers.get("X-Forwarded-Proto") or "").lower() == "https" else "http"
-    return f"{proto}://{host}"
+def public_paths():
+    """Valid public city paths (empty list when there are no valid markets: then /city is not linked either)."""
+    return [p for p, _ in public_entries()]
 
 
 def e(s):
@@ -155,7 +152,7 @@ _FOOT = ('<footer><div class="wrap">\n'
          '<p>© 2026 Dvir Baumel · <span class="addr">{{BUSINESS_ADDRESS}}</span></p>\n'
          '<p><a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · <a href="/refunds.html">Refunds</a>'
          ' · Not affiliated with OpenAI, Google or Anthropic.</p>\n</div></footer>\n'
-         '<script src="/assets/config.js"></script><script src="/assets/app.js"></script>\n</body></html>\n')
+         '<script src="/assets/ref.js"></script><script src="/assets/config.js"></script><script src="/assets/app.js"></script>\n</body></html>\n')
 
 
 def headline(m):
@@ -183,6 +180,9 @@ def city_page(m, base):
         names = (f'<h2>Names the AI produced most often</h2>\n<ol>{rows}</ol>\n'
                  f'<p class="sub">These are names the AI produced. Some may be closed, wrong or not real, and we have not '
                  f'verified them. Being listed here is not a ranking, rating or endorsement of any business.</p>\n')
+    slug = discovery.trade_slug_for_niche(m["niche"])
+    trade = (f'<p><a href="/for/{e(slug)}">AI visibility for {e(m["label"])}: what the check measures</a></p>\n'
+             if slug else "")
     body = (f'<section><div class="wrap">\n<h1>{e(headline(m))}</h1>\n'
             f'<p class="sub">Snapshot of AI answers on {e(m["date"])}. Answers change, and this is not a ranking, '
             f'rating or endorsement of any business.</p>\n'
@@ -199,6 +199,7 @@ def city_page(m, base):
             f'roster of licensed businesses; "not matched" means it was not found there. A name that is not matched is not '
             f'proof of anything by itself. This page shows one moment: run the same questions on another day and the '
             f'answers can differ.</p>\n'
+            f'{trade}'
             f'<h2>Check your own business</h2>\n'
             f'<p><a class="btn" data-pay="payLinkCheck" href="/#pricing">Get the full report — {PRICE}</a> &nbsp; '
             f'<a class="btn ghost" href="/#check">Run a free quick check</a></p>\n'
@@ -250,7 +251,7 @@ def route(path, headers):
         return None
     miss = (404, "application/json", b'{"error": "not found"}')
     ms = load_markets()
-    base = public_base(headers)
+    base = discovery.public_origin(headers.get("Host"), headers.get("X-Forwarded-Proto"))
     if path == "/city":
         return (200, "text/html; charset=utf-8", index_page(ms, base).encode()) if ms else miss
     parts = path[len("/city/"):].split("/")

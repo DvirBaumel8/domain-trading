@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "site"))
 os.environ["ORDERS_LOCAL_DIR"] = os.path.join(tempfile.mkdtemp(), "orders")
-import server, discovery  # noqa: E402
+import server, discovery, cities, products  # noqa: E402
 
 
 def no_network(req, timeout=15):
@@ -83,7 +83,9 @@ class SitemapRobotsLlms(Base):
         self.assertTrue(all(l.startswith("https://example.org/") for l in locs))
         for p in discovery.PUBLIC_PAGES + tuple(discovery.trade_paths()):
             self.assertIn(p, paths)
-        self.assertEqual(len(locs), 6 + 15)
+        self.assertEqual(len(locs), 6 + 15 + len(cities.public_paths()))     # + /city and the dated city pages
+        for p in cities.public_paths():
+            self.assertIn(p, paths)
         for bad in PRIVATE:
             self.assertFalse([p for p in paths if p.startswith(bad)], bad)
 
@@ -173,28 +175,42 @@ class HomeStructuredData(Base):
         self.assertIn(org["contactPoint"]["email"], self.body.split("</script>", 1)[1])   # already public in the footer
 
     def test_product_prices_match_polar(self):
-        want = {"AI Visibility Check": "149", "Google Maps Visibility Check": "149", "Listings Consistency Audit": "249",
-                "AI Content Pack": "249", "AI Visibility Bundle": "397"}
-        got = {p["name"]: p["offers"] for p in self.by_type("Product")}
+        # with the add-on switch off (shipped) only the base check carries an offer; the price is products.py's
+        want = {"AI Visibility Check": "149"}
+        got = {p["name"]: p["offers"] for p in self.by_type("Product") if "offers" in p}
         self.assertEqual({k: v["price"] for k, v in got.items()}, want)
-        self.assertEqual({p["name"]: str(p["price"]) for p in discovery.PRODUCTS}, want)
+        self.assertEqual(str(products.TYPES["base"]["price_usd"]), want["AI Visibility Check"])
+        self.assertFalse(hasattr(discovery, "PRODUCTS"))        # no second price table
         for o in got.values():
             self.assertEqual(o["priceCurrency"], "USD")
             self.assertEqual(o["availability"], "https://schema.org/InStock")
 
     def test_no_ratings_and_no_monthly_offers(self):
         raw = json.dumps(self.graph)
-        for w in ("aggregateRating", "review", "Rating"):
-            self.assertNotIn(w, raw)
+        keys, types = set(), set()
+        def walk(o):                      # schema property names and @types (the visible FAQ text may say "reviews")
+            if isinstance(o, dict):
+                for k, v in o.items():
+                    keys.add(k); walk(v)
+                    if k == "@type":
+                        types.add(v)
+            elif isinstance(o, list):
+                for v in o:
+                    walk(v)
+        walk(self.graph)
+        for w in ("aggregateRating", "review", "reviewRating", "ratingValue", "reviewCount"):
+            self.assertNotIn(w, keys)
+        self.assertFalse({t for t in types if "Rating" in t or "Review" in t})
         for plan in discovery.COMING_SOON_PLANS:
             self.assertFalse([p for p in self.by_type("Product") if p["name"] in (plan, plan + " plan")])
-        self.assertEqual(raw.count("InStock"), 5)
+        self.assertEqual(raw.count("InStock"), 1)       # add-ons: no offers while the switch is off
 
     def test_faq_matches_visible(self):
         faq = self.by_type("FAQPage")[0]["mainEntity"]
-        self.assertTrue(5 <= len(faq) <= 8)
-        sec = re.search(r'<section id="common-questions">(.*?)</section>', self.body, re.S).group(1)
-        visible = [(htmllib.unescape(q), htmllib.unescape(a))
+        self.assertTrue(5 <= len(faq) <= 12)      # the merged "Honest answers" block (was 7 + 7 before the merge)
+        self.assertEqual(self.body.count("<details>"), len(faq))      # exactly one FAQ block on the page
+        sec = re.search(r'<section id="faq">(.*?)</section>', self.body, re.S).group(1)
+        visible = [(htmllib.unescape(q), htmllib.unescape(re.sub(r"<[^>]+>", "", a)))
                    for q, a in re.findall(r"<summary>(.*?)</summary><p>(.*?)</p>", sec, re.S)]
         self.assertEqual(visible, [(x["name"], x["acceptedAnswer"]["text"]) for x in faq])
 

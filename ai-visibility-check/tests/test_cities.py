@@ -95,16 +95,27 @@ class FixtureCities(Base):
         self.assertIn("not matched to the roster: 37%", body)
         self.assertIn("Data date: 2026-12-01", body)
         self.assertIn(NOTE, body)
-        # N-of-M: Alpha is in 5 of 6 answers (counted once per answer), Beta in 3
-        self.assertIn("Alpha Dental — named in 5 of 6 answers", body)
-        self.assertIn("Beta Smiles — named in 3 of 6 answers", body)
-        self.assertEqual(body.count("<li>") - 5, 5)  # 5 stat items + at most 5 names
-        self.assertNotIn("Lambda Dental", body)
+        self.assertEqual(body.count("<li>"), 5)      # the 5 stat items only: names are off by default
         self.assertNotIn("RAWSTRING", body)
         self.assertEqual(body.count("<h1>"), 1)
         self.assertIn("Who does AI name for dentists in Testville, TX?", body)
         self.assertIn("not a ranking", body.lower())
-        self.assertIn("have not verified", body)
+
+    def test_show_names_on_explicitly(self):
+        shipped = cities.SHOW_NAMES
+        cities.SHOW_NAMES = True
+        try:
+            body = self.req("/city/dentists-testville-tx")[1]
+            # N-of-M: Alpha is in 5 of 6 answers (counted once per answer), Beta in 3
+            self.assertIn("Alpha Dental — named in 5 of 6 answers", body)
+            self.assertIn("Beta Smiles — named in 3 of 6 answers", body)
+            self.assertEqual(body.count("<li>") - 5, 5)  # 5 stat items + at most 5 names
+            self.assertNotIn("Lambda Dental", body)
+            self.assertNotIn("RAWSTRING", body)
+            self.assertIn("have not verified", body)     # the disclaimer shows only together with names
+            self.assertNotIn("Alpha Dental", self.req("/city/dentists-testville-tx/card.svg")[1])
+        finally:
+            cities.SHOW_NAMES = shipped
 
     def test_cta_and_links(self):
         body = self.req("/city/dentists-testville-tx")[1]
@@ -127,14 +138,22 @@ class FixtureCities(Base):
         self.assertIn("mailto:?subject=", body)
         self.assertIn("twitter.com/intent/tweet?url=https%3A%2F%2Fexample.org%2Fcity%2Fdentists-testville-tx", body)
         self.assertIn("linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fexample.org%2Fcity%2Fdentists-testville-tx", body)
-        self.assertEqual(body.count("<script"), 2)   # first-party config.js + app.js only
+        self.assertEqual(body.count("<script"), 3)   # first-party ref.js + config.js + app.js only
         self.assertNotIn("http://", body.replace("http://www.w3.org", ""))
 
-    def test_base_url_env_and_hostile_host(self):
-        self.assertEqual(cities.public_base({"Host": "a.b:80"}, {}), "http://a.b:80")
-        self.assertEqual(cities.public_base({"Host": 'x"><script>'}, {}), "http://localhost")
-        self.assertEqual(cities.public_base({"Host": "x.y"}, {"AIVIS_PUBLIC_BASE_URL": "https://site.example/"}), "https://site.example")
-        self.assertEqual(cities.public_base({"Host": "x.y"}, {"AIVIS_PUBLIC_BASE_URL": "javascript:1"}), "http://x.y")
+    def test_origin_comes_from_the_discovery_helper(self):
+        # cities.public_base is gone: canonical and share URLs use discovery.public_origin
+        self.assertFalse(hasattr(cities, "public_base"))
+        canon = lambda h: __import__("re").search(r'rel="canonical" href="(.*?)"', self.req("/city/dentists-testville-tx", h)[1]).group(1)
+        self.assertEqual(canon({"Host": "a.b:80", "X-Forwarded-Proto": "http"}), "http://a.b:80/city/dentists-testville-tx")
+        self.assertEqual(canon({"Host": "a.b"}), "https://a.b/city/dentists-testville-tx")
+        os.environ["AIVIS_PUBLIC_BASE_URL"] = "https://site.example/"
+        try:
+            self.assertEqual(canon({"Host": "x.y"}), "https://site.example/city/dentists-testville-tx")
+            os.environ["AIVIS_PUBLIC_BASE_URL"] = "javascript:1"
+            self.assertEqual(canon({"Host": "x.y"}), "/city/dentists-testville-tx")     # unsafe origin: relative, never echoed
+        finally:
+            os.environ.pop("AIVIS_PUBLIC_BASE_URL", None)
 
     def test_card_svg_valid_xml(self):
         st, body, ct = self.req("/city/dentists-testville-tx/card.svg")
@@ -164,17 +183,14 @@ class FixtureCities(Base):
             os.remove(os.path.join(self.dir, "dentist__second-tx.json"))
 
     def test_show_names_off(self):
-        cities.SHOW_NAMES = False
-        try:
-            st, body, _ = self.req("/city/dentists-testville-tx")
-            card = self.req("/city/dentists-testville-tx/card.svg")[1]
-            self.assertEqual(st, 200)
-            for n in set().union(*[set(a) for a in ANSWERS]):
-                self.assertNotIn(n, body); self.assertNotIn(n, card)
-            self.assertNotIn("named in", body)
-            self.assertIn("Questions asked: 6", body)
-        finally:
-            cities.SHOW_NAMES = True
+        st, body, _ = self.req("/city/dentists-testville-tx")
+        card = self.req("/city/dentists-testville-tx/card.svg")[1]
+        self.assertEqual(st, 200)
+        for n in set().union(*[set(a) for a in ANSWERS]):
+            self.assertNotIn(n, body); self.assertNotIn(n, card)
+        self.assertNotIn("named in", body)
+        self.assertNotIn("have not verified", body)
+        self.assertIn("Questions asked: 6", body)
 
     def test_traversal_and_unknown(self):
         for p in ("/city/../server.py", "/city/%2e%2e/server.py", "/city/..%2fserver.py", "/city/%2e%2e%2fserver.py",
@@ -217,7 +233,7 @@ class FixtureCities(Base):
             self.assertIn("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;&amp;&quot;&#x27;", body)
             self.assertNotIn("<script>alert", svg)
             ET.fromstring(svg.encode())
-            self.assertEqual(body.count("<script"), 2)
+            self.assertEqual(body.count("<script"), 3)
         finally:
             os.remove(os.path.join(self.dir, "dentist__xss-tx.json"))
 
