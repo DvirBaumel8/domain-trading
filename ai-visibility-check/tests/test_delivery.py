@@ -136,7 +136,9 @@ class DeliveryTests(unittest.TestCase):
     def test_invalid_cap_fails_job(self):
         os.environ["AIVIS_AUTORUN"] = "1"; os.environ["AIVIS_ORDER_CAP_USD"] = "0"
         oid, _ = self.paid_order()
-        self.assertEqual(self.order(oid)["status"], "failed"); self.assertEqual(fake_apis.CALLS, [])
+        o = self.order(oid)         # a missing or invalid setting keeps the order queued; nothing is called
+        self.assertEqual(o["status"], "queued"); self.assertEqual(fake_apis.CALLS, [])
+        self.assertIn("AIVIS_ORDER_CAP_USD", o["status_note"])
 
     def test_unpaid_order_never_runs(self):
         from aivis.jobs import JobFailed, build_report

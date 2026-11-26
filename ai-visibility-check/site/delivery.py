@@ -12,12 +12,19 @@ sys.path.insert(0, os.path.join(HERE, "..", "engine"))
 
 TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{22,100}")
 import products                   # noqa: E402
+from site_config import SUPPORT_EMAIL   # noqa: E402
 
 MAX_ATTEMPTS = 2
 SYNC = False                      # tests set True to run jobs inline
 _Q = queue.Queue()
 _worker = None
 _wlock = threading.Lock()
+_PENDING = set()                  # order ids queued or running in this process
+EVENT = lambda **kw: None         # server.py installs the structured-alert function
+CHANNEL = lambda: False           # server.py installs: is any alert channel configured
+RESUME_STALE_SECONDS = 20 * 60    # a running order older than this is taken as lost
+STUCK_SECONDS = 2 * 3600
+ALERT_REPEAT_SECONDS = 6 * 3600
 
 
 def log(msg):
@@ -67,7 +74,39 @@ def set_status(store, oid, status, alert, note="", **extra):
     msg = f"Order {oid}: {status}" + (f" ({note})" if note else "") + f", spent ${float(o.get('spent_usd', 0)):.2f}"
     log("order status: " + msg)
     alert(msg)
+    if status == "failed":
+        EVENT(kind="failed", oid=oid, status=status, ptype=o.get("order_type", "base"))
     return o
+
+
+def autorun_missing():
+    """Names (never values) of what an automatic run still needs. Empty = it may start."""
+    from aivis import config
+    miss = []
+    if os.environ.get("AIVIS_ALLOW_PAID") != "1":
+        miss.append("AIVIS_ALLOW_PAID")
+    miss += [name for name in config.ENV_KEYS.values() if not os.environ.get(name, "").strip()]
+    if cap_or_zero() <= 0:
+        miss.append("AIVIS_ORDER_CAP_USD")
+    if not CHANNEL():
+        miss.append("alert channel")
+    return miss
+
+
+def autorun_state():
+    if os.environ.get("AIVIS_AUTORUN") != "1":
+        return "off"
+    return "blocked" if autorun_missing() else "on"
+
+
+def block_order(store, oid, alert, missing, send=None):
+    """Keep the order queued with a plain note. Alerts once: the same note again changes nothing."""
+    note = "autorun blocked, missing: " + ", ".join(missing)
+    o, _ = store.get(f"orders/{oid}.json")
+    if o is not None and o.get("status") == "queued" and o.get("status_note") == note:
+        return
+    set_status(store, oid, "queued", send or alert, note, status_note=note)
+    EVENT(kind="blocked", oid=oid, status="queued", ptype=(o or {}).get("order_type", "base"))
 
 
 def on_paid(store, oid, alert, lead=""):
@@ -86,16 +125,33 @@ def on_paid(store, oid, alert, lead=""):
     if os.environ.get("AIVIS_AUTORUN") != "1":
         set_status(store, oid, "queued", send, "AIVIS_AUTORUN is off; build the report by hand")
         return
-    set_status(store, oid, "queued", send)
-    if SYNC:
-        run_job(store, oid, alert)
+    missing = autorun_missing()
+    if missing:
+        block_order(store, oid, alert, missing, send)
         return
+    set_status(store, oid, "queued", send, status_note="")
+    enqueue(store, oid, alert)
+
+
+def enqueue(store, oid, alert):
+    """Run the job inline (tests) or hand it to the one background worker."""
     global _worker
+    with _wlock:
+        if oid in _PENDING:
+            return False
+        _PENDING.add(oid)
+    if SYNC:
+        try:
+            run_job(store, oid, alert)
+        finally:
+            _PENDING.discard(oid)
+        return True
     _Q.put((store, oid, alert))
     with _wlock:
         if _worker is None or not _worker.is_alive():
             _worker = threading.Thread(target=_loop, daemon=True)
             _worker.start()
+    return True
 
 
 def _loop():
@@ -105,20 +161,32 @@ def _loop():
             run_job(store, oid, alert)
         except Exception as e:
             log("job crashed: " + type(e).__name__)
+        finally:
+            _PENDING.discard(oid)
 
 
 def run_job(store, oid, alert, roster_fn=None, providers_fn=None):
+    """Attempts and spend are kept in the order record: MAX_ATTEMPTS and the cap hold across restarts."""
     from aivis.jobs import JobFailed, build_report, order_cap_usd
-    spent = 0.0
-    for attempt in range(1, MAX_ATTEMPTS + 1):
+    o, _ = store.get(f"orders/{oid}.json")
+    if o is None or o.get("order_type", "base") not in products.AUTORUN_TYPES:
+        return
+    spent = float(o.get("spent_usd") or 0)
+    done = int(o.get("attempts") or 0)
+    if may_run(o) and done >= MAX_ATTEMPTS:      # the limit is reached: no provider call
+        set_status(store, oid, "failed", alert, "attempt limit reached", spent_usd=round(spent, 4))
+        return
+    for attempt in range(done + 1, MAX_ATTEMPTS + 1):
         o, _ = store.get(f"orders/{oid}.json")
         if o is None or o.get("order_type", "base") not in products.AUTORUN_TYPES:
             return
-        if attempt == 1 and not may_run(o):
+        if attempt == done + 1 and not may_run(o):
             return
         set_status(store, oid, "running", alert, f"attempt {attempt}", attempts=attempt, spent_usd=round(spent, 4))
         try:
             cap = order_cap_usd()
+            if spent >= cap - 1e-9:
+                raise JobFailed("spend cap reached", retryable=False)
             files = build_report(o, cap - spent, roster_fn, providers_fn() if providers_fn else None)
             spent += files.pop("spent_usd")
             for name, text in files.items():           # publish only after the whole run passed
@@ -138,7 +206,6 @@ def run_job(store, oid, alert, roster_fn=None, providers_fn=None):
         return
 
 
-RUNNING_FRESH_SECONDS = 2 * 3600
 
 
 def may_run(o):
@@ -150,7 +217,7 @@ def may_run(o):
             age = (datetime.datetime.now() - datetime.datetime.fromisoformat(o["status_at"])).total_seconds()
         except (KeyError, ValueError, TypeError):
             return False
-        return age >= RUNNING_FRESH_SECONDS
+        return age >= RESUME_STALE_SECONDS
     return True
 
 
@@ -160,6 +227,92 @@ def cap_or_zero():
         return float(config.order_cap_usd())
     except (ValueError, TypeError):
         return 0.0
+
+
+def _age(iso, default=None):
+    try:
+        return (datetime.datetime.now() - datetime.datetime.fromisoformat(iso)).total_seconds()
+    except (TypeError, ValueError):
+        return default
+
+
+def list_orders(store):
+    """Every order record (autorun and manual), read one by one."""
+    for path in store.list_prefix("orders/"):
+        if path.endswith(".json"):
+            o, _ = store.get(path)
+            if isinstance(o, dict) and o.get("order_id"):
+                yield o
+
+
+def resume_orders(store, alert):
+    """Boot and every 10 minutes: re-queue paid orders that are `queued`, or `running` with a stale status.
+    Attempts and spend stay in the record, so the limits hold across restarts. Returns the ids acted on."""
+    if os.environ.get("AIVIS_AUTORUN") != "1":
+        return []
+    from aivis.jobs import order_cap_usd
+    acted = []
+    for o in list_orders(store):
+        oid, st = o["order_id"], o.get("status")
+        if (o.get("order_type", "base") not in products.AUTORUN_TYPES or o.get("paid") is not True
+                or o.get("delivery") == "manual_delivery" or st not in ("queued", "running")):
+            continue
+        if st == "running" and not may_run(o):
+            continue
+        if oid in _PENDING:
+            continue
+        missing = autorun_missing()
+        if missing:
+            block_order(store, oid, alert, missing)
+            acted.append(oid)
+            continue
+        try:
+            over = float(o.get("spent_usd") or 0) >= order_cap_usd() - 1e-9
+        except Exception:
+            over = True
+        if int(o.get("attempts") or 0) >= MAX_ATTEMPTS or over:
+            set_status(store, oid, "failed", alert, "attempt or spend limit reached", status_note="")
+        else:
+            set_status(store, oid, "queued", alert, "resumed", status_note="")
+            enqueue(store, oid, alert)
+        acted.append(oid)
+    return acted
+
+
+def sweep_orders(store, notify):
+    """Every 10 minutes: one alert per order per 6 hours for a paid autorun order that is failed or not
+    ready after 2 hours, and for a manual order past its due date. `notify(**event)` sends it."""
+    sent = []
+    for o in list_orders(store):
+        oid, st = o["order_id"], o.get("status") or ("queued" if o.get("paid") else "")
+        if o.get("paid") is not True or st in ("ready", "held", "done", "delivered", "completed"):
+            continue
+        manual = o.get("order_type", "base") not in products.AUTORUN_TYPES
+        if manual:
+            due = o.get("due_at", "")
+            try:
+                late = datetime.date.fromisoformat(due[:10]) < datetime.date.today()
+            except ValueError:
+                late = False
+            kind = "overdue"
+            if not late:
+                continue
+        else:
+            kind = "stuck"
+            if st != "failed" and (_age(o.get("paid_at") or o.get("status_at"), 0) or 0) <= STUCK_SECONDS:
+                continue
+        last = _age(o.get("last_alert_at"))
+        if last is not None and last < ALERT_REPEAT_SECONDS:
+            continue
+        notify(kind=kind, oid=oid, status=st, ptype=o.get("order_type", "base"),
+               unique=str(int(o.get("alert_n") or 0) + 1), webhook=True)
+        fresh, _ = store.get(f"orders/{oid}.json")
+        if fresh is not None:
+            fresh["alert_n"] = int(fresh.get("alert_n") or 0) + 1
+            fresh["last_alert_at"] = datetime.datetime.now().isoformat(timespec="seconds")
+            store.put(f"orders/{oid}.json", fresh, overwrite=True)
+        sent.append(oid)
+    return sent
 
 
 def status_page(store, token):
@@ -174,7 +327,12 @@ def status_page(store, token):
     if st == "ready":
         body = f'<h2>Your report is ready</h2><p><a href="/r/{token}">Open your report</a></p>'
     elif st == "failed":
-        body = "<h2>Your report is taking longer than expected</h2><p>We are looking into it. This page updates when it is ready.</p>"
+        # Refund sentence: wording to be confirmed by the owner (keep it consistent with refunds.html).
+        mail = _html.escape(SUPPORT_EMAIL)
+        body = ("<h2>Your report is taking longer than expected</h2><p>We are on it. This page updates when it is ready.</p>"
+                f'<p>Questions? Email <a href="mailto:{mail}">{mail}</a>.</p>'
+                '<p>If we cannot make your report within the time stated in our <a href="/refunds.html">refund policy</a>, '
+                "you get a full refund.</p>")
     elif st == "awaiting payment":
         if not manual:
             body = "<h2>Waiting for your payment</h2><p>This page updates once the payment is received.</p>"

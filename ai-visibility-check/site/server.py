@@ -10,10 +10,11 @@ GET  /api/check/<id>  status of a background free run.
 POST /api/intake  order intake -> orders store (private GitHub repo via ORDERS_REPO +
                   ORDERS_GITHUB_TOKEN; else a local folder that is never served).
 POST /api/polar/webhook  Polar payment webhook (POLAR_WEBHOOK_SECRET) marks the order paid.
-New orders and payments alert ORDER_ALERT_WEBHOOK_URL (unset = logged no-op).
+New orders, payments and failed runs alert: a GitHub issue in ORDERS_REPO (ids, status and product type only)
+and/or ORDER_ALERT_WEBHOOK_URL. A background thread resumes lost runs and sweeps stuck orders every 10 minutes.
 Only the files in PUBLIC_FILES / PUBLIC_DIRS are served. Nothing here sends email or spends money.
 """
-import argparse, base64, datetime, hashlib, hmac, http.server, json, mimetypes, os, posixpath, re, sys, threading, time, urllib.parse, urllib.request, uuid
+import argparse, base64, queue, datetime, hashlib, hmac, http.server, json, mimetypes, os, posixpath, re, sys, threading, time, urllib.parse, urllib.request, uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -148,6 +149,30 @@ class Store:
             return False
         raise RuntimeError(f"orders store write failed ({st})")
 
+    def list_prefix(self, prefix):
+        """Paths of the files directly under a folder prefix like 'orders/' (paginated for the remote store)."""
+        folder = prefix.strip("/")
+        if not self.remote:
+            d = os.path.join(LOCAL_ORDERS, folder)
+            return [f"{folder}/{n}" for n in sorted(os.listdir(d))
+                    if os.path.isfile(os.path.join(d, n)) and not n.endswith(".tmp")] if os.path.isdir(d) else []
+        out, seen, page = [], set(), 1
+        while True:
+            st, body = http_call(urllib.request.Request(f"{self._url(folder)}?per_page=100&page={page}", headers=self._hdr()))
+            if st == 404:
+                break
+            if st != 200:
+                raise RuntimeError(f"orders store list failed ({st})")
+            rows = [r for r in json.loads(body) if isinstance(r, dict) and r.get("type") == "file"]
+            new = [r["path"] for r in rows if r["path"] not in seen]
+            if not new:
+                break               # an empty page, or an API that ignores paging and repeats itself
+            seen.update(new); out += new
+            if len(rows) < 100:
+                break
+            page += 1
+        return out
+
     def put_text(self, path, text):
         """Store a text file (report.html etc.), replacing any older copy."""
         if not self.remote:
@@ -185,7 +210,13 @@ class Store:
         return self.get_raw(path)[0]
 
 
+def redact(text):
+    """Webhook/log text never carries an email address or a link."""
+    return re.sub(r"https?://\S+", "[link]", re.sub(r"[^\s@]+@[^\s@]+", "[email]", str(text)))
+
+
 def alert(text):
+    text = redact(text)
     url = os.environ.get("ORDER_ALERT_WEBHOOK_URL", "").strip()
     if not url:
         log("alert (no target set): " + text)
@@ -198,6 +229,105 @@ def alert(text):
     except Exception as e:
         log("alert failed: " + type(e).__name__)
         return False
+
+
+ALERT_LOCK = threading.RLock()
+ALERT_TITLES = {"new": "new order", "failed": "failed run", "blocked": "blocked run", "stuck": "stuck order",
+                "overdue": "overdue manual order", "unmatched": "unmatched payment", "held": "held payment",
+                "unknown_product": "unknown product payment", "webhook_failed": "webhook event failed"}
+
+
+def github_alert_token():
+    return (os.environ.get("ALERT_GITHUB_TOKEN") or os.environ.get("ORDERS_GITHUB_TOKEN") or "").strip()
+
+
+def github_alerts_on():
+    return bool(os.environ.get("ORDERS_REPO", "").strip() and github_alert_token())
+
+
+def alerts_configured():
+    return github_alerts_on() or bool(os.environ.get("ORDER_ALERT_WEBHOOK_URL", "").strip())
+
+
+def alert_text(kind, oid="", status="", ptype="", ref=""):
+    """-> (title, body). Only the internal order id, the status, the product type and (for a payment with
+    no order) the opaque Polar order id and a reason code. Every value is checked against a fixed shape."""
+    oid = oid if re.fullmatch(r"(ORD-\d{6}-[a-f0-9]{6}|MAN-[a-f0-9]{12})", oid or "") else ""
+    ptype = ptype if ptype in products.TYPES else "unknown"
+    status = re.sub(r"[^a-z_ ]", "", str(status or "").lower())[:30]
+    ref = clean_ref(ref)
+    what = ALERT_TITLES.get(kind, "alert")
+    subject = oid or ref
+    title = f"[AVC] {what} {subject} ({ptype})".replace("  ", " ")
+    lines = [f"Order: {oid}"] if oid else [f"Payment (opaque id): {ref}"]
+    lines += ([f"Status: {status}"] if status else []) + [f"Product type: {ptype}", f"Reason: {kind}"]
+    return title, "\n".join(lines)
+
+
+def send_github_issue(title, body):
+    url = f"https://api.github.com/repos/{os.environ['ORDERS_REPO'].strip()}/issues"
+    hdr = {"Authorization": "Bearer " + github_alert_token(), "Accept": "application/vnd.github+json",
+           "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "aivis-orders", "Content-Type": "application/json"}
+    for labels in (["avc-alert"], None):         # a missing label never blocks the alert
+        payload = {"title": title, "body": body, **({"labels": labels} if labels else {})}
+        st, _ = http_call(urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST", headers=hdr))
+        if st in (200, 201):
+            return True
+        if st != 422 or not labels:
+            return False
+    return False
+
+
+def notify_event(kind, oid="", status="", ptype="", ref="", unique="", webhook=False):
+    """One alert per event: the dedupe key (id + kind [+ window]) is stored create-only, so replays, resumes and
+    sweeps never open a second issue. A failed GitHub call is logged by type, kept as pending and retried by the
+    next sweep. Never raises."""
+    try:
+        title, body = alert_text(kind, oid, status, ptype, ref)
+        key = clean_ref("-".join(x for x in (oid or ref, kind, unique) if x), 120)
+        if not key:
+            return False
+        store = Store()
+        with ALERT_LOCK:
+            rec = {"sent": False, "title": title, "body": body}
+            first = store.put(f"alerts/{key}.json", rec)
+            if not first:
+                rec = store.get(f"alerts/{key}.json")[0] or rec
+                if rec.get("sent"):
+                    return False
+            if first and webhook:
+                alert(title + " | " + body.replace("\n", " | "))
+            return deliver_alert(store, key, rec)
+    except Exception as e:
+        log("alert event failed: " + type(e).__name__)
+        return False
+
+
+def deliver_alert(store, key, rec):
+    if not github_alerts_on():
+        return False
+    try:
+        ok = send_github_issue(rec["title"], rec["body"])
+    except Exception as e:
+        log("alert github failed: " + type(e).__name__)
+        ok = False
+    if ok:
+        store.put(f"alerts/{key}.json", {**rec, "sent": True}, overwrite=True)
+    return ok
+
+
+def retry_pending_alerts(store):
+    if not github_alerts_on():
+        return
+    with ALERT_LOCK:
+        for path in store.list_prefix("alerts/"):
+            rec = store.get(path)[0]
+            if isinstance(rec, dict) and rec.get("sent") is False and rec.get("title"):
+                deliver_alert(store, path[len("alerts/"):-len(".json")], rec)
+
+
+delivery.EVENT = notify_event
+delivery.CHANNEL = alerts_configured
 
 
 def email_key(email):
@@ -412,12 +542,14 @@ def _process_paid(store, d, eid):
     if not info:
         alert(f"UNKNOWN Polar product {rec['product_id'] or '(none)'} on Polar order {ref}: nothing was run and no order "
               "was marked paid. Check it by hand.")
+        notify_event("unknown_product", ref=ref, ptype="unknown")
         rec["done"] = True
         store.put(f"purchases/{ref}.json", rec, overwrite=True)
         return {"status": "unknown_product"}
     if rec.get("status", "ok") == "held":
         alert(f"Polar order {ref}: payment needs manual review ({rec.get('reason', '')}). Product type {rec['type']}; "
               "nothing was run, no order was marked paid and no task was created.")
+        notify_event("held", ref=ref, ptype=rec["type"])
         rec["done"] = True
         store.put(f"purchases/{ref}.json", rec, overwrite=True)
         return {"status": "held"}
@@ -453,6 +585,7 @@ def _process_paid(store, d, eid):
         if not paid:
             alert((text + "; " if text else "") + f"UNMATCHED Polar payment {ref}: the report waits for the intake form"
                   + (f" ({why})" if why else "") + ". Match it by hand if no intake arrives.")
+            notify_event("unmatched", ref=ref, ptype=info["type"])
             text = ""
         res = {"status": "paid", "order_id": oid} if paid else {"status": "unmatched"}
     else:
@@ -467,22 +600,87 @@ def _process_paid(store, d, eid):
 EVENT_CLAIM_TTL = 900
 
 
-def claim_event(store, eid, etype):
-    """Create-only claim of a webhook event before any work. A failed (or long-stuck) claim can be taken again."""
-    claim = {"status": "claimed", "type": etype, "claimed_at": int(time.time())}
+def claim_event(store, eid, etype, data=None):
+    """Create-only claim of a webhook event before any work. A failed (or long-stuck) claim can be taken again.
+    The payload is kept (private store) so a lost or failed background run can be retried without Polar."""
+    claim = {"status": "claimed", "type": etype, "claimed_at": int(time.time()), "tries": 1,
+             **({"data": data} if data else {})}
     if store.put(f"events/{eid}.json", claim):
         return True
     with IDX_LOCK:
         cur = store.get(f"events/{eid}.json")[0] or {}
         stale = cur.get("status") == "claimed" and time.time() - cur.get("claimed_at", 0) > EVENT_CLAIM_TTL
         if cur.get("status") == "failed" or stale:
+            claim["tries"] = int(cur.get("tries", 1)) + 1
+            if not data and cur.get("data"):
+                claim["data"] = cur["data"]
             store.put(f"events/{eid}.json", claim, overwrite=True)
             return True
     return False
 
 
+MAX_EVENT_TRIES = 3
+_EQ = queue.Queue()
+_ewlock = threading.Lock()
+_eworker = None
+
+
+def run_event(store, d, eid, etype, reraise=False):
+    """Order matching, status changes and delivery start for one claimed event. A failure marks the event
+    `failed` (payload kept) and alerts, so a retry or a human can pick it up."""
+    try:
+        res = process_paid(store, d, eid) if etype == "order.paid" else {"status": "ignored"}
+    except BaseException as e:
+        log("event failed: " + type(e).__name__)
+        try:
+            cur = store.get(f"events/{eid}.json")[0] or {}
+            store.put(f"events/{eid}.json", {"status": "failed", "type": etype, "tries": cur.get("tries", 1),
+                                             **({"data": d} if d else {})}, overwrite=True)
+        except Exception:
+            pass
+        try:
+            ids = products.product_ids(d) if isinstance(d, dict) else []
+            info = products.PRODUCTS.get(ids[0]) if len(ids) == 1 else None
+            alert(f"Webhook event {clean_ref(eid, 80)} failed in the background; it is kept for a retry.")
+            notify_event("webhook_failed", ref=eid, ptype=info["type"] if info else "unknown")
+        except BaseException:
+            pass
+        if reraise:
+            raise
+        return None
+    store.put(f"events/{eid}.json", {"status": "done", "type": etype}, overwrite=True)
+    return res
+
+
+def _event_loop():
+    while True:
+        store, d, eid, etype = _EQ.get()
+        try:
+            run_event(store, d, eid, etype)
+        except BaseException as e:
+            log("event worker error: " + type(e).__name__)
+        finally:
+            _EQ.task_done()
+
+
+def retry_events(store):
+    """Events whose background run failed, or was lost with a restart (claimed and stale): run them again, at
+    most MAX_EVENT_TRIES times in total."""
+    for path in store.list_prefix("events/"):
+        rec = store.get(path)[0]
+        if not isinstance(rec, dict) or not rec.get("data") or int(rec.get("tries", 1)) >= MAX_EVENT_TRIES:
+            continue
+        if rec.get("status") not in ("failed", "claimed"):
+            continue
+        eid = path[len("events/"):-len(".json")]
+        if claim_event(store, eid, rec.get("type", "")):
+            run_event(store, rec["data"], eid, rec.get("type", ""))
+
+
 def handle_polar(headers, body):
-    """-> (http status, json). Verifies, claims the webhook id, dedupes the Polar order id, routes by product."""
+    """-> (http status, json). Verifies, claims the webhook id, answers 200 at once and does the work in the
+    background worker (inline when delivery.SYNC, for tests)."""
+    global _eworker
     if not verify_polar(os.environ.get("POLAR_WEBHOOK_SECRET", ""), headers, body):
         return 401, {"error": "bad signature"}
     store, eid = Store(), clean_ref(headers.get("webhook-id", ""), 80)
@@ -491,18 +689,16 @@ def handle_polar(headers, body):
     ev = json.loads(body or b"{}")
     d = ev.get("data") or {}
     etype = str(ev.get("type", ""))
-    if not claim_event(store, eid, etype):
+    if not claim_event(store, eid, etype, d if etype == "order.paid" else None):
         return 200, {"status": "duplicate"}
-    try:
-        res = process_paid(store, d, eid) if etype == "order.paid" else {"status": "ignored"}
-    except BaseException:
-        try:
-            store.put(f"events/{eid}.json", {"status": "failed", "type": etype}, overwrite=True)
-        except Exception:
-            pass
-        raise
-    store.put(f"events/{eid}.json", {"status": "done", "type": etype}, overwrite=True)
-    return 200, res
+    if delivery.SYNC:
+        return 200, run_event(store, d, eid, etype, reraise=True)
+    _EQ.put((store, d, eid, etype))
+    with _ewlock:
+        if _eworker is None or not _eworker.is_alive():
+            _eworker = threading.Thread(target=_event_loop, daemon=True)
+            _eworker.start()
+    return 200, {"status": "accepted"}
 
 
 def new_order(d, req):
@@ -568,6 +764,9 @@ def new_order(d, req):
     if run:
         start_delivery(store, oid)
     alert(f"New order {oid}" + (f": awaiting payment, {note}. Match it by hand." if note else ""))
+    cur = store.get(f"orders/{oid}.json")[0] or {}
+    notify_event("new", oid=oid, status=cur.get("status") or ("queued" if cur.get("paid") else "awaiting payment"),
+                 ptype=cur.get("order_type", "base"))
     if manual:
         alert("Intake received for manual delivery: " + manual_summary(store, manual))
     return oid, token
@@ -631,6 +830,38 @@ def free_job(job_id, req):
         print("free job failed:", type(e).__name__, file=sys.stderr)
 
 
+def health():
+    """Booleans and fixed words only: never a value, key or id."""
+    try:
+        autorun = delivery.autorun_state()
+    except Exception:
+        autorun = "blocked"
+    return {"ok": True, "autorun": autorun, "allow_paid": os.environ.get("AIVIS_ALLOW_PAID") == "1",
+            "alerts": alerts_configured(), "orders_store": "remote" if Store().remote else "local"}
+
+
+def maintenance_tick():
+    """Resume lost runs, retry failed events and alerts, sweep stuck orders. One step failing never stops the rest."""
+    store = Store()
+    for step in (lambda: retry_events(store), lambda: delivery.resume_orders(store, alert),
+                 lambda: delivery.sweep_orders(store, notify_event), lambda: retry_pending_alerts(store)):
+        try:
+            step()
+        except Exception as e:
+            log("maintenance step failed: " + type(e).__name__)
+
+
+MAINTENANCE_SECONDS = 600
+
+
+def start_maintenance():
+    def loop():
+        while True:
+            maintenance_tick()
+            time.sleep(MAINTENANCE_SECONDS)
+    threading.Thread(target=loop, daemon=True).start()
+
+
 class H(http.server.BaseHTTPRequestHandler):
     def _json(self, code, obj):
         b = json.dumps(obj).encode()
@@ -664,7 +895,7 @@ class H(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         path = urllib.parse.urlsplit(self.path).path
         if path in ("/health", "/healthz"):
-            return self._json(200, {"ok": True})
+            return self._json(200, health())
         if path == "/robots.txt":
             return self._send(200, "text/plain", b"User-agent: *\nAllow: /\nDisallow: /data/\nDisallow: /api/\nDisallow: /r/\nDisallow: /status/\n")
         m = re.fullmatch(r"/api/check/([a-f0-9-]{36})", path)
@@ -743,4 +974,5 @@ if __name__ == "__main__":
         a.host = "0.0.0.0"
     FREE_RUN = a.free_run or os.environ.get("AIVIS_FREE_RUN") == "1"
     print(f"listening on http://{a.host}:{a.port}  (free-run={'on' if FREE_RUN else 'off'})")
+    start_maintenance()
     http.server.ThreadingHTTPServer((a.host, a.port), H).serve_forever()
