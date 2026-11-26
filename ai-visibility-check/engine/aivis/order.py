@@ -33,6 +33,7 @@ PAID_ENGINES = config.PAID_ENGINES
 ENV_KEYS = config.ENV_KEYS
 DEFAULT_CAP_USD = config.order_cap_usd()    # 12.00; AIVIS_ORDER_CAP_USD overrides
 
+FREE_FAIL_FAST_AFTER = 3        # permanent HTTP errors in one free job before the remaining questions are skipped
 FREE_MIN_ANSWERS = 6            # the free check shows numbers only when at least this many of its 8 questions answered
 MIN_ANSWER_SHARE = 0.8          # every engine must reach this share of its expected answers
 TIERS = {                        # prompts x repeats per engine
@@ -256,7 +257,8 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
         res = run_audit(get_niche(order.niche), order.city, order.business_name, names, providers,
                         n_prompts=n, repeats=r, seed=seed, signals=site,
                         target_reviews=order.target_reviews, competitor_reviews=order.competitor_reviews,
-                        real_cap_usd=cap_usd if mode == "paid" else None)
+                        real_cap_usd=cap_usd if mode == "paid" else None,
+                        fail_fast_after=FREE_FAIL_FAST_AFTER if mode == "free" else None)
     except SpendCapExceeded as e:       # same no-partial path as engine failures: nothing is written
         print(f"[operator] ALERT order {order.order_id}: real usage ${e.spent:.4f} went over the order cap "
               f"${e.cap:.2f}; run stopped, no report", file=sys.stderr)

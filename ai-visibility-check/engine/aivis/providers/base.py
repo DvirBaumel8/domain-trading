@@ -5,9 +5,11 @@ from dataclasses import dataclass, field
 class ProviderError(RuntimeError):
     """A question could not be answered. `reason` is a short code (never user text or a response body)."""
 
-    def __init__(self, message="", reason="error"):
+    def __init__(self, message="", reason="error", category=None, permanent=False):
         super().__init__(message)
         self.reason = reason
+        self.category = category or reason     # family, e.g. http_error for http_403
+        self.permanent = permanent             # no retry would help (counts toward fail-fast)
 
 
 @dataclass

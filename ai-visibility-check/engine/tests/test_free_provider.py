@@ -65,8 +65,34 @@ class ProviderRetry(unittest.TestCase):
 
     def test_permanent_error_not_retried(self):
         f = Fake([http_err(400)])
-        self.assertEqual(reason(f), "http_error")
+        self.assertEqual(reason(f), "http_400")
         self.assertEqual(f.calls, 1)
+
+    def test_exact_http_status_codes(self):
+        for code in (403, 404):
+            f = Fake([http_err(code)] * 3)
+            try:
+                f.provider().ask("q")
+            except ProviderError as e:
+                self.assertEqual((e.reason, e.category, e.permanent), (f"http_{code}", "http_error", True))
+            self.assertEqual(f.calls, 1)           # not retried
+        f = Fake([http_err(502)] * 3)
+        try:
+            f.provider().ask("q")
+        except ProviderError as e:
+            self.assertEqual((e.reason, e.category, e.permanent), ("http_502", "http_error", False))
+        self.assertEqual(f.calls, 3)               # retried
+        for ra in (None, 1):
+            f = Fake([http_err(429, ra)] * 3)
+            try:
+                f.provider().ask("q")
+            except ProviderError as e:
+                self.assertEqual((e.reason, e.category, e.permanent), ("rate_limited", "rate_limited", False))
+            self.assertEqual(f.calls, 3)
+
+    def test_other_codes_are_not_http_status(self):
+        for exc, code in ((TimeoutError(), "timeout"), (ConnectionResetError(), "connection_error")):
+            self.assertEqual(reason(Fake([exc] * 3)), code)
 
     def test_timeout_and_connection_reset(self):
         self.assertEqual(reason(Fake([TimeoutError()] * 3)), "timeout")
@@ -115,7 +141,7 @@ class AuditOutcomes(unittest.TestCase):
                   "- Beta Plumbing", "", "", "",
                   http_err(400), "- Gamma Plumbing", "- Delta Plumbing", "- Eps Plumbing"]
         res, f = self.run_script(script)
-        self.assertEqual(res.reason_counts(), {"ok": 4, "rate_limited": 1, "timeout": 1, "empty_answer": 1, "http_error": 1})
+        self.assertEqual(res.reason_counts(), {"ok": 4, "rate_limited": 1, "timeout": 1, "empty_answer": 1, "http_400": 1})
         self.assertEqual(res.score.total_answers, 4)
         self.assertEqual(len(res.outcomes), 8)
         self.assertNotIn("prompt", json.dumps(res.outcomes).lower().replace("prompt_no", ""))
@@ -175,3 +201,67 @@ class Aggregate(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FailFast(unittest.TestCase):
+    def run_script(self, script, after=3):
+        f = Fake(script)
+        res = run_audit(get_niche("plumber"), "Austin, TX", "Zed", [], [f.provider()], n_prompts=8, repeats=1,
+                        fail_fast_after=after)
+        return res, f
+
+    def test_two_permanent_errors_continue(self):
+        res, f = self.run_script([http_err(403), http_err(403)] + ["- Alpha Plumbing"] * 6)
+        self.assertEqual(res.reason_counts(), {"http_403": 2, "ok": 6})
+        self.assertEqual(f.calls, 8)
+
+    def test_three_permanent_errors_skip_the_rest(self):
+        res, f = self.run_script([http_err(403)] * 3 + ["- Alpha Plumbing"] * 5)
+        self.assertEqual(f.calls, 3)
+        self.assertEqual(res.reason_counts(), {"http_403": 3, "skipped_after_permanent_errors": 5})
+        self.assertEqual(len(res.outcomes), 8)
+        self.assertEqual(res.score.total_answers, 0)
+
+    def test_threshold_is_configurable(self):
+        res, f = self.run_script([http_err(404)] * 2 + ["- A Plumbing"] * 6, after=2)
+        self.assertEqual((f.calls, len(res.outcomes)), (2, 8))
+
+    def test_three_429s_do_not_trigger(self):
+        res, f = self.run_script([http_err(429)] * 9 + ["- Alpha Plumbing"] * 5)
+        self.assertEqual(res.reason_counts(), {"rate_limited": 3, "ok": 5})
+        self.assertEqual(f.calls, 14)
+
+    def test_5xx_does_not_trigger(self):
+        res, f = self.run_script([http_err(502)] * 9 + ["- Alpha Plumbing"] * 5)
+        self.assertEqual(res.reason_counts(), {"http_502": 3, "ok": 5})
+
+    def test_mixed_429_then_three_403(self):
+        res, f = self.run_script([http_err(429)] * 3 + [http_err(403)] * 3 + ["- Alpha Plumbing"] * 5)
+        self.assertEqual(res.reason_counts(),
+                         {"rate_limited": 1, "http_403": 3, "skipped_after_permanent_errors": 4})
+        self.assertEqual(len(res.outcomes), 8)
+        self.assertEqual(f.calls, 6)
+
+
+class PartialNames(unittest.TestCase):
+    PER = [[("Alpha Dental", None)]]
+
+    def test_partial_states_real_denominator(self):
+        s = N.aggregate(self.PER, "Zed", "Austin, TX", "none", asked=8, min_answers=6)
+        self.assertEqual(s["heading"], "Names the AI gave (AI output, not verified)")
+        self.assertEqual((s["answers"], s["answered"], s["based_on"]), (8, 1, "based on 1 of 8 answers"))
+        h = N.to_html(s)
+        self.assertIn("<h2>Names the AI gave (AI output, not verified)</h2>", h)
+        self.assertIn("based on 1 of 8 answers", h)
+        self.assertIn("1 of 8", h)
+        self.assertNotIn("1 of 1", h)
+
+    def test_complete_runs_have_no_based_on_line(self):
+        for n in (6, 8):
+            s = N.aggregate(self.PER * n, "Zed", "Austin, TX", "none", asked=8, min_answers=6)
+            self.assertEqual((s["answers"], s["based_on"]), (8, ""))
+            self.assertNotIn("based on", N.to_html(s))
+
+    def test_instant_path_keeps_own_total(self):
+        s = N.aggregate(self.PER * 3, "Zed", "Austin, TX", "none")
+        self.assertEqual((s["answers"], s["based_on"]), (3, ""))

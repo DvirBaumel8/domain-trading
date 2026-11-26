@@ -1008,7 +1008,8 @@ def free_job(job_id, req):
         def paint(r):
             got = r.score.total_answers
             part = f"Partial result: {got} of {expected} questions answered" if got < FREE_MIN_ANSWERS else ""
-            return render(r, sample=True, run_note=note, register=register, partial_note=part)
+            return render(r, sample=True, run_note=note, register=register, partial_note=part,
+                          names_asked=expected, names_min=FREE_MIN_ANSWERS)
         res, lg = run_order(o, mode="free", out_dir=tmp, render=paint, **({"roster": roster} if roster else {}))
         answers = res.score.total_answers
         reasons = (lg or {}).get("reasons") or (res.reason_counts() if hasattr(res, "reason_counts") else {})
@@ -1018,7 +1019,8 @@ def free_job(job_id, req):
                "reasons": {k: v for k, v in reasons.items() if k != "ok"}}
         records = getattr(res, "records", None)
         if records is not None:
-            out["names"] = names_mod.from_records(records, req["business"], req["city"], register)
+            out["names"] = names_mod.from_records(records, req["business"], req["city"], register,
+                                                 asked=expected, min_answers=FREE_MIN_ANSWERS)
         if answers < FREE_MIN_ANSWERS:
             out.update({"status": "partial", "message": f"Partial result: {answers} of {expected} questions answered"})
         else:
