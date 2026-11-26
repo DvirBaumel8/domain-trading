@@ -24,6 +24,7 @@ from aivis.order import US_STATES, US_ONLY_MSG, normalize_website
 from aivis.uscities import is_us_place  # noqa: E402
 from site_config import BUSINESS_ADDRESS    # noqa: E402
 import delivery                             # noqa: E402
+import products                             # noqa: E402
 import html as _html
 
 DATA = os.path.join(HERE, "data")
@@ -128,8 +129,10 @@ class Store:
             with LOCK:
                 if os.path.exists(f) and not overwrite:
                     return False
-                with open(f, "w", encoding="utf-8") as fh:
+                tmp = f"{f}.{uuid.uuid4().hex}.tmp"     # readers never see a half-written file
+                with open(tmp, "w", encoding="utf-8") as fh:
                     json.dump(obj, fh, indent=1)
+                os.replace(tmp, f)
             return True
         payload = {"message": "order data", "content": base64.b64encode(json.dumps(obj, indent=1).encode()).decode()}
         if overwrite:
@@ -248,57 +251,325 @@ def start_delivery(store, oid, lead=""):
             alert(lead)
 
 
+def now():
+    return datetime.datetime.now()      # tests replace this
+
+
+IDX_LOCK = threading.RLock()
+
+
+def clean_ref(v, limit=60):
+    return re.sub(r"[^A-Za-z0-9_-]", "", str(v or ""))[:limit]
+
+
+def manual_id(ref, part):
+    return "MAN-" + hashlib.sha256(f"{ref}|{part}".encode()).hexdigest()[:12]
+
+
+def index_purchase(store, ek, ref):
+    """payments/<email_key>.json lists every purchase ref of that email (several can coexist)."""
+    with IDX_LOCK:
+        idx = store.get(f"payments/{ek}.json")[0] or {}
+        refs = [r for r in idx.get("refs", []) if isinstance(r, str)]
+        if ref not in refs:
+            store.put(f"payments/{ek}.json", {"refs": refs + [ref]}, overwrite=True)
+
+
+def intake_fields(o):
+    return {k: o.get(k, "") for k in ("business_name", "city", "niche", "website", "email")}
+
+
+def manual_task(store, rec, part, intake):
+    """The manual-delivery order of one part. Created once (keyed by Polar order id + part)."""
+    mid = manual_id(rec["ref"], part)
+    m, _ = store.get(f"orders/{mid}.json")
+    if m is not None:
+        return mid, False
+    info = products.MANUAL_PARTS[part]
+    paid_dt = datetime.datetime.fromisoformat(rec["paid_at"])
+    m = {"order_id": mid, "order_type": part, "product_name": info["name"], "delivery": "manual_delivery",
+         "status": "manual_delivery", "status_at": rec["paid_at"], "paid": True, "paid_ref": rec["ref"],
+         "paid_at": rec["paid_at"], "parts": list(info["owed"]), "bundle": rec["type"] == "bundle",
+         "intake_missing": intake is None, "intake_order": "", "due_at": products.due_date(paid_dt)}
+    if intake is not None:
+        m.update(intake_fields(intake)); m["intake_order"] = intake["order_id"]
+    created = store.put(f"orders/{mid}.json", m)
+    return mid, created
+
+
+def link_manual(store, mid, oid, intake):
+    """Intake arrived: fill the business details and re-compute the due date from payment/intake."""
+    m, _ = store.get(f"orders/{mid}.json")
+    if m is None:
+        return None
+    m.update(intake_fields(intake))
+    m.update({"intake_order": oid, "intake_missing": False,
+              "due_at": products.due_date(datetime.datetime.fromisoformat(m["paid_at"]), now())})
+    store.put(f"orders/{mid}.json", m, overwrite=True)
+    o, _ = store.get(f"orders/{oid}.json")
+    if o is not None and mid not in o.get("manual_orders", []):
+        o["manual_orders"] = o.get("manual_orders", []) + [mid]
+        store.put(f"orders/{oid}.json", o, overwrite=True)
+    return m
+
+
+def manual_summary(store, mids):
+    parts = []
+    for mid in mids:
+        m = store.get(f"orders/{mid}.json")[0] or {}
+        parts.append(f"{mid} {m.get('product_name', '')} due {m.get('due_at', '?')}")
+    return "; ".join(parts)
+
+
+def consumer(store, ref):
+    return (store.get(f"consumed/{ref}.json")[0] or {}).get("order_id", "")
+
+
+def consume(store, ref, oid):
+    """A payment is used by exactly one order. Create-only: True when `oid` holds the payment, False
+    when another order already does."""
+    if store.put(f"consumed/{ref}.json", {"order_id": oid}):
+        return True
+    return consumer(store, ref) == oid
+
+
+def pay_order(store, oid, ref):
+    """Mark an order paid by this payment. An order already paid by another payment is never touched."""
+    o, _ = store.get(f"orders/{oid}.json")
+    if o is None:
+        return False
+    if o.get("paid"):
+        return o.get("paid_ref") == ref
+    return mark_paid(store, oid, ref)
+
+
+def pay_report(store, oid, ref, lead, order_type):
+    """Report part of base/bundle: mark paid, then the one gated delivery path (delivery.on_paid)."""
+    o, _ = store.get(f"orders/{oid}.json")
+    if o is None or (o.get("paid") and o.get("paid_ref") != ref):
+        return False
+    if order_type == "bundle" and o.get("order_type") != "bundle":
+        o["order_type"] = "bundle"
+        store.put(f"orders/{oid}.json", o, overwrite=True)
+    if not pay_order(store, oid, ref):
+        return False
+    start_delivery(store, oid, lead)
+    return True
+
+
+def intake_orders(store, ek):
+    return [i for i in (store.get(f"index/{ek}.json")[0] or {}).get("order_ids", []) if isinstance(i, str)]
+
+
+def find_intake(store, rec, meta_oid):
+    """Intake order for a payment: metadata order id, then the intake that typed this Polar order id,
+    then the email's only eligible intake. -> (order id or "", why not)."""
+    ref, report = rec["ref"], rec["type"] in products.AUTORUN_TYPES
+
+    def usable(oid):
+        o = store.get(f"orders/{oid}.json")[0] if re.fullmatch(r"[A-Za-z0-9_-]{3,40}", oid or "") else None
+        return o is not None and not (report and o.get("paid"))
+
+    if re.fullmatch(r"ORD-\d{6}-[a-f0-9]{6}", meta_oid) and store.get(f"orders/{meta_oid}.json")[0] is not None:
+        return (meta_oid, "") if usable(meta_oid) else ("", "order already paid")
+    typed = (store.get(f"intake_refs/{ref}.json")[0] or {}).get("order_id", "")
+    if typed:
+        return (typed, "") if usable(typed) else ("", "order already paid")
+    if rec.get("email_key"):
+        cands = [o for o in intake_orders(store, rec["email_key"]) if usable(o)]
+        if len(cands) == 1:
+            return cands[0], ""
+        if len(cands) > 1:
+            return "", "several intakes share this email"
+    return "", ""
+
+
+def process_paid(store, d, eid):
+    with IDX_LOCK:
+        return _process_paid(store, d, eid)
+
+
+def _process_paid(store, d, eid):
+    ref = clean_ref(d.get("id")) or ("evt-" + eid)
+    email = str((d.get("customer") or {}).get("email") or d.get("customer_email") or "").strip().lower()
+    meta_oid = str((d.get("metadata") or {}).get("order_id", "")).strip()
+    ids = products.product_ids(d)
+    info = products.PRODUCTS.get(ids[0]) if len(ids) == 1 else None
+    rec, _ = store.get(f"purchases/{ref}.json")
+    if rec and rec.get("done"):
+        return {"status": "duplicate"}
+    if rec is None:         # record the purchase first; the write is create-only (keyed by Polar order id)
+        status, why = ("ok", "") if info else ("unknown", "")
+        if info:
+            ok, why = products.check_payment(d, info)
+            status = "ok" if ok else "held"
+        rec = {"ref": ref, "product_id": clean_ref(",".join(ids)) if len(ids) != 1 else clean_ref(ids[0]),
+               "type": info["type"] if info else "unknown", "status": status, "reason": why,
+               "email_key": email_key(email) if email and status == "ok" else "",
+               "paid_at": now().isoformat(timespec="seconds"), "order_id": "", "manual_orders": [], "done": False}
+        store.put(f"purchases/{ref}.json", rec)
+        rec, _ = store.get(f"purchases/{ref}.json")
+    if not info:
+        alert(f"UNKNOWN Polar product {rec['product_id'] or '(none)'} on Polar order {ref}: nothing was run and no order "
+              "was marked paid. Check it by hand.")
+        rec["done"] = True
+        store.put(f"purchases/{ref}.json", rec, overwrite=True)
+        return {"status": "unknown_product"}
+    if rec.get("status", "ok") == "held":
+        alert(f"Polar order {ref}: payment needs manual review ({rec.get('reason', '')}). Product type {rec['type']}; "
+              "nothing was run, no order was marked paid and no task was created.")
+        rec["done"] = True
+        store.put(f"purchases/{ref}.json", rec, overwrite=True)
+        return {"status": "held"}
+    if rec["email_key"]:
+        index_purchase(store, rec["email_key"], ref)
+    why = ""
+    oid = consumer(store, ref)          # a resumed payment keeps its order
+    if not oid:
+        oid, why = find_intake(store, rec, meta_oid)
+        if oid and not consume(store, ref, oid):
+            oid, why = "", "payment already used by another order"
+    intake = store.get(f"orders/{oid}.json")[0] if oid else None
+    rec["order_id"] = oid if intake else ""
+    mids = []
+    for part in info["manual"]:     # manual parts first: a failed report run must not hide them
+        mid, _ = manual_task(store, rec, part, intake)
+        mids.append(mid)
+    rec["manual_orders"] = mids
+    if intake is not None and mids:
+        intake["manual_orders"] = sorted(set(intake.get("manual_orders", [])) | set(mids))
+        store.put(f"orders/{oid}.json", intake, overwrite=True)
+    text = ""
+    if mids and not rec.get("manual_alerted"):
+        text = (f"{info['name']} paid (Polar {ref}): MANUAL delivery, by hand, nothing automatic. "
+                + manual_summary(store, mids) + ("" if intake else "; intake missing, due dates re-computed when it arrives"))
+        rec["manual_alerted"] = True
+    if info["autorun"]:
+        paid = False
+        if intake is not None:
+            lead = (text + "; " if text else "") + f"Order {oid} PAID (Polar {ref})"
+            paid = pay_report(store, oid, ref, lead, info["type"])
+            text = ""
+        if not paid:
+            alert((text + "; " if text else "") + f"UNMATCHED Polar payment {ref}: the report waits for the intake form"
+                  + (f" ({why})" if why else "") + ". Match it by hand if no intake arrives.")
+            text = ""
+        res = {"status": "paid", "order_id": oid} if paid else {"status": "unmatched"}
+    else:
+        res = {"status": "manual_delivery", "order_type": info["type"]}
+    if text:
+        alert(text)
+    rec["done"] = True
+    store.put(f"purchases/{ref}.json", rec, overwrite=True)
+    return res
+
+
+EVENT_CLAIM_TTL = 900
+
+
+def claim_event(store, eid, etype):
+    """Create-only claim of a webhook event before any work. A failed (or long-stuck) claim can be taken again."""
+    claim = {"status": "claimed", "type": etype, "claimed_at": int(time.time())}
+    if store.put(f"events/{eid}.json", claim):
+        return True
+    with IDX_LOCK:
+        cur = store.get(f"events/{eid}.json")[0] or {}
+        stale = cur.get("status") == "claimed" and time.time() - cur.get("claimed_at", 0) > EVENT_CLAIM_TTL
+        if cur.get("status") == "failed" or stale:
+            store.put(f"events/{eid}.json", claim, overwrite=True)
+            return True
+    return False
+
+
 def handle_polar(headers, body):
-    """-> (http status, json). Verifies, dedupes, marks paid, alerts."""
+    """-> (http status, json). Verifies, claims the webhook id, dedupes the Polar order id, routes by product."""
     if not verify_polar(os.environ.get("POLAR_WEBHOOK_SECRET", ""), headers, body):
         return 401, {"error": "bad signature"}
-    store, eid = Store(), re.sub(r"[^A-Za-z0-9_-]", "", headers.get("webhook-id", ""))[:80]
+    store, eid = Store(), clean_ref(headers.get("webhook-id", ""), 80)
     if not eid:
         return 400, {"error": "missing id"}
-    if store.get(f"events/{eid}.json")[0] is not None:
-        return 200, {"status": "duplicate"}
     ev = json.loads(body or b"{}")
     d = ev.get("data") or {}
-    if ev.get("type") == "order.paid":
-        ref = str(d.get("id", ""))[:60]
-        email = str((d.get("customer") or {}).get("email") or d.get("customer_email") or "").strip().lower()
-        oid = str((d.get("metadata") or {}).get("order_id", "")).strip()
-        paid = bool(re.fullmatch(r"ORD-\d{6}-[a-f0-9]{6}", oid)) and mark_paid(store, oid, ref)
-        if not paid and email:      # no (valid) metadata match: fall back to the buyer email
-            oid = (store.get(f"index/{email_key(email)}.json")[0] or {}).get("order_id", "")
-            paid = bool(oid) and mark_paid(store, oid, ref)
-        if paid:
-            start_delivery(store, oid, f"Order {oid} PAID (Polar {ref})")
-            res = {"status": "paid", "order_id": oid}
-        else:
-            if email:   # payment arrived before the intake form: remember it
-                store.put(f"payments/{email_key(email)}.json", {"ref": ref}, overwrite=True)
-            alert(f"UNMATCHED Polar payment {ref}: no order matches yet. Match it by hand if no intake arrives.")
-            res = {"status": "unmatched"}
-    else:
-        res = {"status": "ignored"}
-    if not store.put(f"events/{eid}.json", {"type": ev.get("type", "")}):
+    etype = str(ev.get("type", ""))
+    if not claim_event(store, eid, etype):
         return 200, {"status": "duplicate"}
+    try:
+        res = process_paid(store, d, eid) if etype == "order.paid" else {"status": "ignored"}
+    except BaseException:
+        try:
+            store.put(f"events/{eid}.json", {"status": "failed", "type": etype}, overwrite=True)
+        except Exception:
+            pass
+        raise
+    store.put(f"events/{eid}.json", {"status": "done", "type": etype}, overwrite=True)
     return 200, res
 
 
 def new_order(d, req):
     store = Store()
-    oid = "ORD-" + datetime.date.today().strftime("%y%m%d") + "-" + uuid.uuid4().hex[:6]
+    oid = "ORD-" + now().strftime("%y%m%d") + "-" + uuid.uuid4().hex[:6]
     token = delivery.new_token()
+    typed = clean_ref(d.get("paid_ref", ""))
     intake = {"order_id": oid, "business_name": req["business"], "city": req["city"],
               "niche": req["niche"], "email": req["email"], "website": req["website"],
-              "token": token, "plan": "check", "paid_ref": str(d.get("paid_ref", ""))[:60], "paid": False,
+              "token": token, "plan": "check", "order_type": "base", "paid_ref": str(d.get("paid_ref", ""))[:60],
+              "paid": False, "created_at": now().isoformat(timespec="seconds"),
               "competitors": [c.strip()[:120] for c in str(d.get("competitors", "")).split(",") if c.strip()][:5]}
     store.put(f"orders/{oid}.json", intake)
     delivery.register_token(store, oid, token)
-    if req["email"]:
-        store.put(f"index/{email_key(req['email'])}.json", {"order_id": oid}, overwrite=True)
-        pay, _ = store.get(f"payments/{email_key(req['email'])}.json")
-        if pay:
-            mark_paid(store, oid, pay.get("ref", ""))
-            start_delivery(store, oid)
-    alert(f"New order {oid}")
+    manual, run, note = [], False, ""
+    with IDX_LOCK:
+        if typed:
+            store.put(f"intake_refs/{typed}.json", {"order_id": oid})
+        recs = []
+        if req["email"]:
+            ek = email_key(req["email"])
+            store.put(f"index/{ek}.json", {"order_id": oid, "order_ids": intake_orders(store, ek) + [oid]}, overwrite=True)
+            for ref in (store.get(f"payments/{ek}.json")[0] or {}).get("refs", []):
+                r, _ = store.get(f"purchases/{clean_ref(ref)}.json")
+                if r and r.get("status", "ok") == "ok" and r.get("type") in products.TYPES:
+                    recs.append(r)
+        email_refs = {r["ref"] for r in recs}
+        typed_rec = None
+        if typed:
+            typed_rec = next((r for r in recs if r["ref"] == typed), None) or store.get(f"purchases/{typed}.json")[0]
+            if typed_rec and not (typed_rec.get("status", "ok") == "ok" and typed_rec.get("type") in products.TYPES):
+                typed_rec = None
+        free = [r for r in recs if not consumer(store, r["ref"])]
+        picked = {}
+        if typed_rec and not consumer(store, typed):
+            picked[typed] = typed_rec
+        report = lambda r: r["type"] in products.AUTORUN_TYPES
+        if not any(report(r) for r in picked.values()):
+            free_reports = [r for r in free if report(r)]
+            if len(free_reports) == 1:
+                picked[free_reports[0]["ref"]] = free_reports[0]
+            elif len(free_reports) > 1:
+                note = "several unused payments share this email and none matches a typed payment reference"
+            elif any(report(r) for r in recs):
+                note = "the payment for this email was already used by another order"
+        for r in free:                  # add-on purchases only hand over the business details
+            if not report(r):
+                picked[r["ref"]] = r
+        for ref, r in picked.items():
+            if not consume(store, ref, oid):
+                continue
+            r["order_id"] = oid
+            for mid in r.get("manual_orders", []):
+                if link_manual(store, mid, oid, intake):
+                    manual.append(mid)
+            if report(r):
+                o, _ = store.get(f"orders/{oid}.json")
+                if r["type"] == "bundle":
+                    o["order_type"] = "bundle"; store.put(f"orders/{oid}.json", o, overwrite=True)
+                if pay_order(store, oid, r["ref"]):
+                    run = True
+            store.put(f"purchases/{r['ref']}.json", r, overwrite=True)
+    if run:
+        start_delivery(store, oid)
+    alert(f"New order {oid}" + (f": awaiting payment, {note}. Match it by hand." if note else ""))
+    if manual:
+        alert("Intake received for manual delivery: " + manual_summary(store, manual))
     return oid, token
 
 

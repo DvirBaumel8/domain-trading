@@ -15,6 +15,7 @@ def fake_http(req, timeout=15):
     raise AssertionError("unexpected network call: " + req.full_url)
 server.http_call = fake_http
 
+BASE_PID = "5a9d5f7a-72a6-4ea4-8ae7-e9d4ac498fde"   # base product (site/products.py)
 ORDER = {"business": "Acme Dental", "city": "Austin, TX", "niche": "dentist", "email": "A@b.co"}
 
 def sign(body, mid="evt1", ts=None, secret="test-secret"):
@@ -222,7 +223,7 @@ class OrderAndPolarTests(Base):
 
     def test_paid_by_email_then_duplicate_ignored(self):
         oid = self.order("buyer@x.co"); self.sent.clear()
-        body = json.dumps({"type": "order.paid", "data": {"id": "pol_1", "customer": {"email": "Buyer@X.co"}}}).encode()
+        body = json.dumps({"type": "order.paid", "data": {"product_id": BASE_PID, "billing_reason": "purchase", "net_amount": 14900, "id": "pol_1", "customer": {"email": "Buyer@X.co"}}}).encode()
         st, b = self.hook(body, mid="evt-paid-1")
         self.assertEqual((st, json.loads(b)["status"]), (200, "paid"))
         o = self.stored(oid); self.assertTrue(o["paid"]); self.assertEqual(o["paid_ref"], "pol_1")
@@ -232,12 +233,12 @@ class OrderAndPolarTests(Base):
 
     def test_paid_by_metadata_order_id(self):
         oid = self.order("m@x.co")
-        body = json.dumps({"type": "order.paid", "data": {"id": "pol_2", "metadata": {"order_id": oid}}}).encode()
+        body = json.dumps({"type": "order.paid", "data": {"product_id": BASE_PID, "billing_reason": "purchase", "net_amount": 14900, "id": "pol_2", "metadata": {"order_id": oid}}}).encode()
         self.assertEqual(json.loads(self.hook(body, mid="evt-meta")[1])["order_id"], oid)
         self.assertTrue(self.stored(oid)["paid"])
 
     def test_payment_before_intake(self):
-        body = json.dumps({"type": "order.paid", "data": {"id": "pol_3", "customer": {"email": "early@x.co"}}}).encode()
+        body = json.dumps({"type": "order.paid", "data": {"product_id": BASE_PID, "billing_reason": "purchase", "net_amount": 14900, "id": "pol_3", "customer": {"email": "early@x.co"}}}).encode()
         self.assertEqual(json.loads(self.hook(body, mid="evt-early")[1])["status"], "unmatched")
         oid = self.order("early@x.co")
         self.assertTrue(self.stored(oid)["paid"])
@@ -302,26 +303,26 @@ class OrderAndPolarTests(Base):
 
     def test_metadata_match_beats_email(self):
         a = self.order("a@x.co"); b = self.order("b@x.co")
-        body = json.dumps({"type": "order.paid", "data": {"id": "pol_m", "metadata": {"order_id": b},
+        body = json.dumps({"type": "order.paid", "data": {"product_id": BASE_PID, "billing_reason": "purchase", "net_amount": 14900, "id": "pol_m", "metadata": {"order_id": b},
                                                          "customer": {"email": "a@x.co"}}}).encode()
         self.assertEqual(json.loads(self.hook(body, mid="evt-mb")[1])["order_id"], b)
         self.assertTrue(self.stored(b)["paid"]); self.assertFalse(self.stored(a)["paid"])
 
     def test_email_match_case_insensitive_and_trimmed(self):
         oid = self.order("  Mixed@Case.CO ")
-        body = json.dumps({"type": "order.paid", "data": {"id": "pol_c", "customer": {"email": " MIXED@case.co  "}}}).encode()
+        body = json.dumps({"type": "order.paid", "data": {"product_id": BASE_PID, "billing_reason": "purchase", "net_amount": 14900, "id": "pol_c", "customer": {"email": " MIXED@case.co  "}}}).encode()
         self.assertEqual(json.loads(self.hook(body, mid="evt-ci")[1])["order_id"], oid)
         self.assertTrue(self.stored(oid)["paid"])
 
     def test_bad_metadata_falls_back_to_email(self):
         oid = self.order("fb@x.co")
-        body = json.dumps({"type": "order.paid", "data": {"id": "pol_f", "metadata": {"order_id": "ORD-000000-aaaaaa"},
+        body = json.dumps({"type": "order.paid", "data": {"product_id": BASE_PID, "billing_reason": "purchase", "net_amount": 14900, "id": "pol_f", "metadata": {"order_id": "ORD-000000-aaaaaa"},
                                                          "customer": {"email": "fb@x.co"}}}).encode()
         self.assertEqual(json.loads(self.hook(body, mid="evt-fb")[1])["order_id"], oid)
 
     def test_unmatched_payment_alerts_without_email(self):
         self.sent.clear()
-        body = json.dumps({"type": "order.paid", "data": {"id": "pol_unm", "customer": {"email": "ghost@x.co", "name": "Ghost"},
+        body = json.dumps({"type": "order.paid", "data": {"product_id": BASE_PID, "billing_reason": "purchase", "net_amount": 14900, "id": "pol_unm", "customer": {"email": "ghost@x.co", "name": "Ghost"},
                                                          "description": "secret body"}}).encode()
         self.assertEqual(json.loads(self.hook(body, mid="evt-unm")[1])["status"], "unmatched")
         self.assertEqual(len(self.sent), 1)

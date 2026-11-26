@@ -11,11 +11,11 @@
         const email = C.contactEmail || "";
         a.textContent = "Contact us — coming soon";
         if (email) {
-          a.href = "mailto:" + email + "?subject=" + encodeURIComponent("Monthly plan — coming soon");
+          a.href = "mailto:" + email + "?subject=" + encodeURIComponent("Coming soon");
         } else {
           a.href = "#";
           a.addEventListener("click", e => { e.preventDefault();
-            alert("Monthly plans are coming soon. Please contact us."); });
+            alert("This is coming soon. Please contact us."); });
         }
       }
     });
