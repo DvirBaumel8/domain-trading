@@ -1,0 +1,62 @@
+<?xml version="1.0" ?><rss xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:media="http://search.yahoo.com/mrss/" xmlns:creativeCommons="http://backend.userland.com/creativeCommonsRssModule" xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+<channel>
+  <title><![CDATA[Meditations, The by Marcus Aurelius (121 - 180)]]></title>
+  <link><![CDATA[https://librivox.org/the-meditations-of-marcus-aurelius/]]></link>
+  <atom:link rel="self" href="https://librivox.org/rss/1095" />
+  <description><![CDATA[Marcus Aurelius wrote Meditations in Greek while on campaign between 170 and 180, as a source for his own guidance and self-improvement. These memos survive and continue to inspire others to this day. These writings take the form of quotations varying in length from one sentence to long paragraphs. He explicates the Stoic philosophy that the only way a man can be harmed by others is to allow his reaction to overpower him. He shows no particular religious faith in his writings, but seems to believe that some sort of logical, benevolent force organizes the universe in such a way that even "bad" occurrences happen for the good of the whole. (Summary by Ticktockman)]]></description>
+  <!--<genre>project element=Genre</genre>-->
+  <language><![CDATA[en]]></language>
+  <itunes:type>serial</itunes:type>
+  <itunes:author>LibriVox</itunes:author>
+  <itunes:summary><![CDATA[Marcus Aurelius wrote Meditations in Greek while on campaign between 170 and 180, as a source for his own guidance and self-improvement. These memos survive and continue to inspire others to this day. These writings take the form of quotations varying in length from one sentence to long paragraphs. He explicates the Stoic philosophy that the only way a man can be harmed by others is to allow his reaction to overpower him. He shows no particular religious faith in his writings, but seems to believe that some sort of logical, benevolent force organizes the universe in such a way that even "bad" occurrences happen for the good of the whole. (Summary by Ticktockman)]]></itunes:summary>
+  <itunes:owner>
+    <itunes:name>LibriVox</itunes:name>
+    <itunes:email>info@librivox.org</itunes:email>
+  </itunes:owner>
+  <itunes:category text="Arts">
+    <itunes:category text="Literature" />
+  </itunes:category>
+  <itunes:image href="https://www.archive.org/download/LibrivoxCdCoverArt4/Meditations_1005.jpg" />  <!-- file loop -->
+    <item>
+    <title><![CDATA[Introduction]]></title>
+    <itunes:episode><![CDATA[0]]></itunes:episode>
+    <!--<reader>file element=reader</reader> -->
+    <link><![CDATA[https://librivox.org/the-meditations-of-marcus-aurelius/]]></link>
+            <enclosure url="https://www.archive.org/download/meditations_0708_librivox/meditations_00_marcusaurelius_64kb.mp3" length="0" type="audio/mpeg" />
+  <itunes:explicit>No</itunes:explicit>
+  <itunes:block>No</itunes:block>
+  <itunes:duration>
+    <![CDATA[00:02:47]]>
+  </itunes:duration>
+  <!--<pubDate>file element=rss.pubDate</pubDate>-->
+  <media:content url="https://www.archive.org/download/meditations_0708_librivox/meditations_00_marcusaurelius_64kb.mp3" type="audio/mpeg" />
+ </item><item>
+    <title><![CDATA[Chapter 1]]></title>
+    <itunes:episode><![CDATA[1]]></itunes:episode>
+    <!--<reader>file element=reader</reader> -->
+    <link><![CDATA[https://librivox.org/the-meditations-of-marcus-aurelius/]]></link>
+            <enclosure url="https://www.archive.org/download/meditations_0708_librivox/meditations_01_marcusaurelius_64kb.mp3" length="0" type="audio/mpeg" />
+  <itunes:explicit>No</itunes:explicit>
+  <itunes:block>No</itunes:block>
+  <itunes:duration>
+    <![CDATA[00:16:25]]>
+  </itunes:duration>
+  <!--<pubDate>file element=rss.pubDate</pubDate>-->
+  <media:content url="https://www.archive.org/download/meditations_0708_librivox/meditations_01_marcusaurelius_64kb.mp3" type="audio/mpeg" />
+ </item><item>
+    <title><![CDATA[Chapter 2]]></title>
+    <itunes:episode><![CDATA[2]]></itunes:episode>
+    <!--<reader>file element=reader</reader> -->
+    <link><![CDATA[https://librivox.org/the-meditations-of-marcus-aurelius/]]></link>
+            <enclosure url="https://www.archive.org/download/meditations_0708_librivox/meditations_02_marcusaurelius_64kb.mp3" length="0" type="audio/mpeg" />
+  <itunes:explicit>No</itunes:explicit>
+  <itunes:block>No</itunes:block>
+  <itunes:duration>
+    <![CDATA[00:13:49]]>
+  </itunes:duration>
+  <!--<pubDate>file element=rss.pubDate</pubDate>-->
+  <media:content url="https://www.archive.org/download/meditations_0708_librivox/meditations_02_marcusaurelius_64kb.mp3" type="audio/mpeg" />
+ </item>
+    <!-- end file loop -->
+</channel>
+</rss>

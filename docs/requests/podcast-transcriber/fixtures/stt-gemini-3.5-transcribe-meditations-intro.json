@@ -1,0 +1,2120 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Introduction to the Meditations of Marcus Aurelius. This is an LibriVox recording. All LibriVox recordings are in the public domain. For more information, to volunteer, please visit librivox.org. Recording by Shane Greenup. The Meditations of Marcus Aurelius by Marcus Aurelius Antoninus, translated by George Long. Introduction. Marcus Annius Verus was born in Rome in AD 121 and assumed the name of Marcus Aurelius Antoninus, by which he is known to history on his adoption by the Emperor T. Aurelius Antoninus. He succeeded to the imperial throne in 161 and ruled till his death in 180. His reign, though marked by justice and moderation at home, was troubled by constant warfare on the frontiers of the empire, and Aurelius spent much of his later years in the uncongenial task of commanding armies that no longer proved irresistible against the barbarian hordes. M. Aurelius was educated by the orator Fronto, but turned aside from rhetoric to study of the Stoic philosophy, of which he was the last distinguished representative. The Meditations, which he wrote in Greek, are among the most noteworthy expressions of this system and exhibit it favorably on its practical side. His own precepts he carried out with singular consistency, and both in his public and his private life he was in the highest degree conscientious. He and his predecessor are noted as the only Roman emperors who can be said to have ruled with a single eye to the welfare of their subjects. During his reign, Rome was visited by a severe pestilence, and this, with reverses suffered by his armies through the populous into a panic and led them to demand the sacrifice of the Christians whom they regarded as having brought down the anger of the gods. Aurelius seems to have shared the panic, and his record it's stained by his sanction of the cruel persecution. This incident in the career of the last and one of the loftiest of the pagan moralists may be regarded as symbolic of the dying effort of heathenism to check the advancing tide of Christianity. The Meditations picture with faithfulness the mind and character of this noblest of the emperors. Simple in style and sincere in tone, they record for all time the height reached by pagan aspirations in its effort to solve the problem of conduct, and the essential agreement of his practice with his teaching proved that even in a palace life may be led well. End of Introduction. Recording by Shane Greenup. shanegreenup.blogspot.com and papersallowed.com",
+            "audioTranscription": {
+              "text": "Introduction to the Meditations of Marcus Aurelius. This is an LibriVox recording. All LibriVox recordings are in the public domain. For more information, to volunteer, please visit librivox.org. Recording by Shane Greenup. The Meditations of Marcus Aurelius by Marcus Aurelius Antoninus, translated by George Long. Introduction. Marcus Annius Verus was born in Rome in AD 121 and assumed the name of Marcus Aurelius Antoninus, by which he is known to history on his adoption by the Emperor T. Aurelius Antoninus. He succeeded to the imperial throne in 161 and ruled till his death in 180. His reign, though marked by justice and moderation at home, was troubled by constant warfare on the frontiers of the empire, and Aurelius spent much of his later years in the uncongenial task of commanding armies that no longer proved irresistible against the barbarian hordes. M. Aurelius was educated by the orator Fronto, but turned aside from rhetoric to study of the Stoic philosophy, of which he was the last distinguished representative. The Meditations, which he wrote in Greek, are among the most noteworthy expressions of this system and exhibit it favorably on its practical side. His own precepts he carried out with singular consistency, and both in his public and his private life he was in the highest degree conscientious. He and his predecessor are noted as the only Roman emperors who can be said to have ruled with a single eye to the welfare of their subjects. During his reign, Rome was visited by a severe pestilence, and this, with reverses suffered by his armies through the populous into a panic and led them to demand the sacrifice of the Christians whom they regarded as having brought down the anger of the gods. Aurelius seems to have shared the panic, and his record it's stained by his sanction of the cruel persecution. This incident in the career of the last and one of the loftiest of the pagan moralists may be regarded as symbolic of the dying effort of heathenism to check the advancing tide of Christianity. The Meditations picture with faithfulness the mind and character of this noblest of the emperors. Simple in style and sincere in tone, they record for all time the height reached by pagan aspirations in its effort to solve the problem of conduct, and the essential agreement of his practice with his teaching proved that even in a palace life may be led well. End of Introduction. Recording by Shane Greenup. shanegreenup.blogspot.com and papersallowed.com",
+              "words": [
+                {
+                  "word": "Introduction",
+                  "startOffset": "0.800s",
+                  "endOffset": "1.400s"
+                },
+                {
+                  "word": "to",
+                  "startOffset": "1.400s",
+                  "endOffset": "1.500s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "1.500s",
+                  "endOffset": "1.600s"
+                },
+                {
+                  "word": "Meditations",
+                  "startOffset": "1.600s",
+                  "endOffset": "2.300s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "2.300s",
+                  "endOffset": "2.400s"
+                },
+                {
+                  "word": "Marcus",
+                  "startOffset": "2.400s",
+                  "endOffset": "2.800s"
+                },
+                {
+                  "word": "Aurelius.",
+                  "startOffset": "2.800s",
+                  "endOffset": "3.400s"
+                },
+                {
+                  "word": "This",
+                  "startOffset": "4s",
+                  "endOffset": "4.200s"
+                },
+                {
+                  "word": "is",
+                  "startOffset": "4.200s",
+                  "endOffset": "4.300s"
+                },
+                {
+                  "word": "an",
+                  "startOffset": "4.300s",
+                  "endOffset": "4.300s"
+                },
+                {
+                  "word": "LibriVox",
+                  "startOffset": "4.800s",
+                  "endOffset": "4.900s"
+                },
+                {
+                  "word": "recording.",
+                  "startOffset": "4.900s",
+                  "endOffset": "5.500s"
+                },
+                {
+                  "word": "All",
+                  "startOffset": "5.700s",
+                  "endOffset": "5.800s"
+                },
+                {
+                  "word": "LibriVox",
+                  "startOffset": "5.800s",
+                  "endOffset": "6.300s"
+                },
+                {
+                  "word": "recordings",
+                  "startOffset": "6.300s",
+                  "endOffset": "6.800s"
+                },
+                {
+                  "word": "are",
+                  "startOffset": "6.800s",
+                  "endOffset": "6.900s"
+                },
+                {
+                  "word": "in",
+                  "startOffset": "6.900s",
+                  "endOffset": "7s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "7s",
+                  "endOffset": "7.100s"
+                },
+                {
+                  "word": "public",
+                  "startOffset": "7.100s",
+                  "endOffset": "7.400s"
+                },
+                {
+                  "word": "domain.",
+                  "startOffset": "7.400s",
+                  "endOffset": "8s"
+                },
+                {
+                  "word": "For",
+                  "startOffset": "8.300s",
+                  "endOffset": "8.400s"
+                },
+                {
+                  "word": "more",
+                  "startOffset": "8.400s",
+                  "endOffset": "8.500s"
+                },
+                {
+                  "word": "information,",
+                  "startOffset": "8.500s",
+                  "endOffset": "9.400s"
+                },
+                {
+                  "word": "to",
+                  "startOffset": "9.500s",
+                  "endOffset": "9.600s"
+                },
+                {
+                  "word": "volunteer,",
+                  "startOffset": "9.600s",
+                  "endOffset": "10.300s"
+                },
+                {
+                  "word": "please",
+                  "startOffset": "10.400s",
+                  "endOffset": "10.700s"
+                },
+                {
+                  "word": "visit",
+                  "startOffset": "10.700s",
+                  "endOffset": "11s"
+                },
+                {
+                  "word": "librivox.org.",
+                  "startOffset": "11s",
+                  "endOffset": "12.300s"
+                },
+                {
+                  "word": "Recording",
+                  "startOffset": "13.100s",
+                  "endOffset": "13.500s"
+                },
+                {
+                  "word": "by",
+                  "startOffset": "13.500s",
+                  "endOffset": "13.600s"
+                },
+                {
+                  "word": "Shane",
+                  "startOffset": "13.600s",
+                  "endOffset": "14s"
+                },
+                {
+                  "word": "Greenup.",
+                  "startOffset": "14s",
+                  "endOffset": "14.400s"
+                },
+                {
+                  "word": "The",
+                  "startOffset": "15.100s",
+                  "endOffset": "15.100s"
+                },
+                {
+                  "word": "Meditations",
+                  "startOffset": "15.100s",
+                  "endOffset": "15.700s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "15.700s",
+                  "endOffset": "15.800s"
+                },
+                {
+                  "word": "Marcus",
+                  "startOffset": "15.800s",
+                  "endOffset": "16.200s"
+                },
+                {
+                  "word": "Aurelius",
+                  "startOffset": "16.200s",
+                  "endOffset": "16.800s"
+                },
+                {
+                  "word": "by",
+                  "startOffset": "16.800s",
+                  "endOffset": "17s"
+                },
+                {
+                  "word": "Marcus",
+                  "startOffset": "17s",
+                  "endOffset": "17.500s"
+                },
+                {
+                  "word": "Aurelius",
+                  "startOffset": "17.500s",
+                  "endOffset": "18.100s"
+                },
+                {
+                  "word": "Antoninus,",
+                  "startOffset": "18.100s",
+                  "endOffset": "18.800s"
+                },
+                {
+                  "word": "translated",
+                  "startOffset": "19.100s",
+                  "endOffset": "19.700s"
+                },
+                {
+                  "word": "by",
+                  "startOffset": "19.700s",
+                  "endOffset": "19.800s"
+                },
+                {
+                  "word": "George",
+                  "startOffset": "19.800s",
+                  "endOffset": "20.200s"
+                },
+                {
+                  "word": "Long.",
+                  "startOffset": "20.200s",
+                  "endOffset": "20.500s"
+                },
+                {
+                  "word": "Introduction.",
+                  "startOffset": "21.500s",
+                  "endOffset": "22.100s"
+                },
+                {
+                  "word": "Marcus",
+                  "startOffset": "23.200s",
+                  "endOffset": "23.700s"
+                },
+                {
+                  "word": "Annius",
+                  "startOffset": "23.700s",
+                  "endOffset": "24s"
+                },
+                {
+                  "word": "Verus",
+                  "startOffset": "24s",
+                  "endOffset": "24.600s"
+                },
+                {
+                  "word": "was",
+                  "startOffset": "24.700s",
+                  "endOffset": "24.900s"
+                },
+                {
+                  "word": "born",
+                  "startOffset": "24.900s",
+                  "endOffset": "25.100s"
+                },
+                {
+                  "word": "in",
+                  "startOffset": "25.100s",
+                  "endOffset": "25.300s"
+                },
+                {
+                  "word": "Rome",
+                  "startOffset": "25.300s",
+                  "endOffset": "25.700s"
+                },
+                {
+                  "word": "in",
+                  "startOffset": "25.700s",
+                  "endOffset": "25.800s"
+                },
+                {
+                  "word": "AD",
+                  "startOffset": "25.800s",
+                  "endOffset": "26.300s"
+                },
+                {
+                  "word": "121",
+                  "startOffset": "26.400s",
+                  "endOffset": "27.600s"
+                },
+                {
+                  "word": "and",
+                  "startOffset": "28s",
+                  "endOffset": "28.100s"
+                },
+                {
+                  "word": "assumed",
+                  "startOffset": "28.100s",
+                  "endOffset": "28.400s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "28.400s",
+                  "endOffset": "28.500s"
+                },
+                {
+                  "word": "name",
+                  "startOffset": "28.500s",
+                  "endOffset": "28.800s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "28.800s",
+                  "endOffset": "28.900s"
+                },
+                {
+                  "word": "Marcus",
+                  "startOffset": "28.900s",
+                  "endOffset": "29.400s"
+                },
+                {
+                  "word": "Aurelius",
+                  "startOffset": "29.400s",
+                  "endOffset": "29.900s"
+                },
+                {
+                  "word": "Antoninus,",
+                  "startOffset": "30s",
+                  "endOffset": "30.700s"
+                },
+                {
+                  "word": "by",
+                  "startOffset": "30.900s",
+                  "endOffset": "31s"
+                },
+                {
+                  "word": "which",
+                  "startOffset": "31s",
+                  "endOffset": "31.300s"
+                },
+                {
+                  "word": "he",
+                  "startOffset": "31.300s",
+                  "endOffset": "31.400s"
+                },
+                {
+                  "word": "is",
+                  "startOffset": "31.400s",
+                  "endOffset": "31.500s"
+                },
+                {
+                  "word": "known",
+                  "startOffset": "31.500s",
+                  "endOffset": "31.800s"
+                },
+                {
+                  "word": "to",
+                  "startOffset": "31.800s",
+                  "endOffset": "31.900s"
+                },
+                {
+                  "word": "history",
+                  "startOffset": "31.900s",
+                  "endOffset": "32.500s"
+                },
+                {
+                  "word": "on",
+                  "startOffset": "32.800s",
+                  "endOffset": "32.900s"
+                },
+                {
+                  "word": "his",
+                  "startOffset": "32.900s",
+                  "endOffset": "33s"
+                },
+                {
+                  "word": "adoption",
+                  "startOffset": "33s",
+                  "endOffset": "33.600s"
+                },
+                {
+                  "word": "by",
+                  "startOffset": "33.600s",
+                  "endOffset": "33.800s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "33.800s",
+                  "endOffset": "33.900s"
+                },
+                {
+                  "word": "Emperor",
+                  "startOffset": "33.900s",
+                  "endOffset": "34.300s"
+                },
+                {
+                  "word": "T.",
+                  "startOffset": "34.300s",
+                  "endOffset": "34.600s"
+                },
+                {
+                  "word": "Aurelius",
+                  "startOffset": "34.600s",
+                  "endOffset": "35.100s"
+                },
+                {
+                  "word": "Antoninus.",
+                  "startOffset": "35.100s",
+                  "endOffset": "35.700s"
+                },
+                {
+                  "word": "He",
+                  "startOffset": "36.600s",
+                  "endOffset": "36.800s"
+                },
+                {
+                  "word": "succeeded",
+                  "startOffset": "36.800s",
+                  "endOffset": "37.300s"
+                },
+                {
+                  "word": "to",
+                  "startOffset": "37.300s",
+                  "endOffset": "37.400s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "37.400s",
+                  "endOffset": "37.500s"
+                },
+                {
+                  "word": "imperial",
+                  "startOffset": "37.500s",
+                  "endOffset": "38s"
+                },
+                {
+                  "word": "throne",
+                  "startOffset": "38s",
+                  "endOffset": "38.400s"
+                },
+                {
+                  "word": "in",
+                  "startOffset": "38.400s",
+                  "endOffset": "38.400s"
+                },
+                {
+                  "word": "161",
+                  "startOffset": "38.400s",
+                  "endOffset": "39.600s"
+                },
+                {
+                  "word": "and",
+                  "startOffset": "40s",
+                  "endOffset": "40.200s"
+                },
+                {
+                  "word": "ruled",
+                  "startOffset": "40.200s",
+                  "endOffset": "40.400s"
+                },
+                {
+                  "word": "till",
+                  "startOffset": "40.400s",
+                  "endOffset": "40.500s"
+                },
+                {
+                  "word": "his",
+                  "startOffset": "40.500s",
+                  "endOffset": "40.700s"
+                },
+                {
+                  "word": "death",
+                  "startOffset": "40.700s",
+                  "endOffset": "41s"
+                },
+                {
+                  "word": "in",
+                  "startOffset": "41s",
+                  "endOffset": "41.100s"
+                },
+                {
+                  "word": "180.",
+                  "startOffset": "41.100s",
+                  "endOffset": "41.900s"
+                },
+                {
+                  "word": "His",
+                  "startOffset": "42.800s",
+                  "endOffset": "43s"
+                },
+                {
+                  "word": "reign,",
+                  "startOffset": "43s",
+                  "endOffset": "43.600s"
+                },
+                {
+                  "word": "though",
+                  "startOffset": "43.600s",
+                  "endOffset": "43.800s"
+                },
+                {
+                  "word": "marked",
+                  "startOffset": "43.800s",
+                  "endOffset": "44.100s"
+                },
+                {
+                  "word": "by",
+                  "startOffset": "44.100s",
+                  "endOffset": "44.300s"
+                },
+                {
+                  "word": "justice",
+                  "startOffset": "44.300s",
+                  "endOffset": "44.700s"
+                },
+                {
+                  "word": "and",
+                  "startOffset": "44.700s",
+                  "endOffset": "44.800s"
+                },
+                {
+                  "word": "moderation",
+                  "startOffset": "44.800s",
+                  "endOffset": "45.400s"
+                },
+                {
+                  "word": "at",
+                  "startOffset": "45.400s",
+                  "endOffset": "45.500s"
+                },
+                {
+                  "word": "home,",
+                  "startOffset": "45.500s",
+                  "endOffset": "46s"
+                },
+                {
+                  "word": "was",
+                  "startOffset": "46s",
+                  "endOffset": "46.200s"
+                },
+                {
+                  "word": "troubled",
+                  "startOffset": "46.200s",
+                  "endOffset": "46.600s"
+                },
+                {
+                  "word": "by",
+                  "startOffset": "46.600s",
+                  "endOffset": "46.700s"
+                },
+                {
+                  "word": "constant",
+                  "startOffset": "46.700s",
+                  "endOffset": "47.200s"
+                },
+                {
+                  "word": "warfare",
+                  "startOffset": "47.200s",
+                  "endOffset": "47.700s"
+                },
+                {
+                  "word": "on",
+                  "startOffset": "47.700s",
+                  "endOffset": "47.800s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "47.800s",
+                  "endOffset": "47.800s"
+                },
+                {
+                  "word": "frontiers",
+                  "startOffset": "47.800s",
+                  "endOffset": "48.400s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "48.400s",
+                  "endOffset": "48.400s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "48.400s",
+                  "endOffset": "48.500s"
+                },
+                {
+                  "word": "empire,",
+                  "startOffset": "48.500s",
+                  "endOffset": "49s"
+                },
+                {
+                  "word": "and",
+                  "startOffset": "49.400s",
+                  "endOffset": "49.500s"
+                },
+                {
+                  "word": "Aurelius",
+                  "startOffset": "49.500s",
+                  "endOffset": "50s"
+                },
+                {
+                  "word": "spent",
+                  "startOffset": "50s",
+                  "endOffset": "50.200s"
+                },
+                {
+                  "word": "much",
+                  "startOffset": "50.200s",
+                  "endOffset": "50.400s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "50.400s",
+                  "endOffset": "50.500s"
+                },
+                {
+                  "word": "his",
+                  "startOffset": "50.500s",
+                  "endOffset": "50.700s"
+                },
+                {
+                  "word": "later",
+                  "startOffset": "50.700s",
+                  "endOffset": "50.900s"
+                },
+                {
+                  "word": "years",
+                  "startOffset": "50.900s",
+                  "endOffset": "51.300s"
+                },
+                {
+                  "word": "in",
+                  "startOffset": "51.300s",
+                  "endOffset": "51.400s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "51.400s",
+                  "endOffset": "51.500s"
+                },
+                {
+                  "word": "uncongenial",
+                  "startOffset": "51.500s",
+                  "endOffset": "52.300s"
+                },
+                {
+                  "word": "task",
+                  "startOffset": "52.300s",
+                  "endOffset": "52.800s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "52.800s",
+                  "endOffset": "52.800s"
+                },
+                {
+                  "word": "commanding",
+                  "startOffset": "52.800s",
+                  "endOffset": "53.300s"
+                },
+                {
+                  "word": "armies",
+                  "startOffset": "53.300s",
+                  "endOffset": "53.700s"
+                },
+                {
+                  "word": "that",
+                  "startOffset": "53.700s",
+                  "endOffset": "53.900s"
+                },
+                {
+                  "word": "no",
+                  "startOffset": "53.900s",
+                  "endOffset": "54s"
+                },
+                {
+                  "word": "longer",
+                  "startOffset": "54s",
+                  "endOffset": "54.300s"
+                },
+                {
+                  "word": "proved",
+                  "startOffset": "54.300s",
+                  "endOffset": "54.700s"
+                },
+                {
+                  "word": "irresistible",
+                  "startOffset": "54.700s",
+                  "endOffset": "55.400s"
+                },
+                {
+                  "word": "against",
+                  "startOffset": "55.400s",
+                  "endOffset": "55.700s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "55.700s",
+                  "endOffset": "55.800s"
+                },
+                {
+                  "word": "barbarian",
+                  "startOffset": "55.800s",
+                  "endOffset": "56.300s"
+                },
+                {
+                  "word": "hordes.",
+                  "startOffset": "56.300s",
+                  "endOffset": "56.800s"
+                },
+                {
+                  "word": "M.",
+                  "startOffset": "57.900s",
+                  "endOffset": "58.100s"
+                },
+                {
+                  "word": "Aurelius",
+                  "startOffset": "58.100s",
+                  "endOffset": "58.800s"
+                },
+                {
+                  "word": "was",
+                  "startOffset": "59s",
+                  "endOffset": "59.200s"
+                },
+                {
+                  "word": "educated",
+                  "startOffset": "59.200s",
+                  "endOffset": "59.700s"
+                },
+                {
+                  "word": "by",
+                  "startOffset": "59.700s",
+                  "endOffset": "59.800s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "59.800s",
+                  "endOffset": "59.900s"
+                },
+                {
+                  "word": "orator",
+                  "startOffset": "59.900s",
+                  "endOffset": "60.500s"
+                },
+                {
+                  "word": "Fronto,",
+                  "startOffset": "60.600s",
+                  "endOffset": "61.100s"
+                },
+                {
+                  "word": "but",
+                  "startOffset": "61.800s",
+                  "endOffset": "61.900s"
+                },
+                {
+                  "word": "turned",
+                  "startOffset": "61.900s",
+                  "endOffset": "62.200s"
+                },
+                {
+                  "word": "aside",
+                  "startOffset": "62.200s",
+                  "endOffset": "62.500s"
+                },
+                {
+                  "word": "from",
+                  "startOffset": "62.500s",
+                  "endOffset": "62.700s"
+                },
+                {
+                  "word": "rhetoric",
+                  "startOffset": "62.700s",
+                  "endOffset": "63s"
+                },
+                {
+                  "word": "to",
+                  "startOffset": "63s",
+                  "endOffset": "63.200s"
+                },
+                {
+                  "word": "study",
+                  "startOffset": "63.200s",
+                  "endOffset": "63.600s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "63.900s",
+                  "endOffset": "64.100s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "64.100s",
+                  "endOffset": "64.200s"
+                },
+                {
+                  "word": "Stoic",
+                  "startOffset": "64.200s",
+                  "endOffset": "64.700s"
+                },
+                {
+                  "word": "philosophy,",
+                  "startOffset": "64.700s",
+                  "endOffset": "65.300s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "65.500s",
+                  "endOffset": "65.700s"
+                },
+                {
+                  "word": "which",
+                  "startOffset": "65.700s",
+                  "endOffset": "65.900s"
+                },
+                {
+                  "word": "he",
+                  "startOffset": "65.900s",
+                  "endOffset": "65.900s"
+                },
+                {
+                  "word": "was",
+                  "startOffset": "65.900s",
+                  "endOffset": "66.100s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "66.100s",
+                  "endOffset": "66.200s"
+                },
+                {
+                  "word": "last",
+                  "startOffset": "66.200s",
+                  "endOffset": "66.600s"
+                },
+                {
+                  "word": "distinguished",
+                  "startOffset": "66.600s",
+                  "endOffset": "67.100s"
+                },
+                {
+                  "word": "representative.",
+                  "startOffset": "67.100s",
+                  "endOffset": "67.800s"
+                },
+                {
+                  "word": "The",
+                  "startOffset": "68.700s",
+                  "endOffset": "68.800s"
+                },
+                {
+                  "word": "Meditations,",
+                  "startOffset": "68.800s",
+                  "endOffset": "69.600s"
+                },
+                {
+                  "word": "which",
+                  "startOffset": "69.700s",
+                  "endOffset": "69.800s"
+                },
+                {
+                  "word": "he",
+                  "startOffset": "69.800s",
+                  "endOffset": "69.900s"
+                },
+                {
+                  "word": "wrote",
+                  "startOffset": "69.900s",
+                  "endOffset": "70.200s"
+                },
+                {
+                  "word": "in",
+                  "startOffset": "70.200s",
+                  "endOffset": "70.300s"
+                },
+                {
+                  "word": "Greek,",
+                  "startOffset": "70.300s",
+                  "endOffset": "70.800s"
+                },
+                {
+                  "word": "are",
+                  "startOffset": "70.900s",
+                  "endOffset": "71s"
+                },
+                {
+                  "word": "among",
+                  "startOffset": "71s",
+                  "endOffset": "71.300s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "71.300s",
+                  "endOffset": "71.400s"
+                },
+                {
+                  "word": "most",
+                  "startOffset": "71.400s",
+                  "endOffset": "71.700s"
+                },
+                {
+                  "word": "noteworthy",
+                  "startOffset": "71.700s",
+                  "endOffset": "72.300s"
+                },
+                {
+                  "word": "expressions",
+                  "startOffset": "72.300s",
+                  "endOffset": "72.900s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "72.900s",
+                  "endOffset": "73s"
+                },
+                {
+                  "word": "this",
+                  "startOffset": "73s",
+                  "endOffset": "73.200s"
+                },
+                {
+                  "word": "system",
+                  "startOffset": "73.200s",
+                  "endOffset": "73.600s"
+                },
+                {
+                  "word": "and",
+                  "startOffset": "73.900s",
+                  "endOffset": "74s"
+                },
+                {
+                  "word": "exhibit",
+                  "startOffset": "74s",
+                  "endOffset": "74.400s"
+                },
+                {
+                  "word": "it",
+                  "startOffset": "74.400s",
+                  "endOffset": "74.500s"
+                },
+                {
+                  "word": "favorably",
+                  "startOffset": "74.500s",
+                  "endOffset": "75.100s"
+                },
+                {
+                  "word": "on",
+                  "startOffset": "75.100s",
+                  "endOffset": "75.200s"
+                },
+                {
+                  "word": "its",
+                  "startOffset": "75.200s",
+                  "endOffset": "75.300s"
+                },
+                {
+                  "word": "practical",
+                  "startOffset": "75.300s",
+                  "endOffset": "75.800s"
+                },
+                {
+                  "word": "side.",
+                  "startOffset": "75.800s",
+                  "endOffset": "76.200s"
+                },
+                {
+                  "word": "His",
+                  "startOffset": "77.200s",
+                  "endOffset": "77.300s"
+                },
+                {
+                  "word": "own",
+                  "startOffset": "77.300s",
+                  "endOffset": "77.500s"
+                },
+                {
+                  "word": "precepts",
+                  "startOffset": "77.500s",
+                  "endOffset": "78s"
+                },
+                {
+                  "word": "he",
+                  "startOffset": "78s",
+                  "endOffset": "78.200s"
+                },
+                {
+                  "word": "carried",
+                  "startOffset": "78.200s",
+                  "endOffset": "78.600s"
+                },
+                {
+                  "word": "out",
+                  "startOffset": "78.600s",
+                  "endOffset": "78.800s"
+                },
+                {
+                  "word": "with",
+                  "startOffset": "78.800s",
+                  "endOffset": "78.900s"
+                },
+                {
+                  "word": "singular",
+                  "startOffset": "78.900s",
+                  "endOffset": "79.300s"
+                },
+                {
+                  "word": "consistency,",
+                  "startOffset": "79.300s",
+                  "endOffset": "80.100s"
+                },
+                {
+                  "word": "and",
+                  "startOffset": "80.500s",
+                  "endOffset": "80.600s"
+                },
+                {
+                  "word": "both",
+                  "startOffset": "80.600s",
+                  "endOffset": "80.900s"
+                },
+                {
+                  "word": "in",
+                  "startOffset": "80.900s",
+                  "endOffset": "81s"
+                },
+                {
+                  "word": "his",
+                  "startOffset": "81s",
+                  "endOffset": "81.200s"
+                },
+                {
+                  "word": "public",
+                  "startOffset": "81.200s",
+                  "endOffset": "81.600s"
+                },
+                {
+                  "word": "and",
+                  "startOffset": "81.600s",
+                  "endOffset": "81.700s"
+                },
+                {
+                  "word": "his",
+                  "startOffset": "81.700s",
+                  "endOffset": "81.800s"
+                },
+                {
+                  "word": "private",
+                  "startOffset": "81.800s",
+                  "endOffset": "82.200s"
+                },
+                {
+                  "word": "life",
+                  "startOffset": "82.200s",
+                  "endOffset": "82.600s"
+                },
+                {
+                  "word": "he",
+                  "startOffset": "82.700s",
+                  "endOffset": "82.800s"
+                },
+                {
+                  "word": "was",
+                  "startOffset": "82.800s",
+                  "endOffset": "83s"
+                },
+                {
+                  "word": "in",
+                  "startOffset": "83s",
+                  "endOffset": "83.100s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "83.100s",
+                  "endOffset": "83.200s"
+                },
+                {
+                  "word": "highest",
+                  "startOffset": "83.200s",
+                  "endOffset": "83.600s"
+                },
+                {
+                  "word": "degree",
+                  "startOffset": "83.600s",
+                  "endOffset": "83.900s"
+                },
+                {
+                  "word": "conscientious.",
+                  "startOffset": "83.900s",
+                  "endOffset": "84.800s"
+                },
+                {
+                  "word": "He",
+                  "startOffset": "85.700s",
+                  "endOffset": "85.900s"
+                },
+                {
+                  "word": "and",
+                  "startOffset": "85.900s",
+                  "endOffset": "86s"
+                },
+                {
+                  "word": "his",
+                  "startOffset": "86s",
+                  "endOffset": "86.200s"
+                },
+                {
+                  "word": "predecessor",
+                  "startOffset": "86.200s",
+                  "endOffset": "87s"
+                },
+                {
+                  "word": "are",
+                  "startOffset": "87.200s",
+                  "endOffset": "87.300s"
+                },
+                {
+                  "word": "noted",
+                  "startOffset": "87.300s",
+                  "endOffset": "87.700s"
+                },
+                {
+                  "word": "as",
+                  "startOffset": "87.700s",
+                  "endOffset": "87.900s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "87.900s",
+                  "endOffset": "88s"
+                },
+                {
+                  "word": "only",
+                  "startOffset": "88s",
+                  "endOffset": "88.300s"
+                },
+                {
+                  "word": "Roman",
+                  "startOffset": "88.300s",
+                  "endOffset": "88.700s"
+                },
+                {
+                  "word": "emperors",
+                  "startOffset": "88.700s",
+                  "endOffset": "89.200s"
+                },
+                {
+                  "word": "who",
+                  "startOffset": "89.200s",
+                  "endOffset": "89.400s"
+                },
+                {
+                  "word": "can",
+                  "startOffset": "89.400s",
+                  "endOffset": "89.600s"
+                },
+                {
+                  "word": "be",
+                  "startOffset": "89.600s",
+                  "endOffset": "89.700s"
+                },
+                {
+                  "word": "said",
+                  "startOffset": "89.700s",
+                  "endOffset": "90s"
+                },
+                {
+                  "word": "to",
+                  "startOffset": "90s",
+                  "endOffset": "90.100s"
+                },
+                {
+                  "word": "have",
+                  "startOffset": "90.100s",
+                  "endOffset": "90.300s"
+                },
+                {
+                  "word": "ruled",
+                  "startOffset": "90.300s",
+                  "endOffset": "90.700s"
+                },
+                {
+                  "word": "with",
+                  "startOffset": "90.700s",
+                  "endOffset": "90.800s"
+                },
+                {
+                  "word": "a",
+                  "startOffset": "90.800s",
+                  "endOffset": "90.800s"
+                },
+                {
+                  "word": "single",
+                  "startOffset": "90.800s",
+                  "endOffset": "91.300s"
+                },
+                {
+                  "word": "eye",
+                  "startOffset": "91.300s",
+                  "endOffset": "91.500s"
+                },
+                {
+                  "word": "to",
+                  "startOffset": "91.500s",
+                  "endOffset": "91.600s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "91.600s",
+                  "endOffset": "91.700s"
+                },
+                {
+                  "word": "welfare",
+                  "startOffset": "91.700s",
+                  "endOffset": "92s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "92s",
+                  "endOffset": "92.100s"
+                },
+                {
+                  "word": "their",
+                  "startOffset": "92.100s",
+                  "endOffset": "92.300s"
+                },
+                {
+                  "word": "subjects.",
+                  "startOffset": "92.300s",
+                  "endOffset": "92.800s"
+                },
+                {
+                  "word": "During",
+                  "startOffset": "93.900s",
+                  "endOffset": "94.200s"
+                },
+                {
+                  "word": "his",
+                  "startOffset": "94.200s",
+                  "endOffset": "94.400s"
+                },
+                {
+                  "word": "reign,",
+                  "startOffset": "94.400s",
+                  "endOffset": "94.800s"
+                },
+                {
+                  "word": "Rome",
+                  "startOffset": "94.800s",
+                  "endOffset": "95.100s"
+                },
+                {
+                  "word": "was",
+                  "startOffset": "95.100s",
+                  "endOffset": "95.300s"
+                },
+                {
+                  "word": "visited",
+                  "startOffset": "95.300s",
+                  "endOffset": "95.700s"
+                },
+                {
+                  "word": "by",
+                  "startOffset": "95.700s",
+                  "endOffset": "95.900s"
+                },
+                {
+                  "word": "a",
+                  "startOffset": "95.900s",
+                  "endOffset": "95.900s"
+                },
+                {
+                  "word": "severe",
+                  "startOffset": "95.900s",
+                  "endOffset": "96.300s"
+                },
+                {
+                  "word": "pestilence,",
+                  "startOffset": "96.300s",
+                  "endOffset": "97s"
+                },
+                {
+                  "word": "and",
+                  "startOffset": "97.400s",
+                  "endOffset": "97.600s"
+                },
+                {
+                  "word": "this,",
+                  "startOffset": "97.600s",
+                  "endOffset": "98s"
+                },
+                {
+                  "word": "with",
+                  "startOffset": "98s",
+                  "endOffset": "98.200s"
+                },
+                {
+                  "word": "reverses",
+                  "startOffset": "98.200s",
+                  "endOffset": "99s"
+                },
+                {
+                  "word": "suffered",
+                  "startOffset": "99.200s",
+                  "endOffset": "99.600s"
+                },
+                {
+                  "word": "by",
+                  "startOffset": "99.600s",
+                  "endOffset": "99.800s"
+                },
+                {
+                  "word": "his",
+                  "startOffset": "99.800s",
+                  "endOffset": "100s"
+                },
+                {
+                  "word": "armies",
+                  "startOffset": "100s",
+                  "endOffset": "100.400s"
+                },
+                {
+                  "word": "through",
+                  "startOffset": "100.800s",
+                  "endOffset": "101s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "101s",
+                  "endOffset": "101.100s"
+                },
+                {
+                  "word": "populous",
+                  "startOffset": "101.100s",
+                  "endOffset": "101.500s"
+                },
+                {
+                  "word": "into",
+                  "startOffset": "101.500s",
+                  "endOffset": "101.800s"
+                },
+                {
+                  "word": "a",
+                  "startOffset": "101.800s",
+                  "endOffset": "101.800s"
+                },
+                {
+                  "word": "panic",
+                  "startOffset": "101.800s",
+                  "endOffset": "102.300s"
+                },
+                {
+                  "word": "and",
+                  "startOffset": "102.400s",
+                  "endOffset": "102.500s"
+                },
+                {
+                  "word": "led",
+                  "startOffset": "102.500s",
+                  "endOffset": "102.700s"
+                },
+                {
+                  "word": "them",
+                  "startOffset": "102.700s",
+                  "endOffset": "102.800s"
+                },
+                {
+                  "word": "to",
+                  "startOffset": "102.800s",
+                  "endOffset": "102.900s"
+                },
+                {
+                  "word": "demand",
+                  "startOffset": "102.900s",
+                  "endOffset": "103.300s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "103.300s",
+                  "endOffset": "103.400s"
+                },
+                {
+                  "word": "sacrifice",
+                  "startOffset": "103.400s",
+                  "endOffset": "104s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "104s",
+                  "endOffset": "104.100s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "104.100s",
+                  "endOffset": "104.200s"
+                },
+                {
+                  "word": "Christians",
+                  "startOffset": "104.200s",
+                  "endOffset": "104.800s"
+                },
+                {
+                  "word": "whom",
+                  "startOffset": "105.100s",
+                  "endOffset": "105.200s"
+                },
+                {
+                  "word": "they",
+                  "startOffset": "105.200s",
+                  "endOffset": "105.400s"
+                },
+                {
+                  "word": "regarded",
+                  "startOffset": "105.400s",
+                  "endOffset": "105.900s"
+                },
+                {
+                  "word": "as",
+                  "startOffset": "105.900s",
+                  "endOffset": "106s"
+                },
+                {
+                  "word": "having",
+                  "startOffset": "106s",
+                  "endOffset": "106.300s"
+                },
+                {
+                  "word": "brought",
+                  "startOffset": "106.300s",
+                  "endOffset": "106.600s"
+                },
+                {
+                  "word": "down",
+                  "startOffset": "106.600s",
+                  "endOffset": "106.800s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "106.800s",
+                  "endOffset": "107s"
+                },
+                {
+                  "word": "anger",
+                  "startOffset": "107s",
+                  "endOffset": "107.300s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "107.300s",
+                  "endOffset": "107.300s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "107.300s",
+                  "endOffset": "107.400s"
+                },
+                {
+                  "word": "gods.",
+                  "startOffset": "107.400s",
+                  "endOffset": "107.800s"
+                },
+                {
+                  "word": "Aurelius",
+                  "startOffset": "109.100s",
+                  "endOffset": "109.600s"
+                },
+                {
+                  "word": "seems",
+                  "startOffset": "109.600s",
+                  "endOffset": "109.900s"
+                },
+                {
+                  "word": "to",
+                  "startOffset": "109.900s",
+                  "endOffset": "110s"
+                },
+                {
+                  "word": "have",
+                  "startOffset": "110s",
+                  "endOffset": "110.200s"
+                },
+                {
+                  "word": "shared",
+                  "startOffset": "110.200s",
+                  "endOffset": "110.500s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "110.500s",
+                  "endOffset": "110.600s"
+                },
+                {
+                  "word": "panic,",
+                  "startOffset": "110.600s",
+                  "endOffset": "111s"
+                },
+                {
+                  "word": "and",
+                  "startOffset": "111.400s",
+                  "endOffset": "111.500s"
+                },
+                {
+                  "word": "his",
+                  "startOffset": "111.500s",
+                  "endOffset": "111.600s"
+                },
+                {
+                  "word": "record",
+                  "startOffset": "111.600s",
+                  "endOffset": "112.200s"
+                },
+                {
+                  "word": "it's",
+                  "startOffset": "112.400s",
+                  "endOffset": "112.700s"
+                },
+                {
+                  "word": "stained",
+                  "startOffset": "112.700s",
+                  "endOffset": "113.100s"
+                },
+                {
+                  "word": "by",
+                  "startOffset": "113.100s",
+                  "endOffset": "113.200s"
+                },
+                {
+                  "word": "his",
+                  "startOffset": "113.200s",
+                  "endOffset": "113.400s"
+                },
+                {
+                  "word": "sanction",
+                  "startOffset": "113.400s",
+                  "endOffset": "113.800s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "113.800s",
+                  "endOffset": "113.900s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "113.900s",
+                  "endOffset": "114s"
+                },
+                {
+                  "word": "cruel",
+                  "startOffset": "114s",
+                  "endOffset": "114.300s"
+                },
+                {
+                  "word": "persecution.",
+                  "startOffset": "114.300s",
+                  "endOffset": "115.200s"
+                },
+                {
+                  "word": "This",
+                  "startOffset": "116.200s",
+                  "endOffset": "116.400s"
+                },
+                {
+                  "word": "incident",
+                  "startOffset": "116.400s",
+                  "endOffset": "116.900s"
+                },
+                {
+                  "word": "in",
+                  "startOffset": "116.900s",
+                  "endOffset": "117s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "117s",
+                  "endOffset": "117.100s"
+                },
+                {
+                  "word": "career",
+                  "startOffset": "117.100s",
+                  "endOffset": "117.700s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "117.700s",
+                  "endOffset": "117.800s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "117.800s",
+                  "endOffset": "118s"
+                },
+                {
+                  "word": "last",
+                  "startOffset": "118s",
+                  "endOffset": "118.400s"
+                },
+                {
+                  "word": "and",
+                  "startOffset": "118.400s",
+                  "endOffset": "118.600s"
+                },
+                {
+                  "word": "one",
+                  "startOffset": "118.600s",
+                  "endOffset": "118.800s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "118.800s",
+                  "endOffset": "118.800s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "118.800s",
+                  "endOffset": "119s"
+                },
+                {
+                  "word": "loftiest",
+                  "startOffset": "119s",
+                  "endOffset": "119.600s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "119.600s",
+                  "endOffset": "119.700s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "119.700s",
+                  "endOffset": "119.800s"
+                },
+                {
+                  "word": "pagan",
+                  "startOffset": "119.800s",
+                  "endOffset": "120.200s"
+                },
+                {
+                  "word": "moralists",
+                  "startOffset": "120.200s",
+                  "endOffset": "120.900s"
+                },
+                {
+                  "word": "may",
+                  "startOffset": "120.900s",
+                  "endOffset": "121.100s"
+                },
+                {
+                  "word": "be",
+                  "startOffset": "121.100s",
+                  "endOffset": "121.300s"
+                },
+                {
+                  "word": "regarded",
+                  "startOffset": "121.300s",
+                  "endOffset": "121.900s"
+                },
+                {
+                  "word": "as",
+                  "startOffset": "121.900s",
+                  "endOffset": "122.100s"
+                },
+                {
+                  "word": "symbolic",
+                  "startOffset": "122.100s",
+                  "endOffset": "122.600s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "122.600s",
+                  "endOffset": "122.800s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "122.800s",
+                  "endOffset": "122.900s"
+                },
+                {
+                  "word": "dying",
+                  "startOffset": "122.900s",
+                  "endOffset": "123.300s"
+                },
+                {
+                  "word": "effort",
+                  "startOffset": "123.300s",
+                  "endOffset": "123.700s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "123.700s",
+                  "endOffset": "123.800s"
+                },
+                {
+                  "word": "heathenism",
+                  "startOffset": "123.800s",
+                  "endOffset": "124.500s"
+                },
+                {
+                  "word": "to",
+                  "startOffset": "125.500s",
+                  "endOffset": "125.600s"
+                },
+                {
+                  "word": "check",
+                  "startOffset": "125.600s",
+                  "endOffset": "126s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "126s",
+                  "endOffset": "126.100s"
+                },
+                {
+                  "word": "advancing",
+                  "startOffset": "126.100s",
+                  "endOffset": "126.600s"
+                },
+                {
+                  "word": "tide",
+                  "startOffset": "126.600s",
+                  "endOffset": "126.800s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "126.800s",
+                  "endOffset": "126.900s"
+                },
+                {
+                  "word": "Christianity.",
+                  "startOffset": "126.900s",
+                  "endOffset": "127.700s"
+                },
+                {
+                  "word": "The",
+                  "startOffset": "128.600s",
+                  "endOffset": "128.700s"
+                },
+                {
+                  "word": "Meditations",
+                  "startOffset": "128.700s",
+                  "endOffset": "129.600s"
+                },
+                {
+                  "word": "picture",
+                  "startOffset": "129.600s",
+                  "endOffset": "130s"
+                },
+                {
+                  "word": "with",
+                  "startOffset": "130s",
+                  "endOffset": "130.200s"
+                },
+                {
+                  "word": "faithfulness",
+                  "startOffset": "130.200s",
+                  "endOffset": "131s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "131.100s",
+                  "endOffset": "131.200s"
+                },
+                {
+                  "word": "mind",
+                  "startOffset": "131.200s",
+                  "endOffset": "131.600s"
+                },
+                {
+                  "word": "and",
+                  "startOffset": "131.600s",
+                  "endOffset": "131.800s"
+                },
+                {
+                  "word": "character",
+                  "startOffset": "131.800s",
+                  "endOffset": "132.300s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "132.300s",
+                  "endOffset": "132.400s"
+                },
+                {
+                  "word": "this",
+                  "startOffset": "132.400s",
+                  "endOffset": "132.600s"
+                },
+                {
+                  "word": "noblest",
+                  "startOffset": "132.600s",
+                  "endOffset": "133s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "133s",
+                  "endOffset": "133.100s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "133.100s",
+                  "endOffset": "133.300s"
+                },
+                {
+                  "word": "emperors.",
+                  "startOffset": "133.300s",
+                  "endOffset": "133.800s"
+                },
+                {
+                  "word": "Simple",
+                  "startOffset": "134.600s",
+                  "endOffset": "134.900s"
+                },
+                {
+                  "word": "in",
+                  "startOffset": "134.900s",
+                  "endOffset": "135s"
+                },
+                {
+                  "word": "style",
+                  "startOffset": "135s",
+                  "endOffset": "135.900s"
+                },
+                {
+                  "word": "and",
+                  "startOffset": "135.900s",
+                  "endOffset": "136s"
+                },
+                {
+                  "word": "sincere",
+                  "startOffset": "136s",
+                  "endOffset": "136.500s"
+                },
+                {
+                  "word": "in",
+                  "startOffset": "136.500s",
+                  "endOffset": "136.600s"
+                },
+                {
+                  "word": "tone,",
+                  "startOffset": "136.600s",
+                  "endOffset": "137.200s"
+                },
+                {
+                  "word": "they",
+                  "startOffset": "137.200s",
+                  "endOffset": "137.300s"
+                },
+                {
+                  "word": "record",
+                  "startOffset": "137.300s",
+                  "endOffset": "137.800s"
+                },
+                {
+                  "word": "for",
+                  "startOffset": "137.800s",
+                  "endOffset": "138s"
+                },
+                {
+                  "word": "all",
+                  "startOffset": "138s",
+                  "endOffset": "138.100s"
+                },
+                {
+                  "word": "time",
+                  "startOffset": "138.100s",
+                  "endOffset": "138.600s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "139s",
+                  "endOffset": "139.100s"
+                },
+                {
+                  "word": "height",
+                  "startOffset": "139.100s",
+                  "endOffset": "139.400s"
+                },
+                {
+                  "word": "reached",
+                  "startOffset": "139.400s",
+                  "endOffset": "139.700s"
+                },
+                {
+                  "word": "by",
+                  "startOffset": "139.700s",
+                  "endOffset": "139.900s"
+                },
+                {
+                  "word": "pagan",
+                  "startOffset": "139.900s",
+                  "endOffset": "140.300s"
+                },
+                {
+                  "word": "aspirations",
+                  "startOffset": "140.300s",
+                  "endOffset": "141s"
+                },
+                {
+                  "word": "in",
+                  "startOffset": "141.400s",
+                  "endOffset": "141.600s"
+                },
+                {
+                  "word": "its",
+                  "startOffset": "141.600s",
+                  "endOffset": "141.800s"
+                },
+                {
+                  "word": "effort",
+                  "startOffset": "141.800s",
+                  "endOffset": "142.100s"
+                },
+                {
+                  "word": "to",
+                  "startOffset": "142.100s",
+                  "endOffset": "142.200s"
+                },
+                {
+                  "word": "solve",
+                  "startOffset": "142.200s",
+                  "endOffset": "142.600s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "142.600s",
+                  "endOffset": "142.700s"
+                },
+                {
+                  "word": "problem",
+                  "startOffset": "142.700s",
+                  "endOffset": "143.100s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "143.100s",
+                  "endOffset": "143.200s"
+                },
+                {
+                  "word": "conduct,",
+                  "startOffset": "143.200s",
+                  "endOffset": "143.800s"
+                },
+                {
+                  "word": "and",
+                  "startOffset": "144.400s",
+                  "endOffset": "144.500s"
+                },
+                {
+                  "word": "the",
+                  "startOffset": "144.500s",
+                  "endOffset": "144.600s"
+                },
+                {
+                  "word": "essential",
+                  "startOffset": "144.600s",
+                  "endOffset": "145.100s"
+                },
+                {
+                  "word": "agreement",
+                  "startOffset": "145.100s",
+                  "endOffset": "145.600s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "145.600s",
+                  "endOffset": "145.700s"
+                },
+                {
+                  "word": "his",
+                  "startOffset": "145.700s",
+                  "endOffset": "145.900s"
+                },
+                {
+                  "word": "practice",
+                  "startOffset": "145.900s",
+                  "endOffset": "146.500s"
+                },
+                {
+                  "word": "with",
+                  "startOffset": "146.800s",
+                  "endOffset": "147s"
+                },
+                {
+                  "word": "his",
+                  "startOffset": "147s",
+                  "endOffset": "147.200s"
+                },
+                {
+                  "word": "teaching",
+                  "startOffset": "147.200s",
+                  "endOffset": "147.700s"
+                },
+                {
+                  "word": "proved",
+                  "startOffset": "147.700s",
+                  "endOffset": "148.300s"
+                },
+                {
+                  "word": "that",
+                  "startOffset": "148.300s",
+                  "endOffset": "148.600s"
+                },
+                {
+                  "word": "even",
+                  "startOffset": "149s",
+                  "endOffset": "149.200s"
+                },
+                {
+                  "word": "in",
+                  "startOffset": "149.200s",
+                  "endOffset": "149.400s"
+                },
+                {
+                  "word": "a",
+                  "startOffset": "149.400s",
+                  "endOffset": "149.400s"
+                },
+                {
+                  "word": "palace",
+                  "startOffset": "149.400s",
+                  "endOffset": "150s"
+                },
+                {
+                  "word": "life",
+                  "startOffset": "150s",
+                  "endOffset": "150.300s"
+                },
+                {
+                  "word": "may",
+                  "startOffset": "150.300s",
+                  "endOffset": "150.400s"
+                },
+                {
+                  "word": "be",
+                  "startOffset": "150.400s",
+                  "endOffset": "150.600s"
+                },
+                {
+                  "word": "led",
+                  "startOffset": "150.600s",
+                  "endOffset": "150.800s"
+                },
+                {
+                  "word": "well.",
+                  "startOffset": "150.800s",
+                  "endOffset": "151.100s"
+                },
+                {
+                  "word": "End",
+                  "startOffset": "152.400s",
+                  "endOffset": "152.600s"
+                },
+                {
+                  "word": "of",
+                  "startOffset": "152.600s",
+                  "endOffset": "152.800s"
+                },
+                {
+                  "word": "Introduction.",
+                  "startOffset": "152.800s",
+                  "endOffset": "153.400s"
+                },
+                {
+                  "word": "Recording",
+                  "startOffset": "154.500s",
+                  "endOffset": "155s"
+                },
+                {
+                  "word": "by",
+                  "startOffset": "155s",
+                  "endOffset": "155.100s"
+                },
+                {
+                  "word": "Shane",
+                  "startOffset": "155.100s",
+                  "endOffset": "155.500s"
+                },
+                {
+                  "word": "Greenup.",
+                  "startOffset": "155.500s",
+                  "endOffset": "155.800s"
+                },
+                {
+                  "word": "shanegreenup.blogspot.com",
+                  "startOffset": "156.600s",
+                  "endOffset": "158.600s"
+                },
+                {
+                  "word": "and",
+                  "startOffset": "158.800s",
+                  "endOffset": "159s"
+                },
+                {
+                  "word": "papersallowed.com",
+                  "startOffset": "159s",
+                  "endOffset": "160.100s"
+                }
+              ]
+            }
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "index": 0
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 4186,
+    "candidatesTokenCount": 516,
+    "totalTokenCount": 4702,
+    "promptTokensDetails": [
+      {
+        "modality": "AUDIO",
+        "tokenCount": 4186
+      }
+    ],
+    "serviceTier": "standard"
+  },
+  "modelVersion": "gemini-3.5-transcribe",
+  "responseId": "LVMIa4LGM7GFytMP_vjSkAU"
+}

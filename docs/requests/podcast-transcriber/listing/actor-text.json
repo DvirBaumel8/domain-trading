@@ -1,0 +1,7 @@
+{
+  "name": "podcast-transcriber",
+  "title": "Podcast Transcriber: RSS Feeds to Text, SRT and Summary",
+  "description": "Turn podcast episodes into text. Paste a podcast RSS feed, an Apple Podcasts link or a direct audio file URL and get the transcript with timestamps, SRT and VTT subtitles, and optionally a summary, chapters and key quotes. If the publisher already ships a transcript in the feed, it is used first, so you do not pay for speech-to-text twice. Public RSS audio only: no YouTube, no Spotify, no private or paid feeds.",
+  "seoTitle": "Podcast Transcript Scraper: RSS to Text, SRT, Summary",
+  "seoDescription": "Transcribe podcast episodes from an RSS feed or audio URL. Get text, timestamps, SRT/VTT, speakers, summary and chapters. Public feeds only."
+}

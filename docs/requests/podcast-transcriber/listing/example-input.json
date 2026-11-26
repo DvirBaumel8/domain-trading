@@ -1,0 +1,11 @@
+{
+  "sources": [
+    "https://www.archive.org/download/meditations_0708_librivox/meditations_00_marcusaurelius_64kb.mp3"
+  ],
+  "maxEpisodesPerFeed": 1,
+  "language": "auto",
+  "preferPublisherTranscript": true,
+  "addOns": ["summary", "chapters"],
+  "outputFormats": ["txt", "srt"],
+  "confirmRights": true
+}
