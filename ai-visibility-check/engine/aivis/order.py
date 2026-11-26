@@ -50,7 +50,7 @@ class Order:
     website: str = ""
     plan: str = "check"          # check | lean | free
     engines: list = field(default_factory=lambda: list(PAID_ENGINES))
-    paid_ref: str = ""           # payment reference (PayPal txn id), filled by the operator
+    paid_ref: str = ""           # payment reference (Polar order id), filled by the operator
     competitors: list = field(default_factory=list)
 
     @staticmethod
