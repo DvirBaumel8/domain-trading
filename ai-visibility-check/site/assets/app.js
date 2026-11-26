@@ -39,11 +39,22 @@
     }
   });
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+  function namesHtml(n){
+    if (!n) return "";
+    let h = `<h4 style="margin:14px 0 4px">${esc(n.heading)}</h4>`;
+    if (n.answers) h += `<p class="small">Your business: ${n.named_in ? "named in " + n.named_in + " of " + n.answers + " answers" : "not named"}.</p>`;
+    if (n.names && n.names.length) {
+      h += "<ul class='small' style='margin:4px 0 4px 18px'>" + n.names.map(x =>
+        `<li>${esc(x.name)} — ${x.answers} of ${n.answers} answers${x.match ? " (" + esc(x.match) + ")" : ""}</li>`).join("") + "</ul>";
+    } else { h += `<p class="small">${esc(n.empty_note || "The AI did not name any businesses in its answers.")}</p>`; }
+    return h + `<p class="small">${esc(n.register_note || "")}</p>`;
+  }
   function render(j, d){
     if (j.status === "instant") {
       return `<h3 style="margin-top:0">${esc(d.business)}: named in <span style="color:${j.named_in? '#059669':'#b91c1c'}">${j.named_in} of ${j.answers}</span> AI answers</h3>
       <p>In our latest free test for <b>${esc(j.niche_label)} in ${esc(j.city)}</b>, AI named <b>${j.competitors}</b> other local businesses.
       ${j.unverified_pct}% of the names it gave did not match the official register.</p>
+      ${namesHtml(j.names)}
       <p class="small">Free quick check: ${esc(j.source_note)} The full $149 report asks the major AI assistants many more questions, several times, and lists every competitor and fix.</p>
       <a class="btn" data-pay="payLinkCheck" href="#pricing">Get the full report — $149</a>`;
     }
@@ -59,8 +70,9 @@
     const t = setInterval(async () => {
       if (Date.now() - started > 5 * 60 * 1000) { return stop(t, "<p>This is taking longer than expected. Please try again in a few minutes.</p>"); }
       try { const r = await fetch((C.apiBase||"") + "/api/check/" + p.dataset.id); const j = await r.json();
-        if (j.status === "done") { stop(t, `<p><b>Done.</b> Named in ${j.named_in} of ${j.answers} answers. <a href="${j.report}" target="_blank">Open your free result</a></p>`); }
-        if (j.status === "failed") { stop(t, "<p>Sorry, the free model didn't answer. We saved your request.</p>"); }
+        if (j.status === "done") { stop(t, `<p><b>Done.</b> Named in ${j.named_in} of ${j.answers} answers. <a href="${esc(j.report)}" target="_blank">Open your free result</a></p>${namesHtml(j.names)}`); }
+        if (j.status === "partial") { stop(t, `<p><b>${esc(j.message)}</b> This is not a reliable check, so we are not showing a score. <a href="${esc(j.report)}" target="_blank">Open the partial result</a></p>${namesHtml(j.names)}`); }
+        if (j.status === "failed") { stop(t, `<p>${esc(j.message || "We could not get answers from the AI model right now. Please try again in a few minutes.")} We saved your request.</p>`); }
         if (j.status === "unknown") { stop(t, "<p>This check expired. Please run it again.</p>"); }
       } catch(e) {}
     }, 5000);

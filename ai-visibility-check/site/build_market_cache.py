@@ -15,7 +15,8 @@ a = ap.parse_args()
 niche = get_niche(a.niche)
 roster = [e.name for e in from_csv(a.roster)]
 res = result_from_saved(niche, a.city, "__none__", json.load(open(a.answers)), roster)
-answers = [{"names": [m.roster_name or m.raw for m in ms], "raw": [m.raw for m in ms]} for _, ms, _ in res.records]
+answers = [{"names": [m.roster_name or m.raw for m in ms], "raw": [m.raw for m in ms],
+            "matched": [m.verified for m in ms]} for _, ms, _ in res.records]
 allm = [m for _, ms, _ in res.records for m in ms]
 unv = sum(1 for m in allm if not m.verified)
 data = {"niche": a.niche, "niche_label": niche.plural, "city": a.city, "answers": answers,

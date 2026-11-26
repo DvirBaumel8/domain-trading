@@ -13,6 +13,12 @@ GENERIC = {"here are some options", "good options include", "note", "tips", "sum
            "always check recent reviews", "why", "pros", "cons", "location", "phone", "website",
            "services", "reviews", "address", "hours", "key features", "highlights", "price", "pricing"}
 LEAD = re.compile(r"^\s*(?:\d+[.)]|[-*•–]|#{1,4})\s+")
+# lines where the model says it does not know: never a business name
+NOT_SURE = re.compile(r"\b(not sure|unsure|don'?t know|do not know|cannot (?:verify|confirm|provide|find)|can'?t "
+                      r"(?:verify|confirm|provide|find)|unable to|no (?:specific |reliable |known )?(?:information|"
+                      r"businesses|record)|as an ai|i(?: am|'m) not|i have no|no way to|say so instead|"
+                      r"instead of guessing|not aware of|could not find|couldn'?t find|does not exist|may not exist|"
+                      r"might not exist|i apologi[sz]e|sorry)\b", re.I)
 BOLD = re.compile(r"\*\*([^*]{2,80})\*\*")
 
 
@@ -52,8 +58,8 @@ def extract_candidates(text: str) -> list:
             continue
         bolds = BOLD.findall(line)
         if bolds:
-            out.extend(_clean_candidate(b) for b in bolds)
-        elif LEAD.match(line):
+            out.extend(_clean_candidate(b) for b in bolds if not NOT_SURE.search(b))
+        elif LEAD.match(line) and not NOT_SURE.search(line):
             out.append(_clean_candidate(LEAD.sub("", line)))
     seen, res = set(), []
     for c in out:

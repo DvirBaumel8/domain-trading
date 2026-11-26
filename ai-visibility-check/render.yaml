@@ -16,3 +16,5 @@ services:
         value: "1"
       - key: PYTHONUNBUFFERED
         value: "1"
+      - key: AVC_TEST_BYPASS_TOKEN   # internal testing only; set in the Render dashboard, never here
+        sync: false

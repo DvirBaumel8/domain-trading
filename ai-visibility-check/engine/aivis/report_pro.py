@@ -13,6 +13,7 @@ import string
 
 from .niches import niche_label
 from .report import GRADE_LABEL
+from . import names as names_mod
 
 E = html.escape
 
@@ -66,7 +67,7 @@ def _vendor(provider):
 
 
 def render(result, sample=False, anonymize=False, brand="AI Visibility Check", target_label=None,
-           run_note="", date=None) -> str:
+           run_note="", date=None, register=None, partial_note="") -> str:
     s = result.score
     target = result.target
     tlabel = target_label or target
@@ -107,6 +108,8 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
     h.append(f"<div class='brand'><i></i>{E(brand.upper())}</div>")
     h.append(f"<h1>{E(tlabel)}</h1><div class='sub'>{E(niche_label(result.niche.label))} · {E(result.city)} · "
              f"{len(result.prompts)} customer questions · {s.total_answers} AI answers · {E(date)}</div>")
+    if partial_note:
+        h.append("<div class='notice'><b>" + E(partial_note) + "</b> Do not rely on these numbers.</div>")
     if sample:
         h.append("<div class='notice'><b>This is a sample report.</b> " + E(run_note) +
                  (" Business names are hidden on this public sample." if anonymize else "") +
@@ -137,6 +140,8 @@ def render(result, sample=False, anonymize=False, brand="AI Visibility Check", t
         h.append("</table>")
     else:
         h.append("<p class='sub'>none found</p>")
+    if register:                     # the free check lists the names the AI gave (never as competitors)
+        h.append(names_mod.to_html(names_mod.from_records(result.records, target, result.city, register)))
     ex = next(((a.prompt, FREE_MODEL if a.provider == "pollinations" else a.provider,
                 [(m.roster_name or m.raw).strip() for m in ms][:5]) for a, ms, _ in result.records
                if ms and target not in [m.roster_name for m in ms]), None)

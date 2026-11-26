@@ -3,7 +3,11 @@ from dataclasses import dataclass, field
 
 
 class ProviderError(RuntimeError):
-    pass
+    """A question could not be answered. `reason` is a short code (never user text or a response body)."""
+
+    def __init__(self, message="", reason="error"):
+        super().__init__(message)
+        self.reason = reason
 
 
 @dataclass
