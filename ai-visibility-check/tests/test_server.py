@@ -23,6 +23,45 @@ def sign(body, mid="evt1", ts=None, secret="test-secret"):
     return {"webhook-id": mid, "webhook-timestamp": ts, "webhook-signature": "v1," + base64.b64encode(mac).decode()}
 
 
+class VerifyPolarKeyTests(unittest.TestCase):
+    """Signatures built independently of server.verify_polar's key derivation."""
+    RAW = b"\x01\x02standard-webhooks-raw-key\xfe\xff"
+    SECRET = "whsec_" + base64.b64encode(RAW).decode()
+    BODY = b'{"type":"order.paid","data":{}}'
+
+    def hdrs(self, key, ts=None, body=None):
+        ts = str(int(ts or time.time()))
+        mac = hmac.new(key, b"msg1." + ts.encode() + b"." + (body or self.BODY), hashlib.sha256).digest()
+        return {"webhook-id": "msg1", "webhook-timestamp": ts, "webhook-signature": "v1," + base64.b64encode(mac).decode()}
+
+    def test_standard_base64_key_verifies(self):
+        self.assertTrue(server.verify_polar(self.SECRET, self.hdrs(self.RAW), self.BODY))
+
+    def test_legacy_utf8_key_verifies(self):
+        self.assertTrue(server.verify_polar(self.SECRET, self.hdrs(self.SECRET.encode("utf-8")), self.BODY))
+
+    def test_signature_list_with_other_versions(self):
+        h = self.hdrs(self.RAW)
+        h["webhook-signature"] = "v1,AAAA v2,zzzz " + h["webhook-signature"]
+        self.assertTrue(server.verify_polar(self.SECRET, h, self.BODY))
+
+    def test_wrong_secret_rejected(self):
+        self.assertFalse(server.verify_polar(self.SECRET, self.hdrs(b"some-other-key"), self.BODY))
+        other = "whsec_" + base64.b64encode(b"different").decode()
+        self.assertFalse(server.verify_polar(other, self.hdrs(self.RAW), self.BODY))
+
+    def test_old_timestamp_rejected(self):
+        self.assertFalse(server.verify_polar(self.SECRET, self.hdrs(self.RAW, ts=time.time() - 3600), self.BODY))
+
+    def test_tampered_body_rejected(self):
+        self.assertFalse(server.verify_polar(self.SECRET, self.hdrs(self.RAW), self.BODY + b" "))
+
+    def test_invalid_base64_secret_falls_back_without_error(self):
+        s = "whsec_not*base64!"
+        self.assertTrue(server.verify_polar(s, self.hdrs(s.encode()), self.BODY))
+        self.assertFalse(server.verify_polar(s, self.hdrs(b"x"), self.BODY))
+
+
 class Base(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

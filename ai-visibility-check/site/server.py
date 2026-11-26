@@ -164,9 +164,21 @@ def verify_polar(secret, headers, body):
             return False
     except ValueError:
         return False
-    mac = hmac.new(secret.encode(), f"{mid}.{ts}.".encode() + body, hashlib.sha256).digest()
-    want = base64.b64encode(mac).decode()
-    return any(hmac.compare_digest(want, c.split(",", 1)[1]) for c in sig.split() if c.startswith("v1,"))
+    keys = []
+    if secret.startswith("whsec_"):          # Standard Webhooks: key is the base64-decoded part after the prefix
+        try:
+            keys.append(base64.b64decode(secret[len("whsec_"):]))
+        except ValueError:
+            pass
+    keys.append(secret.encode("utf-8"))      # legacy: the secret string itself
+    msg = f"{mid}.{ts}.".encode() + body
+    sigs = [c.split(",", 1)[1] for c in sig.split() if c.startswith("v1,")]
+    ok = False
+    for key in keys:
+        want = base64.b64encode(hmac.new(key, msg, hashlib.sha256).digest()).decode()
+        for s in sigs:
+            ok = hmac.compare_digest(want, s) or ok
+    return ok
 
 
 def mark_paid(store, oid, ref):
