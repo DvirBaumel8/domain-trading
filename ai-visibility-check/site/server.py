@@ -28,6 +28,9 @@ from aivis.uscities import is_us_place  # noqa: E402
 from site_config import BUSINESS_ADDRESS, SUPPORT_EMAIL    # noqa: E402
 import delivery                             # noqa: E402
 import products                             # noqa: E402
+import discovery                            # noqa: E402
+import refs                                 # noqa: E402
+import cities                               # noqa: E402
 import html as _html
 
 DATA = os.path.join(HERE, "data")
@@ -58,9 +61,10 @@ PUBLIC_DIRS = {"assets": {".css", ".js", ".png"}}   # direct children only, thes
 LOCAL_ORDERS = os.environ.get("ORDERS_LOCAL_DIR") or os.path.join(HERE, "..", "private-orders")
 
 
-def render_page(raw):
-    """Fill the {{BUSINESS_ADDRESS}} token of a static HTML page from site_config."""
-    return render_addon_buttons(raw).replace(b"{{BUSINESS_ADDRESS}}", _html.escape(BUSINESS_ADDRESS).encode())
+def render_page(raw, origin=""):
+    """Fill the {{BUSINESS_ADDRESS}} token (and the discovery tokens) of an HTML page; add-on buttons follow ADDONS_CHECKOUT."""
+    raw = discovery.fill_tokens(render_addon_buttons(raw), origin)
+    return raw.replace(b"{{BUSINESS_ADDRESS}}", _html.escape(BUSINESS_ADDRESS).encode())
 
 
 ADDON_BUTTON = re.compile(r'<a class="btn ghost" data-pay="(payLinkMaps|payLinkListingsCheck|payLinkListings|payLinkContent|payLinkBundle)" href="#pricing">[^<]*</a>')
@@ -824,7 +828,7 @@ def new_order(d, req):
     typed = clean_ref(d.get("paid_ref", ""))
     intake = {"order_id": oid, "business_name": req["business"], "city": req["city"],
               "niche": req["niche"], "email": req["email"], "website": req["website"],
-              "token": token, "plan": "check", "order_type": "base", "paid_ref": str(d.get("paid_ref", ""))[:60],
+              "token": token, "plan": "check", "order_type": "base", "ref": refs.clean_ref(d.get("ref")), "paid_ref": str(d.get("paid_ref", ""))[:60],
               "paid": False, "created_at": now().isoformat(timespec="seconds"),
               "competitors": [c.strip()[:120] for c in str(d.get("competitors", "")).split(",") if c.strip()][:5]}
     store.put(f"orders/{oid}.json", intake)
@@ -899,6 +903,13 @@ def save_lead(obj):
 
 def free_report_path(fid):
     return f"free/{fid}/report.html"
+
+
+def save_line(path, obj):
+    """Append one JSON line to a local file under DATA. Only the page-hit log uses it (no requests, no leads)."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with LOCK, open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(obj) + "\n")
 
 
 def clean(d):
@@ -1074,10 +1085,15 @@ class H(http.server.BaseHTTPRequestHandler):
             self.send_header(k, v)
         super().end_headers()
 
-    def _send(self, code, ctype, body, private=False, robots="noindex, nofollow", no_store=False):
+    def _origin(self):
+        return discovery.public_origin(self.headers.get("Host"), self.headers.get("X-Forwarded-Proto"))
+
+    def _send(self, code, ctype, body, private=False, robots="noindex, nofollow", no_store=False, cache=False):
         self.send_response(code); self.send_header("Content-Type", ctype)
         if no_store and not private:
             self.send_header("Cache-Control", "no-store")
+        elif cache:
+            self.send_header("Cache-Control", "public, max-age=3600")
         if private:
             for k, v in (("X-Robots-Tag", robots), ("Cache-Control", "no-store"),
                          ("Referrer-Policy", "no-referrer")):
@@ -1117,7 +1133,26 @@ class H(http.server.BaseHTTPRequestHandler):
         if path in ("/health", "/healthz"):
             return self._json(200, health())
         if path == "/robots.txt":
-            return self._send(200, "text/plain", b"User-agent: *\nAllow: /\nDisallow: /data/\nDisallow: /api/\nDisallow: /r/\nDisallow: /status/\nDisallow: /free/\n")
+            return self._send(200, "text/plain; charset=utf-8", discovery.robots_txt(self._origin()).encode(), cache=True)
+        if path == "/sitemap.xml":
+            return self._send(200, "application/xml; charset=utf-8", discovery.sitemap_xml(self._origin()).encode(), cache=True)
+        if path == "/llms.txt":
+            return self._send(200, "text/plain; charset=utf-8", discovery.llms_txt(self._origin()).encode(), cache=True)
+        if path == "/for" or path.startswith("/for/"):     # trade pages: allow-listed slugs only
+            m = re.fullmatch(r"/for/([a-z0-9-]{1,80})", path)
+            page = discovery.trade_page(m.group(1), self._origin()) if m else None
+            if page is None:
+                return self._json(404, {"error": "not found"})
+            refs.record_page(self.path, path, DATA, save_line)
+            return self._send(200, "text/html; charset=utf-8", render_page(page, self._origin()), cache=True)
+        r = cities.route(path, self.headers)
+        if r:
+            st, ctype, body = r
+            if st != 200:
+                return self._json(404, {"error": "not found"})
+            if ctype.startswith("text/html"):          # /city and /city/<slug>, not card.svg
+                refs.record_page(self.path, path, DATA, save_line)
+            return self._send(200, ctype, render_page(body, self._origin()) if ctype.startswith("text/html") else body)
         m = re.fullmatch(r"/api/check/([a-f0-9-]{36})", path)
         if m:
             prune_jobs()
@@ -1159,7 +1194,8 @@ class H(http.server.BaseHTTPRequestHandler):
         with open(f, "rb") as fh:
             body = fh.read()
         if f.endswith(".html"):
-            body = render_page(body)
+            body = render_page(body, self._origin())
+            refs.record_hit(self.path, f, HERE, DATA, save_line)
         return self._send(200, ctype, body)
 
     def do_POST(self):
@@ -1169,7 +1205,8 @@ class H(http.server.BaseHTTPRequestHandler):
                 code, obj = handle_polar(hdr, self._body(MAX_HOOK_BODY))
                 return self._json(code, obj)
             if self.path == "/api/check":
-                req = clean(self._form())
+                body = self._form()
+                req = clean(body)
                 ip = client_ip(self.headers, self.client_address[0])
                 r = instant(req)
                 bypass = bypass_ok(self.headers)
@@ -1177,7 +1214,8 @@ class H(http.server.BaseHTTPRequestHandler):
                     ip = "bypass"               # never counted against a real visitor's address
                 elif not admit_check(ip, FREE_RUN and not r):
                     return self._json(429, {"error": BUSY_MSG})
-                rec = {**req, "at": datetime.datetime.now().isoformat(timespec="seconds"), "ip": ip}
+                rec = {**req, "at": datetime.datetime.now().isoformat(timespec="seconds"), "ip": ip,
+                       "ref": refs.clean_ref(body.get("ref"))}
                 if bypass:
                     rec["bypass"] = True
                     log(f"bypass_used at={rec['at']} route=/api/check result={'instant' if r else 'free-run' if FREE_RUN else 'saved'}")
