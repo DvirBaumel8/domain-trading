@@ -20,10 +20,12 @@ class AuditResult:
     findings: list
     errors: list
     cost_usd: float
+    has_register: bool = False   # True only if names were checked against an NPI taxonomy or a roster
 
 
 def run_audit(niche, city, target, roster_names, providers, n_prompts=30, repeats=3, seed=0,
               signals=None, target_reviews=None, competitor_reviews=None, max_errors=10):
+    has_register = bool(niche.npi_taxonomy) or bool(roster_names)
     if target not in roster_names:
         roster_names = list(roster_names) + [target]
     prompts = generate_prompts(niche, city, n_prompts, seed)
@@ -42,7 +44,7 @@ def run_audit(niche, city, target, roster_names, providers, n_prompts=30, repeat
                 records.append((ans, find_mentions(ans.text, roster_names, city=city), p.intent))
     sc = score_audit(target, records)
     findings = build_findings(sc, niche, signals, target_reviews, competitor_reviews)
-    return AuditResult(niche, city, target, prompts, records, sc, findings, errors, cost)
+    return AuditResult(niche, city, target, prompts, records, sc, findings, errors, cost, has_register)
 
 
 def result_from_saved(niche, city, target, raw_answers, roster_names):
@@ -50,6 +52,7 @@ def result_from_saved(niche, city, target, raw_answers, roster_names):
     from .providers.base import Answer
     from .prompts import Prompt
     names = list(roster_names)
+    has_register = bool(niche.npi_taxonomy) or bool(names)
     if target not in names:
         names.append(target)
     records = []
@@ -62,4 +65,4 @@ def result_from_saved(niche, city, target, raw_answers, roster_names):
         p = Prompt(x["prompt"], x["intent"])
         if p not in prompts:
             prompts.append(p)
-    return AuditResult(niche, city, target, prompts, records, sc, build_findings(sc, niche), [], 0.0)
+    return AuditResult(niche, city, target, prompts, records, sc, build_findings(sc, niche), [], 0.0, has_register)

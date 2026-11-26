@@ -14,6 +14,8 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 
+from .parse import normalize
+
 
 @dataclass
 class RosterEntry:
@@ -27,15 +29,38 @@ class RosterEntry:
     npi: str = ""
 
 
+SUFFIX_UPPER = {"pllc", "llc", "pc", "pa", "dds", "dmd", "md", "llp", "lp", "dvm", "inc", "dmd", "do"}
+SMALL = {"and", "of", "the", "at", "in"}
+FILLER = {"center", "centre", "clinic", "clinics", "group", "practice", "office", "offices", "associates",
+          "care", "and", "the", "of"}
+
+
 def title_case(s: str) -> str:
-    small = {"and", "of", "the", "at", "in", "pllc", "llc", "pc", "pa", "dds", "dmd"}
     out = []
     for i, w in enumerate(s.lower().split()):
-        if w in small and i:
-            out.append(w.upper() if w in {"pllc", "llc", "pc", "pa", "dds", "dmd"} else w)
+        bare = w.strip(".,;")
+        if bare.replace(".", "") in SUFFIX_UPPER:
+            out.append(w.upper())
+        elif w in SMALL and i:
+            out.append(w)
         else:
             out.append(w[:1].upper() + w[1:])
     return " ".join(out)
+
+
+def _dedupe_key(name: str) -> str:
+    return " ".join(t for t in normalize(name).split() if t not in FILLER)
+
+
+def dedupe_names(names) -> list:
+    """Drop near-duplicates ('X Dental' vs 'X Dental Center PLLC'); keeps the first seen."""
+    seen, out = set(), []
+    for n in names:
+        k = _dedupe_key(n) or n.lower()
+        if k not in seen:
+            seen.add(k)
+            out.append(n)
+    return out
 
 
 def from_nppes(taxonomy: str, city: str, state: str, limit: int = 200, opener=None) -> list:
@@ -59,16 +84,21 @@ def from_nppes(taxonomy: str, city: str, state: str, limit: int = 200, opener=No
             break
         skip += 200
     # de-duplicate by name (chains file one NPI per location)
-    seen, uniq = set(), []
-    for e in out:
-        if e.name.lower() not in seen:
-            seen.add(e.name.lower())
-            uniq.append(e)
-    return uniq[:limit]
+    return _dedupe_entries(out)[:limit]
+
+
+def _dedupe_entries(entries) -> list:
+    keep = set(dedupe_names([e.name for e in entries]))
+    seen, out = set(), []
+    for e in entries:
+        if e.name in keep and e.name not in seen:
+            seen.add(e.name)
+            out.append(e)
+    return out
 
 
 def from_csv(path: str) -> list:
     with open(path, newline="", encoding="utf-8") as f:
-        return [RosterEntry(**{k: (row.get(k) or "").strip() for k in
+        return _dedupe_entries([RosterEntry(**{k: (row.get(k) or "").strip() for k in
                                ("name", "city", "state", "phone", "website", "email", "source")})
-                for row in csv.DictReader(f) if (row.get("name") or "").strip()]
+                for row in csv.DictReader(f) if (row.get("name") or "").strip()])

@@ -20,6 +20,7 @@ import zlib
 from dataclasses import dataclass, field, asdict
 
 from .audit import run_audit
+from . import signals as _signals
 from .niches import NICHES, get_niche
 from .providers import (REGISTRY, BudgetGuard, Business, MockProvider, PAID_COST_PER_CALL,
                         PollinationsProvider, ProviderError)
@@ -123,8 +124,15 @@ def run_order(order: Order, mode: str = "free", cap_usd: float = DEFAULT_CAP_USD
     guard = None
     if providers is None:
         providers, guard = build_providers(order, mode, cap_usd, roster, seed)
-    res = run_audit(get_niche(order.niche), order.city, order.business_name, roster or [], providers,
-                    n_prompts=n, repeats=r, seed=seed)
+    site = _signals.fetch_and_analyze(order.website, order.city) if order.website.strip() else None
+    names = list(roster or [])
+    low = {x.lower() for x in names}
+    for c in order.competitors:         # competitors the buyer watches are tracked by name
+        if c.strip() and c.strip().lower() not in low:
+            names.append(c.strip())
+            low.add(c.strip().lower())
+    res = run_audit(get_niche(order.niche), order.city, order.business_name, names, providers,
+                    n_prompts=n, repeats=r, seed=seed, signals=site)
     log.update({"finished": _dt.datetime.now().isoformat(timespec="seconds"),
                 "answers": res.score.total_answers, "errors": len(res.errors),
                 "spent_usd": round(guard.spent if guard else res.cost_usd, 4), "score": res.score.score})

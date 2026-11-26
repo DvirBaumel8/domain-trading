@@ -6,6 +6,8 @@ proven stable, cross-platform causal effect on being discovered).
 """
 from dataclasses import dataclass
 
+from .niches import niche_label
+
 
 @dataclass
 class Finding:
@@ -49,7 +51,7 @@ def build_findings(score, niche, signals=None, target_reviews=None, competitor_r
         if not signals.has_local_schema:
             f.append(Finding(
                 "No LocalBusiness-type structured data on your homepage.",
-                f"Add {niche.label.title().replace(' ', '')}/LocalBusiness JSON-LD with name, address, phone, hours.",
+                f"Add {niche_label(niche.label).replace(' ', '')}/LocalBusiness JSON-LD with name, address, phone, hours.",
                 "Correlated (17.2% vs 11.7% named, Cited Lens) but adding schema alone moved ChatGPT citations "
                 "+2.2% (not significant) in Ahrefs' 1,885-page controlled test.",
                 "hygiene", "low"))

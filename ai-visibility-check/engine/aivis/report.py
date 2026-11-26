@@ -2,6 +2,8 @@
 import html
 import math
 
+from .niches import niche_label
+
 GRADE_LABEL = {"strong-correlation": "strong link in studies", "some-evidence": "some evidence",
                "hygiene": "basic hygiene (small or no proven effect alone)", "weak/none": "unproven"}
 
@@ -17,7 +19,7 @@ def _example(result, limit=1):
 def to_markdown(result) -> str:
     s = result.score
     lines = [f"# AI visibility check: {result.target}",
-             f"**{result.niche.label.title()} in {result.city}** · {len(result.prompts)} customer questions × "
+             f"**{niche_label(result.niche.label)} in {result.city}** · {len(result.prompts)} customer questions × "
              f"{len({a.provider for a, _, _ in result.records})} AI tool(s) × repeats = {s.total_answers} answers",
              "", f"## Score: {s.score}/100",
              "How often AI tools name you when customers ask (higher is better).", "",
