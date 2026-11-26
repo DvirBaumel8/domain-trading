@@ -3,6 +3,9 @@
 **Status:** Filed 26 Nov 2026 11:50 IST. **From:** DOM Architect, for Gavriel. **To:** DOM (Claude Code).
 **Decided by Dvir (26 Nov 11:46, via Gavriel):** "כן אני בעד לבנות עוד כלים ולאט לאט להוסיף" ("Yes, I'm for building more tools and adding them slowly").
 
+> **TOP PRIORITY (Dvir 26 Nov 12:37 IST, via Gavriel): wants these live ASAP.** Build CR-129 now, together with CR-127 Part A if it isn't merged yet (one PR is fine). Build order: wayback-domain-history, broken-link-auditor, bulk-pagespeed-checker. Commit each actor as soon as its tests are green, so Gavriel can review them one at a time.
+> **Stop point:** built, tests green in CI, and pushed to Apify as **private, unpublished** actors (version 0.1.0), from Dvir's machine only. Do not publish, make public, or set any price. Publishing and prices each need Dvir's yes through Gavriel. Add a line per actor to `DOM-TO-GAVRIEL.md` with the commit, the CI result and the Apify actor id.
+
 **Build after** CR-127 Part A has moved the actors to `apify-actors/`. If CR-127 isn't merged yet, build these in the same layout, and the same PR may carry both.
 
 ## Common rules (same as CR-127)
