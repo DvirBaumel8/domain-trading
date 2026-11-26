@@ -25,6 +25,7 @@ from . import signals as _signals
 from .niches import NICHES, get_niche
 from .parse import match_name
 from . import config
+from .uscities import is_us_place
 from .providers import REGISTRY, BudgetGuard, Business, MockProvider, PollinationsProvider, ProviderError
 
 PAID_ENGINES = config.PAID_ENGINES
@@ -42,7 +43,7 @@ TIERS = {                        # prompts x repeats per engine
 US_STATES = frozenset("AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY "
                       "NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC".split())   # 50 states + DC
 US_ONLY_MSG = ("This check covers US businesses only. Enter your city as 'City, XX' with a US state code "
-               "(or DC), for example 'Austin, TX'.")
+               "(or DC) for a real US city, for example 'Austin, TX'.")
 
 
 class OrderError(RuntimeError):
@@ -50,9 +51,10 @@ class OrderError(RuntimeError):
 
 
 def city_is_us(city: str) -> bool:
-    """True only for 'City, XX' where XX is one of the 50 US state codes or DC (upper case)."""
-    m = re.fullmatch(r"[^,]+,\s*([A-Z]{2})", (city or "").strip())
-    return bool(m) and m.group(1) in US_STATES
+    """True only for 'City, XX' where XX is a US state code or DC (upper case) and the city is a real
+    US place in that state (offline Census Gazetteer list, case-insensitive; St./Saint, Ft./Fort handled)."""
+    m = re.fullmatch(r"([^,]+),\s*([A-Z]{2})", (city or "").strip())
+    return bool(m) and m.group(2) in US_STATES and is_us_place(m.group(1), m.group(2))
 
 
 def normalize_website(raw) -> str:
@@ -95,7 +97,8 @@ class Order:
         if not self.business_name.strip():
             raise OrderError("business_name is required")
         if not city_is_us(self.city):
-            raise OrderError("city must look like 'Austin, TX' with a US state code or DC (US only)")
+            raise OrderError("city must be a real US place written like 'Austin, TX' (US only; "
+                             f"'{self.city}' is not a US city in that state)")
         try:
             self.website = normalize_website(self.website)
         except ValueError as e:

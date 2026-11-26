@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT / "engine"))
 sys.path.insert(0, str(ROOT.parent / "docs" / "requests" / "avc-mock-run"))
 import fake_apis  # noqa: E402
 from aivis import config, order as order_mod  # noqa: E402
-from aivis.order import DEFAULT_CAP_USD, PAID_ENGINES, Order, run_order  # noqa: E402
+from aivis.order import DEFAULT_CAP_USD, PAID_ENGINES, Order, OrderError, run_order  # noqa: E402
 from aivis.providers import REGISTRY, BudgetGuard, ProviderError  # noqa: E402
 from aivis.report_pro import render  # noqa: E402
 from aivis.smoke import run_smoke  # noqa: E402
@@ -160,3 +160,14 @@ class SiteText(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UsCityTests(unittest.TestCase):
+    def test_engine_order_rejects_non_us_place(self):
+        from aivis.order import city_is_us
+        for c in ("Tel Aviv, IL", "London, UK", "Austin", "Austin, OH"):
+            self.assertFalse(city_is_us(c), c)
+        for c in ("Columbus, OH", "Austin, TX", "St. Louis, MO", "Saint Louis, MO", "Washington, DC", "Ft. Worth, TX"):
+            self.assertTrue(city_is_us(c), c)
+        with self.assertRaises(OrderError):
+            Order(order_id="X", business_name="B", city="Tel Aviv, IL", niche="plumber", plan="check").validate()

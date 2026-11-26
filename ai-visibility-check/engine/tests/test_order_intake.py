@@ -13,8 +13,16 @@ BASE = {"order_id": "ORD-261126-abc123", "business_name": "Acme Dental", "city":
 class CityTests(unittest.TestCase):
     def test_all_states_and_dc_accepted(self):
         self.assertEqual(len(US_STATES), 51)
+        from aivis import uscities
         for code in US_STATES:
-            Order.from_dict({**BASE, "city": f"Springfield, {code}"})
+            Order.from_dict({**BASE, "city": f"{sorted(uscities._load()[code])[0]}, {code}"})
+
+    def test_real_us_place_required(self):
+        for city in ("Tel Aviv, IL", "Austin, OH"):
+            with self.assertRaises(OrderError, msg=city):
+                Order.from_dict({**BASE, "city": city})
+        for city in ("Columbus, OH", "Austin, TX", "St. Louis, MO", "Washington, DC"):
+            Order.from_dict({**BASE, "city": city})
 
     def test_non_us_rejected(self):
         for city in ("London, UK", "Toronto, ON", "Austin, ZZ", "Austin, tx", "Austin"):

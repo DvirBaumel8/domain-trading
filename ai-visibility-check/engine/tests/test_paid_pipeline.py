@@ -14,7 +14,7 @@ import fake_apis
 from aivis import signals
 from aivis.audit import run_audit
 from aivis.niches import get_niche
-from aivis.order import Order, OrderError, run_order
+from aivis.order import Order, OrderError, TIERS, run_order
 from aivis.providers import BudgetGuard, ProviderError
 from aivis.providers.base import Provider
 from aivis.report_pro import render
@@ -126,8 +126,10 @@ class FakeVendors(unittest.TestCase):
         self.assertIn("openai", str(cm.exception))
 
     def test_healthy_run_still_produces_report(self):
-        res, log = self.run_paid(_order("F-OK"))
-        self.assertEqual(log["answers"], 240)
+        o = _order("F-OK")
+        res, log = self.run_paid(o)
+        n, r = TIERS[o.plan]
+        self.assertEqual(log["answers"], n * r * len(o.engines))   # 60 per engine: 180 for the default 3
         self.assertTrue(os.path.exists(os.path.join(self.folder("F-OK"), "report.html")))
 
     # item 6

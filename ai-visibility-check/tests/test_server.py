@@ -258,8 +258,20 @@ class OrderAndPolarTests(Base):
     def test_every_state_code_and_dc_accepted(self):
         from aivis.order import US_STATES
         self.assertEqual(len(US_STATES), 51); self.assertIn("DC", US_STATES)
+        from aivis import uscities
+        places = uscities._load()
         for code in sorted(US_STATES):
-            self.assertEqual(server.clean({**ORDER, "city": f"Springfield, {code}"})["city"], f"Springfield, {code}")
+            name = sorted(places[code])[0]              # any real place in that state
+            self.assertEqual(server.clean({**ORDER, "city": f"{name}, {code}"})["city"], f"{name.title()}, {code}")
+
+    def test_city_must_be_a_real_place_in_that_state(self):
+        for city in ("Tel Aviv, IL", "Tel Aviv, TX", "Lagos, NY", "Austin, OH"):
+            st, b = self.post("/api/intake", {**ORDER, "city": city})
+            self.assertEqual(st, 400, city)
+            self.assertIn("US businesses only", json.loads(b)["error"])
+        for city in ("Columbus, OH", "Austin, TX", "St. Louis, MO", "Saint Louis, MO", "Washington, DC",
+                     "ft. worth, tx", "Fort  Worth, TX"):
+            self.assertEqual(self.post("/api/intake", {**ORDER, "city": city})[0], 200, city)
 
     def test_html_pattern_matches_whitelist(self):
         import re as _re
