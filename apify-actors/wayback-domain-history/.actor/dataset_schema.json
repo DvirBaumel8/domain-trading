@@ -1,0 +1,92 @@
+{
+  "actorSpecification": 1,
+  "fields": {
+    "type": "object",
+    "properties": {
+      "domain": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string",
+        "description": "ok, no_snapshots or error"
+      },
+      "error": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "firstSeen": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "lastSeen": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "totalSnapshots": {
+        "type": "integer"
+      },
+      "snapshotsPerYear": {
+        "type": "object"
+      },
+      "statusCounts": {
+        "type": "object"
+      },
+      "yearsWithCaptures": {
+        "type": "array"
+      },
+      "sampleSnapshots": {
+        "type": "object"
+      },
+      "summary": {
+        "type": "string"
+      },
+      "checkedAt": {
+        "type": "string"
+      }
+    }
+  },
+  "views": {
+    "overview": {
+      "title": "Overview",
+      "transformation": {
+        "fields": [
+          "domain",
+          "status",
+          "firstSeen",
+          "lastSeen",
+          "totalSnapshots",
+          "summary"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "domain": {
+            "label": "domain"
+          },
+          "status": {
+            "label": "status"
+          },
+          "firstSeen": {
+            "label": "firstSeen"
+          },
+          "lastSeen": {
+            "label": "lastSeen"
+          },
+          "totalSnapshots": {
+            "label": "totalSnapshots"
+          },
+          "summary": {
+            "label": "summary"
+          }
+        }
+      }
+    }
+  }
+}

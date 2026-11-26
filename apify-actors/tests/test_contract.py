@@ -93,3 +93,9 @@ def test_bot_guard_blocks_code_and_non_text_keys():
     out = g.check_files(["apify-actors/a/src/main.py", "src/app.ts", "apify-actors/a/.actor/actor.json"], shows)
     assert "apify-actors/a/src/main.py" in out and "src/app.ts" in out
     assert any("version" in o for o in out) and any("type" in o for o in out)
+
+
+def test_polite_copies_identical():
+    ref = (ROOT / "shared" / "polite.py").read_text()
+    for p in ROOT.glob("*/src/polite.py"):
+        assert p.read_text() == ref, p
