@@ -32,6 +32,8 @@ def normalize_url(raw, base: str | None = None) -> str | None:
         return None
     if p.scheme.lower() not in ("http", "https") or not p.hostname:
         return None
+    if re.search(r"[\s<>\"{}|\\^`]", p.hostname) or p.hostname.startswith(".") or ".." in p.hostname:
+        return None  # "not a url" must not become https://not a url/
     path = p.path or "/"
     return urlunsplit((p.scheme.lower(), p.netloc.lower(), path, p.query, ""))
 

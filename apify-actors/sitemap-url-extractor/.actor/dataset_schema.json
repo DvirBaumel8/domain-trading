@@ -36,14 +36,14 @@
           "integer",
           "null"
         ],
-        "description": "Number of image entries for this URL"
+        "description": "Number of image entries published for this URL (0 if none)"
       },
       "hreflang": {
         "type": [
           "array",
           "null"
         ],
-        "description": "Alternate language URLs (xhtml:link)"
+        "description": "Alternate-language versions published with the URL, each {lang, url}; empty list if none"
       },
       "sitemapUrl": {
         "type": [
@@ -57,34 +57,48 @@
           "string",
           "null"
         ],
-        "description": "Input site/start URL"
+        "description": "The start entry this URL was found for (as you gave it; a missing https:// is added)"
       },
       "statusCode": {
         "type": [
           "integer",
           "null"
         ],
-        "description": "HTTP status of the page (only if status check is on)"
+        "description": "HTTP status of the page; null unless Check HTTP status is on (or the request failed)"
       },
       "finalUrl": {
         "type": [
           "string",
           "null"
         ],
-        "description": "URL after redirects (only if status check is on)"
+        "description": "URL after redirects; null unless Check HTTP status is on (or the request failed)"
       }
-    }
+    },
+    "required": [
+      "url",
+      "lastmod",
+      "changefreq",
+      "priority",
+      "imageCount",
+      "hreflang",
+      "sitemapUrl",
+      "site",
+      "statusCode",
+      "finalUrl"
+    ]
   },
   "views": {
     "overview": {
-      "title": "Overview",
+      "title": "URLs",
       "transformation": {
         "fields": [
           "url",
           "lastmod",
           "changefreq",
           "priority",
+          "imageCount",
           "statusCode",
+          "finalUrl",
           "sitemapUrl",
           "site"
         ]
@@ -93,25 +107,31 @@
         "component": "table",
         "properties": {
           "url": {
-            "label": "url"
+            "label": "URL"
           },
           "lastmod": {
-            "label": "lastmod"
+            "label": "Last modified"
           },
           "changefreq": {
-            "label": "changefreq"
+            "label": "Change frequency"
           },
           "priority": {
-            "label": "priority"
+            "label": "Priority"
+          },
+          "imageCount": {
+            "label": "Images"
           },
           "statusCode": {
-            "label": "statusCode"
+            "label": "Status"
+          },
+          "finalUrl": {
+            "label": "Final URL"
           },
           "sitemapUrl": {
-            "label": "sitemapUrl"
+            "label": "Sitemap file"
           },
           "site": {
-            "label": "site"
+            "label": "Site"
           }
         }
       }
