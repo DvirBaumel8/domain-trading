@@ -1,0 +1,26 @@
+diff --git a/.github/workflows/requests-only.yml b/.github/workflows/requests-only.yml
+index 995694b..395b3fc 100644
+--- a/.github/workflows/requests-only.yml
++++ b/.github/workflows/requests-only.yml
+@@ -1,6 +1,6 @@
+ name: requests-only
+ 
+-# Gavriel (the customer's bot) may only add or change files under docs/requests/.
++# Gavriel (the customer's bot) may only add or change files under docs/requests/, plus apify-actors/*/README.md and the text keys of apify-actors/*/.actor/*.json.
+ # Every commit in a push whose author or committer name contains "Gavriel", "Grok" or "DOM (cloud)" is checked.
+ # This catches mistakes; it cannot undo a push. Real enforcement = branch protection plus a separate
+ # GitHub identity for Gavriel.
+@@ -25,12 +25,7 @@ jobs:
+           for c in $(git rev-list "$range"); do
+             who="$(git log -1 --format='%an|%cn' "$c")"
+             if echo "$who" | grep -qiE 'gavriel|grok|dom \(cloud\)'; then
+-              outside="$(git diff-tree --no-commit-id --name-only -r "$c" | grep -vE '^docs/requests/' || true)"
+-              if [ -n "$outside" ]; then
+-                echo "::error::commit $c by '$who' changes files outside docs/requests/:"
+-                echo "$outside"
+-                bad=1
+-              fi
++              if ! python3 apify-actors/tools/bot-text-guard.py "$c"; then bad=1; fi
+             fi
+           done
+           exit $bad
