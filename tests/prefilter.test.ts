@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { feedObjects, readFeed, type Feed, type Listing } from '../src/prefilter/feed.js';
 import { createHistory, readHistory, type History } from '../src/prefilter/history.js';
+import { nameCut, splits, bundledLists, type NameLists } from '../src/prefilter/names.js';
+import { createExactNameSearch, parseResults, sameNameHits, type ExactNameResult, type ExactNameSearchFn } from '../src/prefilter/search.js';
 import { gate, metrics, runPrefilter, type CloseRow, type RunInput, type ShadowRow } from '../src/prefilter/run.js';
 import type { WebRisk } from '../src/sources/web-risk.js';
 import { parseState, type State } from '../src/state.js';
@@ -106,7 +108,7 @@ describe('the gates', () => {
 
 const nothing: History = { status: 'no_hits', pages: 3, partial: false, first_snapshot: '2015-01-01', evidence: [], reason: null };
 const risk = (status: WebRisk['status']): WebRisk => ({ status, threatTypes: status === 'flagged' ? ['MALWARE'] : [], checkedAt: new Date(NOW), errorCode: status === 'error' ? 'TIMEOUT' : status === 'missing_key' ? 'KEY_MISSING' : null });
-const run = (o: Partial<RunInput> = {}) => runPrefilter({ ...no, now: () => NOW, auctions: feed([listing()]), endingToday: feed([]), closeouts: feed([closeout({ domain: 'closeout.com' })]), closed: new Set(), webRisk: async () => risk('clean'), history: async () => nothing, ...o });
+const run = (o: Partial<RunInput> = {}) => runPrefilter({ ...no, now: () => NOW, auctions: feed([listing()]), endingToday: feed([]), closeouts: feed([closeout({ domain: 'closeout.com' })]), closed: new Set(), webRisk: async () => risk('clean'), history: async () => nothing, exactName: async () => ({ status: 'no_hit' }), ...o });
 
 describe('a run', () => {
   it('logs every name left, from both files, and never says the budget is within', async () => {
@@ -194,5 +196,110 @@ describe('where it writes', () => {
   it('the kill list is one .com name a line', () => {
     const lines = readFileSync('docs/requests/kills.txt', 'utf8').split('\n').filter((l) => l && !l.startsWith('#'));
     expect(lines.filter((l) => /^[a-z0-9-]+\.com$/.test(l)).length).toBeGreaterThan(0); // bots edit it; the job counts the lines it cannot read
+  });
+});
+
+const set = (s: string) => new Set(s.split(' ').filter(Boolean));
+const fixture: NameLists = { words: set('roof concept good name tomato close out fine'), given: set('joe tom amy'), places: set('houston'), trades: set('marina roofing') };
+
+describe('the plain-word, person and local-business cuts', () => {
+  const cut = (n: string, l: NameLists = fixture) => nameCut(n, l);
+  it('one word and two words of the list stay; a split into three counts', () => {
+    expect([cut('roofconcept'), cut('roof'), cut('roofconceptname')]).toEqual([null, null, null]);
+    expect(splits('roofroofroofroof', fixture.words, 3)).toBe(false);
+  });
+  it('a coined name is not_plain_word', () => { expect([cut('xwsy'), cut('qynaps')]).toEqual(['not_plain_word', 'not_plain_word']); });
+  it('a given name and a family name or trade is person_name', () => {
+    expect([cut('joelevy'), cut('joemarina'), cut('roofingjoe')]).toEqual(['person_name', 'person_name', 'person_name']);
+  });
+  it('a place and a trade is local_business', () => { expect([cut('houstonmarina'), cut('marinahouston')]).toEqual(['local_business', 'local_business']); });
+  it('letters that look like a name, but no clear shape, stay', () => {
+    expect([cut('tomato'), cut('joey'), cut('houston')]).toEqual([null, 'not_plain_word', 'not_plain_word']); // a whole word is never a person; a short rest is no family name
+  });
+  it('the bundled lists: plain words pass, coined, person and local names are cut', () => {
+    const l = bundledLists();
+    expect(['roofconcept', 'civilcloud', 'timingdiagram', 'goodname', 'closeout', 'fine'].map((n) => nameCut(n, l))).toEqual([null, null, null, null, null, null]);
+    expect(['xwsy', 'qynaps'].map((n) => nameCut(n, l))).toEqual(['not_plain_word', 'not_plain_word']);
+    expect(['danielmooney', 'amytiemann'].map((n) => nameCut(n, l))).toEqual(['person_name', 'person_name']);
+    expect(['houstonmarina', 'sflroofing'].map((n) => nameCut(n, l))).toEqual(['local_business', 'local_business']);
+  });
+  it('in the gate: each cut is counted by its reason, after the older gates', () => {
+    const g = (domain: string) => Object.keys(gate('auction', feed([listing({ domain })]), { ...no, lists: fixture }, NOW).dropped)[0] ?? 'left';
+    expect([g('roofconcept.com'), g('xwsy.com'), g('joelevy.com'), g('houstonmarina.com')]).toEqual(['left', 'not_plain_word', 'person_name', 'local_business']);
+    expect(dropped('auction', listing({ domain: 'xwsy.com', bids: 0 }))).toBe('no_bid');
+  });
+});
+
+describe('the quality cuts and the exact-name search in a run', () => {
+  const spy = () => { const c = { risk: 0, history: 0, search: 0, asked: [] as string[] }; return { c, webRisk: async () => { c.risk++; return risk('clean'); }, history: async () => { c.history++; return nothing; }, exactName: async (d: string) => { c.search++; c.asked.push(d); return { status: 'no_hit' } as ExactNameResult; } }; };
+  const names = (...d: string[]) => feed(d.map((domain) => listing({ domain })));
+  it('a name cut by quality makes no Web Risk, history or search call', async () => {
+    const s = spy();
+    const r = await run({ auctions: names('xwsy.com', 'danielmooney.com', 'houstonmarina.com'), closeouts: feed([]), webRisk: s.webRisk, history: s.history, exactName: s.exactName });
+    expect([s.c.risk, s.c.history, s.c.search, r.rows.length]).toEqual([0, 0, 0, 0]);
+    expect(r.summary.auction!.dropped).toEqual({ not_plain_word: 1, person_name: 1, local_business: 1 });
+  });
+  it('the older reasons still drop the same rows', async () => {
+    const r = await run({ auctions: feed([listing({ bids: 0 }), listing({ adult: true, domain: 'fine.com' })]), closeouts: feed([closeout({ priceCents: 100 })]) });
+    expect([r.summary.auction!.dropped, r.summary.closeout!.dropped]).toEqual([{ no_bid: 1, adult: 1 }, { price: 1 }]);
+  });
+  it('a same-name hit is killed with the evidence and not logged', async () => {
+    const r = await run({ closeouts: feed([]), exactName: async () => ({ status: 'hit', hits: [{ title: 'Goodname', url: 'https://goodname.io/' }] }) });
+    expect([r.rows.length, r.killed]).toEqual([0, [{ domain: 'goodname.com', source: 'auction', by: 'exact_name_search', evidence: [{ title: 'Goodname', url: 'https://goodname.io/' }] }]]);
+  });
+  it('no hit is logged as checked; an error, a throw or no adapter is logged and left open, never clean', async () => {
+    const [ok] = (await run({ closeouts: feed([]) })).rows;
+    expect([ok!.checks.exact_name, ok!.open_checks]).toEqual([{ status: 'no_hit', reason: null }, ['budget', 'trademark', 'spamhaus']]);
+    const bad: ExactNameSearchFn[] = [async () => ({ status: 'error', reason: 'TIMEOUT' }), async () => { throw new Error('boom'); }];
+    for (const exactName of bad) {
+      const [x] = (await run({ closeouts: feed([]), exactName })).rows;
+      expect(x!.checks.exact_name.status).toBe('error');
+      expect(x!.open_checks).toContain('exact_name');
+    }
+    const none = (await run({ closeouts: feed([]), exactName: undefined })).rows[0]!;
+    expect([none.checks.exact_name.status, none.open_checks]).toEqual(['not_checked', ['budget', 'trademark', 'spamhaus', 'exact_name']]);
+  });
+  it('there is no cap: 20 names that pass are 20 searches', async () => {
+    const s = spy();
+    const twenty = Array.from({ length: 20 }, (_, k) => `good${'abcdefghijklmnopqrst'[k]}`).map((x) => `${x}word.com`);
+    const lists: NameLists = { ...fixture, words: new Set([...fixture.words, ...twenty.map((t) => t.slice(0, -4))]) };
+    await run({ auctions: names(...twenty), closeouts: feed([]), lists, ...s });
+    expect(s.c.search).toBe(20);
+  });
+  it('the row still has only known fields', async () => {
+    const [x] = (await run()).rows;
+    expect(Object.keys(x!.checks).sort()).toEqual(['exact_name', 'history', 'spamhaus', 'trademark', 'web_risk']);
+  });
+});
+
+describe('the DuckDuckGo adapter (never the network)', () => {
+  const page = (...items: [string, string, string][]) => `<html><body>${items.map(([t, u, s]) => `<div class="result"><a rel="nofollow" class="result__a" href="//duckduckgo.com/l/?uddg=${encodeURIComponent(u)}&amp;rut=x">${t}</a><a class="result__snippet" href="x">${s}</a></div>`).join('')}</body></html>`;
+  const none = '<html><body><div class="no-results">No results.</div></body></html>';
+  it('reads title, address and snippet only', () => {
+    expect(parseResults(page(['Roof <b>Concept</b> | Roofing', 'https://roofconcept.io/a', 'We roof &amp; more']))).toEqual([{ title: 'Roof Concept | Roofing', url: 'https://roofconcept.io/a', snippet: 'We roof & more' }]);
+    expect(parseResults(none)).toEqual([]);
+    expect(parseResults('<html>Unusual traffic anomaly</html>')).toBeNull();
+  });
+  it('a site or a title that is the name is a hit; the name\'s own .com and explainers are not', () => {
+    const r = (title: string, url: string) => ({ title, url, snippet: '' });
+    expect(sameNameHits('roofconcept', [r('x', 'https://www.roofconcept.io/'), r('RoofConcept - Roofing', 'https://a.com/'), r('Roof concept', 'https://roofconcept.com/'), r('Roofconcept', 'https://en.wikipedia.org/wiki/Roofconcept'), r('A roof concept for homes', 'https://b.com/')]).map((h) => h.url)).toEqual(['https://www.roofconcept.io/', 'https://a.com/']);
+  });
+  it('answers: hit, no hit, and an unreadable page, a 429 or a throw are errors; it waits between requests and stops after 5 failures', async () => {
+    let t = 0;
+    const waits: number[] = [];
+    const sleep = async (ms: number) => { waits.push(ms); t += ms; };
+    const hit = createExactNameSearch(() => t, sleep, async () => new Response(page(['Roofconcept', 'https://roofconcept.net/', ''])));
+    expect((await hit('roofconcept.com')).status).toBe('hit');
+    expect(waits.length).toBe(1);
+    const clean = createExactNameSearch(() => t, sleep, async () => new Response(none));
+    expect(await clean('roofconcept.com')).toEqual({ status: 'no_hit' });
+    for (const f of [async () => new Response('<html>blocked</html>'), async () => new Response('busy', { status: 429 }), async () => { throw new Error('offline'); }]) {
+      expect((await createExactNameSearch(() => t, sleep, f)('roofconcept.com')).status).toBe('error');
+    }
+    let calls = 0;
+    const down = createExactNameSearch(() => t, sleep, async () => { calls++; return new Response('busy', { status: 429 }); });
+    const got = [];
+    for (let k = 0; k < 7; k++) got.push((await down('a.com')).status);
+    expect([got, calls]).toEqual([Array(7).fill('error'), 10]);
   });
 });

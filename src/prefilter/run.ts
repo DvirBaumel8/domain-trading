@@ -6,6 +6,8 @@ import type { WebRiskFn } from '../sources/web-risk.js';
 import type { State } from '../state.js';
 import type { Feed, Listing } from './feed.js';
 import type { History, HistoryFn } from './history.js';
+import { bundledLists, nameCut, type NameLists } from './names.js';
+import type { ExactNameSearchFn } from './search.js';
 
 const MIN_HOURS_LEFT = 16;
 /** Closeouts have no bids, so they need another sign of demand: the same name live on 3 other endings, and 5 years of age. */
@@ -22,6 +24,8 @@ export interface ShadowRow {
   checks: {
     web_risk: { status: 'clean' | 'missing_key' | 'error'; reason: string | null };
     history: History;
+    /** The same-name search. `no_hit` is the only answer that closes it; `not_checked` also covers a missing adapter. */
+    exact_name: { status: 'no_hit' | 'error' | 'not_checked'; reason: string | null };
     trademark: { status: 'not_checked'; reason: string };
     spamhaus: { status: 'not_checked'; reason: string };
   };
@@ -36,12 +40,16 @@ export interface RunInput {
   /** Every row already in the log, and the ones that already have a close row (`domain logged_at`). */
   logged: readonly ShadowRow[]; closed: ReadonlySet<string>;
   webRisk: WebRiskFn; history: HistoryFn;
+  /** Missing means the search is left open on every row, never clean. */
+  exactName?: ExactNameSearchFn;
+  /** The word, given-name, place and trade lists. The bundled ones when missing. */
+  lists?: NameLists;
 }
 
 type Drops = Record<string, number>;
 const closeKey = (r: { domain: string; logged_at: string }) => `${r.domain} ${r.logged_at}`;
 
-export function gate(source: ShadowRow['source'], feed: Feed, i: Pick<RunInput, 'state' | 'kills' | 'logged'>, now: number): { left: Listing[]; dropped: Drops } {
+export function gate(source: ShadowRow['source'], feed: Feed, i: Pick<RunInput, 'state' | 'kills' | 'logged' | 'lists'>, now: number): { left: Listing[]; dropped: Drops } {
   const dropped: Drops = {};
   const owned = new Set(i.state.domains.map((d) => d.domain));
   const recent = new Set(i.logged.filter((r) => now - Date.parse(r.logged_at) < LOGGED_AGAIN_AFTER_MS).map((r) => r.domain));
@@ -59,7 +67,9 @@ export function gate(source: ShadowRow['source'], feed: Feed, i: Pick<RunInput, 
     if (recent.has(l.domain)) return 'already_logged';
     // the renewal price is not in the file, so this can only say "over" or "unknown"
     const b = budget(i.state, { allInCents: l.priceCents, renewalCents: null, source }, null);
-    return b.status === 'over' ? `over_${b.over[0]}` : null;
+    if (b.status === 'over') return `over_${b.over[0]}`;
+    // the quality cuts come last, so every older reason keeps its count; they are pure code and run before any outside call
+    return nameCut(l.domain.replace(/\.com$/, ''), i.lists ?? bundledLists());
   };
   const left = feed.listings.filter((l) => {
     const reason = why(l);
@@ -91,11 +101,24 @@ export function metrics(rows: readonly ShadowRow[], closed: readonly CloseRow[],
   return { auctions: mine.filter((r) => r.source === 'auction').length, closeouts: mine.filter((r) => r.source === 'closeout').length, with_last_price: seen.length };
 }
 
+/** A search that is missing, throws or answers badly is left open; only a clean `no_hit` closes it. */
+async function exactName(search: ExactNameSearchFn | undefined, domain: string): Promise<{ result: Awaited<ReturnType<ExactNameSearchFn>>; check: ShadowRow['checks']['exact_name'] }> {
+  if (!search) return { result: { status: 'error', reason: 'no search adapter' }, check: { status: 'not_checked', reason: 'no search adapter' } };
+  try {
+    const result = await search(domain);
+    if (result.status === 'hit') return { result, check: { status: 'no_hit', reason: null } }; // never logged: the row is not written
+    if (result.status === 'no_hit') return { result, check: { status: 'no_hit', reason: null } };
+    return { result, check: { status: 'error', reason: String(result.reason).slice(0, 80) } };
+  } catch {
+    return { result: { status: 'error', reason: 'SEARCH_FAILED' }, check: { status: 'error', reason: 'SEARCH_FAILED' } };
+  }
+}
+
 export async function runPrefilter(i: RunInput) {
   const now = i.now();
   const loggedAt = toJerusalemIso(new Date(now));
   const rows: ShadowRow[] = [];
-  const killed: { domain: string; source: ShadowRow['source']; by: 'web_risk' | 'history'; evidence: unknown }[] = [];
+  const killed: { domain: string; source: ShadowRow['source']; by: 'web_risk' | 'history' | 'exact_name_search'; evidence: unknown }[] = [];
   const summary: Record<string, { file_built_at: string; counts: Feed['counts']; dropped: Drops; checked: number; logged: number }> = {};
   for (const [source, feed] of [['auction', i.auctions], ['closeout', i.closeouts]] as const) {
     const { left, dropped } = gate(source, feed, i, now);
@@ -103,17 +126,19 @@ export async function runPrefilter(i: RunInput) {
     for (const l of left) {
       const risk = await i.webRisk(l.domain);
       if (risk.status === 'flagged') { killed.push({ domain: l.domain, source, by: 'web_risk', evidence: risk.threatTypes }); continue; }
+      const exact = await exactName(i.exactName, l.domain);
+      if (exact.result.status === 'hit') { killed.push({ domain: l.domain, source, by: 'exact_name_search', evidence: exact.result.hits }); continue; }
       const history = await i.history(l.domain);
       if (history.status === 'killed') { killed.push({ domain: l.domain, source, by: 'history', evidence: history.evidence }); continue; }
       rows.push({
         domain: l.domain, source, auction_id: l.auctionId, logged_at: loggedAt, file_built_at: toJerusalemIso(new Date(feed.builtAt)), ends_at: toJerusalemIso(new Date(l.endsAt)),
         price_cents: l.priceCents, bids: l.bids, age: l.age, exact_match_tlds: l.exactMatchTlds, developed_tlds: l.developedTlds, budget: 'unknown',
         checks: {
-          web_risk: { status: risk.status, reason: risk.errorCode }, history,
+          web_risk: { status: risk.status, reason: risk.errorCode }, history, exact_name: exact.check,
           trademark: { status: 'not_checked', reason: 'USPTO has no word search by API' },
           spamhaus: { status: 'not_checked', reason: 'free for non-commercial use only' },
         },
-        open_checks: ['budget', 'trademark', 'spamhaus', ...(risk.status === 'clean' ? [] : ['web_risk']), ...(['no_hits', 'no_snapshots'].includes(history.status) && !history.partial ? [] : ['history'])],
+        open_checks: ['budget', 'trademark', 'spamhaus', ...(risk.status === 'clean' ? [] : ['web_risk']), ...(exact.check.status === 'no_hit' ? [] : ['exact_name']), ...(['no_hits', 'no_snapshots'].includes(history.status) && !history.partial ? [] : ['history'])],
       });
     }
     summary[source] = { file_built_at: toJerusalemIso(new Date(feed.builtAt)), counts: feed.counts, dropped, checked: left.length, logged: rows.length - before };
