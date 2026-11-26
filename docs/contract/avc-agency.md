@@ -33,3 +33,4 @@ Two modes. **Agency-branded**: name, logo, colour, contact line, optional "Prepa
 
 ## Environment
 `AIVIS_AGENCY`, `AIVIS_PACK_DAILY_CAP_USD`; the existing `AIVIS_AUTORUN`, `AIVIS_ALLOW_PAID`, `AIVIS_ORDER_CAP_USD`, `POLAR_WEBHOOK_SECRET`. The agency feature needs `pillow` and `fpdf2` (`ai-visibility-check/requirements.txt`) installed by the build.
+The build installs `requirements.txt` (Pillow, fpdf2; pypdf is only for tests).

@@ -7,7 +7,7 @@ services:
     runtime: python
     plan: free
     region: frankfurt
-    buildCommand: "python3 -m compileall -q site engine"
+    buildCommand: "pip install -r requirements.txt && python3 -m compileall -q site engine"
     startCommand: "python3 site/server.py --free-run --host 0.0.0.0"
     healthCheckPath: /health
     autoDeploy: false
