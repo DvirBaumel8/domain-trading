@@ -1,0 +1,66 @@
+{
+  "title": "Broken Link Auditor",
+  "type": "object",
+  "schemaVersion": 1,
+  "required": [
+    "startUrls"
+  ],
+  "properties": {
+    "startUrls": {
+      "title": "Start URLs",
+      "type": "array",
+      "description": "A site, a sitemap URL, or a list of URLs.",
+      "editor": "stringList",
+      "prefill": [
+        "https://example.com/"
+      ]
+    },
+    "mode": {
+      "title": "Mode",
+      "type": "string",
+      "description": "list: check the given URLs. sitemap: expand sitemaps first. crawl: follow same-site links.",
+      "enum": [
+        "list",
+        "sitemap",
+        "crawl"
+      ],
+      "default": "list"
+    },
+    "maxPages": {
+      "title": "Max URLs",
+      "type": "integer",
+      "description": "Stop after this many unique URLs.",
+      "default": 1000,
+      "minimum": 1,
+      "maximum": 100000
+    },
+    "maxDepth": {
+      "title": "Max crawl depth",
+      "type": "integer",
+      "description": "Crawl mode only.",
+      "default": 3,
+      "minimum": 0,
+      "maximum": 10
+    },
+    "checkExternal": {
+      "title": "Check external links",
+      "type": "boolean",
+      "description": "Crawl mode: also check links that point to other sites (they are not crawled).",
+      "default": false
+    },
+    "maxConcurrency": {
+      "title": "Concurrency",
+      "type": "integer",
+      "description": "Parallel requests.",
+      "default": 5,
+      "minimum": 1,
+      "maximum": 20
+    },
+    "respectRobots": {
+      "title": "Respect robots.txt",
+      "type": "boolean",
+      "description": "Skip URLs that robots.txt disallows.",
+      "default": true
+    }
+  }
+}
