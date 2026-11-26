@@ -1,1 +1,7 @@
-# no third-party packages; the app uses the Python standard library
+# The service itself is standard library only while AIVIS_AGENCY is off. The agency feature (flag on) needs
+# Pillow (logo check and re-encode) and fpdf2 (PDF reports); both are pure pip wheels, no Chrome, no apt.
+# pypdf is used by the tests only (reading a PDF back). Render's build command must install this file
+# before the flag is turned on (see CR-133-NOTES.md).
+pillow>=10,<14
+fpdf2>=2.8,<3
+pypdf>=5,<8

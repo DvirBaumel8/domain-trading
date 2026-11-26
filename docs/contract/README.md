@@ -8,6 +8,7 @@ Phase 1 (Dvir, 23 Nov 2026): the app is stateless, has no database and **only re
 |---|---|
 | `endpoints.md` | Every route |
 | `prefilter.md` | The daily auction pre-filter and the shadow log |
+| `avc-agency.md` | AI Visibility Check agency report bundles (CR-133), behind a flag, nothing for sale |
 | `CHANGELOG.md` | Contract versions |
 
 ## Base URL
