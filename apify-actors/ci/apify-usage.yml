@@ -1,0 +1,43 @@
+name: apify-usage
+
+# Daily 08:00 IST (06:00 UTC). GET-only against Apify. Writes usage/DATE.json to the branch apify-usage.
+# No file is written if any call fails (401, 429 after backoff).
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  usage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check out the apify-usage branch (or start it)
+        run: |
+          if git ls-remote --exit-code --heads origin apify-usage > /dev/null; then
+            git fetch origin apify-usage
+            git worktree add -B apify-usage ../log origin/apify-usage
+          else
+            git worktree add --detach ../log
+            git -C ../log checkout --orphan apify-usage
+            git -C ../log rm -rf -q .
+          fi
+      - name: Collect
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: python apify-actors/tools/apify_usage.py --out ../log/usage
+      - name: Commit and push
+        run: |
+          cd ../log
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add usage
+          git diff --cached --quiet && exit 0
+          git commit -q -m "usage $(date -u +%F)"
+          git push origin apify-usage
