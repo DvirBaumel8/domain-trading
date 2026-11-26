@@ -1,0 +1,6 @@
+# Workflow files to install by hand
+
+The Claude GitHub App cannot write `.github/workflows/`. Dvir copies these there (needs the `APIFY_TOKEN` repo secret, already set):
+
+- `apify-push.yml`: manual `workflow_dispatch`; pytest first, then `apify push` of one of the 3 new actors (or `all-new`) as PRIVATE; then a GET check that fails on `isPublic: true` or any pricing; summary with id, name and build, plus the line for `docs/requests/DOM-TO-GAVRIEL.md` (job summary and artifact). Each run needs Dvir's OK via Gavriel.
+- `apify-usage.yml`: daily `0 6 * * *` plus manual; `tools/apify_usage.py` writes `usage/DATE.json` and day-over-day deltas to the branch `apify-usage`. GET-only; nothing is written if a call fails.
