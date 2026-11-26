@@ -62,7 +62,11 @@ jobs:
             printf '%s\n' "$out" | sed "s|$APIFY_TOKEN|***|g"
             echo "pushed $a"
           done
-      - name: Post-push check (fails if public or priced) and summary
+      - name: Set run memory to 256 MB (apify push ignores actor.json defaultRunOptions)
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: python apify-actors/tools/apify_memory.py $ACTORS
+      - name: Post-push check (fails if public, priced or memory is not 256) and summary
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
         run: python apify-actors/tools/apify_guard.py $ACTORS

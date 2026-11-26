@@ -2,7 +2,7 @@
 """Post-push check for `apify-push`: the actor must be private and carry no pricing. GET-only.
 
 Usage: apify_guard.py <actor-folder-name> ...   (token from APIFY_TOKEN, never printed)
-Fails (exit 1) if isPublic is true or any pricing info exists. Prints id, name and build version,
+Fails (exit 1) if isPublic is true, any pricing info exists, or defaultRunOptions.memoryMbytes != 256. Prints id, name and build version,
 and writes them to the job summary plus a ready line for docs/requests/DOM-TO-GAVRIEL.md.
 """
 from __future__ import annotations
@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 BASE = "https://api.apify.com"
 ALLOWED = ("wayback-domain-history", "broken-link-auditor", "bulk-pagespeed-checker")
 PRICE_KEY_HINTS = ("pric", "monetiz")
+TARGET_MEMORY_MB = 256
 
 
 def problems(actor: dict) -> list[str]:
@@ -31,6 +32,9 @@ def problems(actor: dict) -> list[str]:
     for key, value in actor.items():
         if key != "pricingInfos" and any(h in key.lower() for h in PRICE_KEY_HINTS) and value not in (None, False, [], {}, ""):
             out.append(f"pricing field set: {key}")
+    memory = (actor.get("defaultRunOptions") or {}).get("memoryMbytes")
+    if memory != TARGET_MEMORY_MB:
+        out.append(f"defaultRunOptions.memoryMbytes is {memory}, expected {TARGET_MEMORY_MB}")
     return out
 
 

@@ -12,18 +12,20 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import apify_guard as guard  # noqa: E402
 import apify_usage as usage  # noqa: E402
+import apify_memory as memory  # noqa: E402
 
 NOW = datetime(2026, 11, 27, 6, 0, tzinfo=timezone.utc)
+MEM = {"defaultRunOptions": {"memoryMbytes": 256}}
 NEW = {"wayback-domain-history", "broken-link-auditor", "bulk-pagespeed-checker"}
 
 
 # ---- post-push guard
 def test_guard_ok_for_private_unpriced():
-    assert guard.problems({"id": "a", "isPublic": False, "pricingInfos": []}) == []
+    assert guard.problems({"id": "a", "isPublic": False, "pricingInfos": [], **MEM}) == []
 
 
 def test_guard_fails_on_public():
-    assert guard.problems({"isPublic": True})
+    assert guard.problems({"isPublic": True, **MEM})
 
 
 @pytest.mark.parametrize("extra", [
@@ -32,12 +34,12 @@ def test_guard_fails_on_public():
     {"actorPricing": {"x": 1}},
 ])
 def test_guard_fails_on_any_pricing(extra):
-    assert guard.problems({"isPublic": False, **extra})
+    assert guard.problems({"isPublic": False, **MEM, **extra})
 
 
 def test_guard_main_fails_without_leaking_token(monkeypatch, capsys):
     monkeypatch.setenv("APIFY_TOKEN", "sekret-token")
-    assert guard.main(["broken-link-auditor"], fetch_fn=lambda n, t: {"id": "x", "name": n, "isPublic": True}) == 1
+    assert guard.main(["broken-link-auditor"], fetch_fn=lambda n, t: {"id": "x", "name": n, "isPublic": True, **MEM}) == 1
     out = capsys.readouterr()
     assert "sekret-token" not in out.out + out.err
 
@@ -215,3 +217,76 @@ def test_no_hard_coded_prices_in_new_scripts():
     pat = re.compile(r"(?<!\\)\$\s?\d")
     for f in ("apify_usage.py", "apify_guard.py"):
         assert not pat.search((ROOT / "tools" / f).read_text()), f
+
+
+# ---- memory: guard check
+@pytest.mark.parametrize("opts", [{"defaultRunOptions": {"memoryMbytes": 4096}}, {"defaultRunOptions": {}}, {}])
+def test_guard_fails_when_memory_not_256(opts):
+    assert any("memoryMbytes" in p for p in guard.problems({"isPublic": False, **opts}))
+
+
+def test_guard_main_fails_on_4096(monkeypatch, capsys):
+    monkeypatch.setenv("APIFY_TOKEN", "sekret-token")
+    bad = {"id": "x", "name": "n", "isPublic": False, "defaultRunOptions": {"memoryMbytes": 4096}}
+    assert guard.main(["broken-link-auditor"], fetch_fn=lambda n, t: bad) == 1
+    assert "sekret-token" not in capsys.readouterr().err
+
+
+# ---- memory: setter with mocked HTTP
+def _mock(current):
+    calls = []
+
+    def put_fn(path, token, body):
+        calls.append((path, body))
+        return {"defaultRunOptions": body["defaultRunOptions"]}
+
+    return (lambda n, t: {"id": "ID1", "isPublic": False, "defaultRunOptions": current}), put_fn, calls
+
+
+def test_memory_put_sends_only_run_options_and_keeps_others(monkeypatch):
+    monkeypatch.setenv("APIFY_TOKEN", "sekret-token")
+    fetch_fn, put_fn, calls = _mock({"build": "latest", "timeoutSecs": 3600, "memoryMbytes": 4096})
+    assert memory.main(["wayback-domain-history"], fetch_fn=fetch_fn, put_fn=put_fn) == 0
+    assert calls == [("/v2/acts/ID1", {"defaultRunOptions": {"build": "latest", "timeoutSecs": 3600, "memoryMbytes": 256}})]
+
+
+def test_memory_rejects_old_and_unknown_actors(monkeypatch):
+    monkeypatch.setenv("APIFY_TOKEN", "t")
+    fetch_fn, put_fn, calls = _mock({})
+    assert memory.main(["sitemap-url-extractor"], fetch_fn=fetch_fn, put_fn=put_fn) == 2
+    assert calls == []
+
+
+def test_memory_requires_token(monkeypatch):
+    monkeypatch.delenv("APIFY_TOKEN", raising=False)
+    assert memory.main(["broken-link-auditor"]) == 2
+
+
+def test_memory_failure_exit_1_without_leaking_token(monkeypatch, capsys):
+    monkeypatch.setenv("APIFY_TOKEN", "sekret-token")
+
+    def boom(path, token, body):
+        raise RuntimeError(f"https://x/?token={token}")
+
+    fetch_fn, _, _ = _mock({})
+    assert memory.main(["broken-link-auditor"], fetch_fn=fetch_fn, put_fn=boom) == 1
+    out = capsys.readouterr()
+    assert "sekret-token" not in out.out + out.err
+
+
+def test_memory_fails_if_apify_reports_other_value(monkeypatch):
+    monkeypatch.setenv("APIFY_TOKEN", "t")
+    fetch_fn, _, _ = _mock({})
+    assert memory.main(["broken-link-auditor"], fetch_fn=fetch_fn,
+                       put_fn=lambda p, t, b: {"defaultRunOptions": {"memoryMbytes": 4096}}) == 1
+
+
+def test_memory_put_body_never_has_forbidden_fields():
+    src = (ROOT / "tools" / "apify_memory.py").read_text()
+    assert '{"defaultRunOptions": options}' in src
+    assert "isPublic" not in src.split('"""', 2)[2]
+
+
+def test_push_workflow_sets_memory_before_guard():
+    wf = (ROOT / "ci" / "apify-push.yml").read_text()
+    assert "apify_memory.py" in wf and wf.index("apify_memory.py") < wf.index("apify_guard.py")
