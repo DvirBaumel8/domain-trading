@@ -1,0 +1,11 @@
+{
+  "candidates": [
+    {"content": {"role": "model", "parts": [{"text": "1. **Asana**\n"}, {"text": "2. **Trello**\n"}]},
+     "groundingMetadata": {
+       "webSearchQueries": ["best project management software"],
+       "groundingChunks": [
+         {"web": {"uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AAA", "title": "asana.com"}},
+         {"web": {"uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/BBB", "title": "A review site"}}
+       ]}}
+  ]
+}

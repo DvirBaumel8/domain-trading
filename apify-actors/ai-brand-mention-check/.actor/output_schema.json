@@ -1,0 +1,18 @@
+{
+  "actorOutputSchemaVersion": 1,
+  "title": "AI Brand Mention Check output",
+  "properties": {
+    "results": {
+      "type": "string",
+      "title": "Results",
+      "description": "All result rows in the default dataset",
+      "template": "{{links.apiDefaultDatasetUrl}}/items"
+    },
+    "summary": {
+      "type": "string",
+      "title": "Summary",
+      "description": "Mention rate and average rank per engine, top competitors, warnings and notes",
+      "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/SUMMARY"
+    }
+  }
+}

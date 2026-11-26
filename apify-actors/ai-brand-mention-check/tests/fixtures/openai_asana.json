@@ -1,0 +1,15 @@
+{
+  "id": "resp_fixture_1",
+  "output": [
+    {"type": "web_search_call", "id": "ws_1", "status": "completed"},
+    {"type": "message", "role": "assistant", "content": [
+      {"type": "output_text",
+       "text": "For project management software I would look at:\n\n1. **Asana** - flexible task views and timelines\n2. **Trello** - simple boards\n3. **Monday.com** - customisable workflows\n",
+       "annotations": [
+         {"type": "url_citation", "url": "https://asana.com/pricing", "title": "Asana pricing"},
+         {"type": "url_citation", "url": "https://trello.com/", "title": "Trello"},
+         {"type": "url_citation", "url": "https://asana.com/pricing", "title": "Asana pricing again"}
+       ]}
+    ]}
+  ]
+}
