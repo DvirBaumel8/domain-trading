@@ -28,6 +28,7 @@ from site_config import BUSINESS_ADDRESS    # noqa: E402
 import delivery                             # noqa: E402
 import products                             # noqa: E402
 import discovery                            # noqa: E402
+import refs                                 # noqa: E402
 import html as _html
 
 DATA = os.path.join(HERE, "data")
@@ -768,7 +769,7 @@ def new_order(d, req):
     typed = clean_ref(d.get("paid_ref", ""))
     intake = {"order_id": oid, "business_name": req["business"], "city": req["city"],
               "niche": req["niche"], "email": req["email"], "website": req["website"],
-              "token": token, "plan": "check", "order_type": "base", "paid_ref": str(d.get("paid_ref", ""))[:60],
+              "token": token, "plan": "check", "order_type": "base", "ref": refs.clean_ref(d.get("ref")), "paid_ref": str(d.get("paid_ref", ""))[:60],
               "paid": False, "created_at": now().isoformat(timespec="seconds"),
               "competitors": [c.strip()[:120] for c in str(d.get("competitors", "")).split(",") if c.strip()][:5]}
     store.put(f"orders/{oid}.json", intake)
@@ -1041,6 +1042,7 @@ class H(http.server.BaseHTTPRequestHandler):
             body = fh.read()
         if f.endswith(".html"):
             body = render_page(body, self._origin())
+            refs.record_hit(self.path, f, HERE, DATA, save_line)
         return self._send(200, ctype, body)
 
     def do_POST(self):
@@ -1050,12 +1052,14 @@ class H(http.server.BaseHTTPRequestHandler):
                 code, obj = handle_polar(hdr, self._body(MAX_HOOK_BODY))
                 return self._json(code, obj)
             if self.path == "/api/check":
-                req = clean(self._form())
+                body = self._form()
+                req = clean(body)
                 ip = client_ip(self.headers, self.client_address[0])
                 r = instant(req)
                 if not admit_check(ip, FREE_RUN and not r):
                     return self._json(429, {"error": BUSY_MSG})
-                rec = {**req, "at": datetime.datetime.now().isoformat(timespec="seconds"), "ip": ip}
+                rec = {**req, "at": datetime.datetime.now().isoformat(timespec="seconds"), "ip": ip,
+                       "ref": refs.clean_ref(body.get("ref"))}
                 if r:
                     try:
                         save_lead({**rec, "result": "instant"})
