@@ -113,6 +113,8 @@ def match_name(candidate: str, roster_names, threshold: float = 0.9, city: str =
         nd = _distinctive_tokens(n, city_stop)
         if not cd or not nd or cd != nd:
             continue
+        if (len(cd) == 1 or len(nd) == 1) and len(cd & nd) < 2:
+            continue    # one distinctive token only: needs exact equality (handled above) or 2+ shared
         score = max(SequenceMatcher(None, c, n).ratio(), 0.9 if (c in n or n in c) else 0.0)
         score = max(score, 0.9)  # same distinctive tokens is strong evidence
         if score > best_score:

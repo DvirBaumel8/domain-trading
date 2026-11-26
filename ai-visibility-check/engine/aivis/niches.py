@@ -19,6 +19,11 @@ class Niche:
     attributes: tuple = field(default=("affordable", "highly rated", "family-friendly"))
 
 
+def niche_label(label: str) -> str:
+    """Title-case a niche label but keep acronyms ('HVAC company' -> 'HVAC Company')."""
+    return " ".join(w if w.isupper() else w[:1].upper() + w[1:] for w in label.split())
+
+
 NICHES = {
     "dentist": Niche(
         "dentist", "dentist", "dentists",
