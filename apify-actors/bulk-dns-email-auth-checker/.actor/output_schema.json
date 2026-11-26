@@ -1,6 +1,6 @@
 {
   "actorOutputSchemaVersion": 1,
-  "title": "Bulk DNS & Email Authentication Checker (SPF, DKIM, DMARC, MX) output",
+  "title": "Cold-Email List Pre-Check output",
   "properties": {
     "results": {
       "type": "string",

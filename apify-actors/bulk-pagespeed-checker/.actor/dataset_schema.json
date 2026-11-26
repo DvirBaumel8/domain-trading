@@ -4,50 +4,71 @@
     "type": "object",
     "properties": {
       "url": {
-        "type": "string"
+        "type": "string",
+        "description": "The URL that was tested (https:// added if it was missing)"
       },
       "strategy": {
-        "type": "string"
+        "type": "string",
+        "description": "mobile or desktop"
       },
       "status": {
         "type": "string",
-        "description": "ok or error"
+        "description": "ok = the test finished, error = it did not (see error). Error rows are not charged"
       },
       "error": {
         "type": [
           "string",
           "null"
-        ]
+        ],
+        "description": "Plain reason when status is error (bad key or URL, API not enabled for the key, quota exceeded, Lighthouse error); null otherwise"
       },
       "scores": {
-        "type": "object"
+        "type": "object",
+        "description": "Lighthouse category scores 0-100, for example {\"performance\": 87}; empty object on error"
       },
       "labMetrics": {
-        "type": "object"
+        "type": "object",
+        "description": "Lab measurements: lcpMs, cls, tbtMs, fcpMs, speedIndexMs, ttiMs (null when Google did not report one); empty object on error"
       },
       "fieldDataPresent": {
-        "type": "boolean"
+        "type": "boolean",
+        "description": "true when Google has real-user (Chrome UX Report) data for this exact URL"
       },
       "fieldData": {
         "type": [
           "object",
           "null"
-        ]
+        ],
+        "description": "Real-user Core Web Vitals for this URL: lcpMs, inpMs, cls (each {value, category}) and overallCategory; null when there is no URL-level data"
       },
       "originFieldData": {
         "type": [
           "object",
           "null"
-        ]
+        ],
+        "description": "The same for the whole origin (site); null when Google has none"
       },
       "checkedAt": {
-        "type": "string"
+        "type": "string",
+        "description": "UTC time of the test (ISO 8601)"
       }
-    }
+    },
+    "required": [
+      "url",
+      "strategy",
+      "status",
+      "error",
+      "scores",
+      "labMetrics",
+      "fieldDataPresent",
+      "fieldData",
+      "originFieldData",
+      "checkedAt"
+    ]
   },
   "views": {
     "overview": {
-      "title": "Overview",
+      "title": "Core Web Vitals",
       "transformation": {
         "fields": [
           "url",
@@ -55,29 +76,41 @@
           "status",
           "scores",
           "labMetrics",
-          "fieldDataPresent"
+          "fieldDataPresent",
+          "fieldData",
+          "originFieldData",
+          "error"
         ]
       },
       "display": {
         "component": "table",
         "properties": {
           "url": {
-            "label": "url"
+            "label": "URL"
           },
           "strategy": {
-            "label": "strategy"
+            "label": "Strategy"
           },
           "status": {
-            "label": "status"
+            "label": "Status"
           },
           "scores": {
-            "label": "scores"
+            "label": "Scores"
           },
           "labMetrics": {
-            "label": "labMetrics"
+            "label": "Lab metrics"
           },
           "fieldDataPresent": {
-            "label": "fieldDataPresent"
+            "label": "Field data"
+          },
+          "fieldData": {
+            "label": "Real-user CWV (URL)"
+          },
+          "originFieldData": {
+            "label": "Real-user CWV (origin)"
+          },
+          "error": {
+            "label": "Error"
           }
         }
       }

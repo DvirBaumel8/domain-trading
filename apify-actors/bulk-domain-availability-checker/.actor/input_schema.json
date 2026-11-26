@@ -1,32 +1,32 @@
 {
-  "title": "Bulk Domain Availability Checker input",
+  "title": "Startup Name Checker input",
   "type": "object",
   "schemaVersion": 1,
-  "description": "Provide **Domains** and/or **Keywords**. At least one of the two is required. Paste full names (example.com), or type bare names and TLDs and the Actor will build every combination. You are charged only for rows returned.",
+  "description": "Give name ideas in **Keywords** (they are combined with every TLD) and/or finished names in **Domains**. At least one of the two is required. Rows for names on a TLD that does not exist are returned but never charged.",
   "properties": {
     "domains": {
       "title": "Domains",
       "type": "array",
-      "description": "Full domain names to check, one per line (for example example.com). URLs and emails are accepted and normalised. Leave this empty if you are using Keywords only.",
-      "editor": "stringList",
-      "prefill": [
-        "apify.com",
-        "quietbluefalcon.com",
-        "example.org"
-      ]
+      "description": "Finished domain names to check, one per line, for example example.com. Website URLs and email addresses are reduced to their domain; www. is dropped. Entries that are not a domain are skipped and saved to INVALID_INPUTS. Leave empty if you only use Keywords.",
+      "editor": "stringList"
     },
     "keywords": {
       "sectionCaption": "Name generator (optional)",
       "sectionDescription": "Use this instead of, or as well as, a finished domain list. Each keyword is combined with every TLD, and with any prefixes or suffixes you add.",
       "title": "Keywords / names",
       "type": "array",
-      "description": "Names without a TLD (for example rentguitar). Each name is combined with every TLD below. Required if Domains is empty.",
-      "editor": "stringList"
+      "description": "Name ideas without a TLD, one per line, for example rentguitar or Solar Pet (spaces are removed, letters, digits and hyphens only). Each is combined with every TLD below, and with any prefixes and suffixes. Required if Domains is empty.",
+      "editor": "stringList",
+      "prefill": [
+        "rentguitar",
+        "solarpet",
+        "quietfalcon"
+      ]
     },
     "tlds": {
       "title": "TLDs for keywords",
       "type": "array",
-      "description": "TLDs to combine with keywords, without the leading dot. Used only when Keywords are provided. Default if you leave this blank is com.",
+      "description": "TLDs to combine with Keywords, without the leading dot, for example com, io, ai. Only used with Keywords. Default: com. A TLD that is not in the IANA root zone list (for example zz) gives rows with status invalid_tld, which are not charged.",
       "editor": "stringList",
       "default": [
         "com"
@@ -43,32 +43,41 @@
     "prefixes": {
       "title": "Prefixes (optional)",
       "type": "array",
-      "description": "Optional words added before each keyword (for example get, try, my), producing names such as getrentguitar.com.",
-      "editor": "stringList"
+      "description": "Optional. Words placed before each keyword, for example get, try, my, giving getrentguitar.com. Each prefix adds one more variant per keyword and TLD.",
+      "editor": "stringList",
+      "prefill": [
+        "get"
+      ]
     },
     "suffixes": {
       "title": "Suffixes (optional)",
       "type": "array",
-      "description": "Optional words added after each keyword (for example hq, app, online), producing names such as rentguitarhq.com.",
+      "description": "Optional. Words placed after each keyword, for example hq, app, online, giving rentguitarhq.com. Each suffix adds one more variant per keyword and TLD.",
       "editor": "stringList"
     },
     "onlyAvailable": {
       "sectionCaption": "Results and limits",
       "title": "Return only available domains",
       "type": "boolean",
-      "description": "When on, registered names are omitted from the dataset. You are only charged for rows that are actually returned.",
+      "description": "When on, only names with status available are written to the dataset (rows for registered, unknown and invalid_tld names are left out). Names with status likely_available are left out too unless you switch on Include likely-available names. Default: off.",
+      "default": false
+    },
+    "includeLikelyAvailable": {
+      "title": "Include likely-available names",
+      "type": "boolean",
+      "description": "Only matters together with Return only available domains. A name on a real TLD that has no public RDAP registry and no DNS record gets status likely_available (available is null: DNS says it does not exist, but the registry could not confirm it). Those rows are left out when Return only available domains is on, unless you switch this on. Default: off.",
       "default": false
     },
     "lookupRegistered": {
       "title": "Registration details for taken domains",
       "type": "boolean",
-      "description": "Also fetch registrar, creation date and expiry date for registered domains. This is slower because it queries the registry.",
+      "description": "When on, names that DNS shows as registered are also looked up at the registry (RDAP) to add registrar, creation date, expiry date, age and status codes. Slower, because registry lookups are throttled. Default: off.",
       "default": false
     },
     "maxDomains": {
       "title": "Max domains per run",
       "type": "integer",
-      "description": "Safety cap on how many generated or pasted domains are checked in this run.",
+      "description": "Safety cap on how many names are checked in one run. Default 5000, allowed 1 to 50000. Names beyond the cap are not checked. 1,000 name ideas times 3 TLDs is 3,000 names, which fits the default.",
       "default": 5000,
       "minimum": 1,
       "maximum": 50000
@@ -76,7 +85,7 @@
     "concurrency": {
       "title": "Concurrency",
       "type": "integer",
-      "description": "Parallel DNS lookups. Registry (RDAP) lookups are always throttled politely, regardless of this value.",
+      "description": "How many DNS lookups run at the same time. Default 20, allowed 1 to 50. Registry (RDAP) lookups are throttled to about 3 per second per registry whatever this is set to.",
       "default": 20,
       "minimum": 1,
       "maximum": 50

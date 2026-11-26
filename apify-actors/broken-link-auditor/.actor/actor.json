@@ -1,8 +1,8 @@
 {
   "actorSpecification": 1,
   "name": "broken-link-auditor",
-  "title": "Broken Link & URL Status Auditor",
-  "description": "Check the HTTP status of a list of URLs, a sitemap or a whole site crawl. Returns the final status, the redirect chain, loops, response time and content type, and for crawls the source page and anchor text of every link.",
+  "title": "Site Migration QA: Check Old URLs Redirect to Live Pages",
+  "description": "Site migration QA: check that every old URL redirects to a live page. Paste old URLs, a sitemap or a site address and get the final status, the 301/302 redirect chain, redirect loops and 404s for each URL. In crawl mode it also reports the page and anchor text that link to each broken URL, so you can run it monthly as a broken-link report.",
   "version": "0.1",
   "buildTag": "latest",
   "meta": {
@@ -20,6 +20,6 @@
   "defaultRunOptions": {
     "memoryMbytes": 256
   },
-  "seoTitle": "Broken Link Checker and URL Status Auditor",
-  "seoDescription": "Find broken links and redirect chains. Check URLs from a list, a sitemap or a site crawl, with final status, redirect hops, loops and source pages."
+  "seoTitle": "Site Migration Link Checker: 301 Redirects and 404s",
+  "seoDescription": "Site migration QA: check that every old URL redirects to a live page. See 301 chains, loops and 404s from a URL list, sitemap or crawl."
 }

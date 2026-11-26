@@ -1,105 +1,90 @@
-## Bulk Domain Availability Checker (DNS + RDAP)
+# Check 1,000 Startup Name Ideas at Once (DNS + RDAP)
 
-Check **hundreds or thousands of domain names for availability** in one run. Paste a list of domains, or give keywords and TLDs and let the Actor build every combination (for example `rentguitar` × `.com .io .ai .co`). Each domain gets a clear **available / registered** answer, confirmed against the **official registry (RDAP)**, plus registrar, creation date, expiry date, domain age and a listed-for-sale or parked flag.
+Check 1,000 startup-name ideas at once: combine your name ideas with any TLDs, run a fast DNS pre-check, and confirm with the registry's RDAP server. The input allows up to 50,000 names per run.
 
-You pay **per domain returned**. Current prices per 1,000 results, including any plan discounts, are on the **Pricing** tab. Turn on **Return only available domains** if you only want free names — registered rows are then omitted and not charged. The Apify Free plan includes monthly Store credit you can use for a first test — open the Pricing tab to see how far it goes at today's rates.
+**Returns** one row per domain: `domain`, `status`, `available`, `method`, `registrar`, `createdDate`, `expiryDate`, `domainAgeYears`, `rdapStatus`, `nameservers`, `parkedOrForSale`, `keyword`, `tld`, `length`, `error`, `checkedAt`.
 
-![Sample output from Bulk Domain Availability Checker](https://api.apify.com/v2/key-value-stores/dNe1hFUAqsMnqLOYE/records/availability-output.png)
-
-## Use cases
-
-- Domain investors and brand-name hunters checking a long list of names before bidding or registering.
-- Founders and agencies testing a product name across many TLDs.
-- SEO teams generating names × TLDs and keeping only the available ones.
-- Watch lists: schedule a daily run and get notified when a name becomes available.
-
-## What does it do?
-
-- ✅ **Bulk availability check**: thousands of domains per run (300 domains in about 35 seconds in our tests).
-- ✅ **Two-step accuracy**: a fast DNS pre-check, then confirmation from the registry's official RDAP server (the modern replacement for WHOIS) for every name that looks free.
-- ✅ **Names × TLDs generator**: keywords + TLDs + optional prefixes (get, try, my) and suffixes (hq, app).
-- ✅ **Registration details**: registrar, creation date, expiry date, domain age in years and EPP status codes for taken domains (switch on *Registration details for taken domains*).
-- ✅ **For-sale / parked flag**: spots names parked at Afternic, Sedo, Dan.com, Atom, HugeDomains, BrandBucket, Bodis and others, based on their nameservers.
-- ✅ **Works with 1,200+ TLDs**: every TLD in the IANA RDAP registry, plus .io, .co, .me and .de.
-- ✅ **Clean input handling**: URLs, emails, `www.`, uppercase and international (IDN) names are normalised automatically. Invalid entries are flagged, not silently dropped.
-
-## How to use it
-
-1. Paste domains into **Domains**, or fill **Keywords** and **TLDs**. At least one of the two is required.
-2. Optional: tick **Return only available domains** to get just the free names. You only pay for rows you get.
-3. Click **Start**. Download results as JSON, CSV, Excel or HTML, or pull them through the Apify API.
-
-### Input example
+**Cost:** pay per result, one result per domain returned. Rows with status `invalid_tld` are not charged. See the Pricing tab for current prices.
 
 ```json
-{
-  "keywords": ["rentguitar", "solarpet"],
-  "tlds": ["com", "io", "ai"],
-  "prefixes": ["get"],
-  "onlyAvailable": true
-}
+{ "keywords": ["rentguitar", "solarpet", "quietfalcon"], "tlds": ["com", "io", "ai"], "prefixes": ["get"], "onlyAvailable": true }
 ```
 
-### Output example
+## Name ideas across TLDs
+
+Put one idea per line in **Keywords**, the TLDs in **TLDs** and, optionally, words in **Prefixes** and **Suffixes**. The Actor builds every combination once. The example above is 3 keywords x 2 variants (plain and with `get`) x 3 TLDs = 18 names. 1,000 ideas on 3 TLDs is 3,000 names, inside the default cap of 5,000 per run (`maxDomains`, up to 50,000).
+
+Already have finished names? Paste them into **Domains** (domains, URLs or emails, one per line). Both inputs can be used together.
+
+## How to read `status`
+
+| `status` | `available` | Meaning |
+|---|---|---|
+| `available` | `true` | DNS has no record and the registry's RDAP server says the name is not registered |
+| `registered` | `false` | The name has nameservers in DNS, or the registry returned a record |
+| `likely_available` | `null` | The TLD is real but has no public RDAP server in the IANA list, and DNS says the name does not exist. The registry could not confirm it, so check at a registrar. Left out when **Return only available domains** is on, unless **Include likely-available names** is on |
+| `unknown` | `null` | The lookups did not give a clear answer (see `error`) |
+| `invalid_tld` | `null` | The TLD is not in the IANA root zone list (for example `.zz`). It is never reported as available and is not charged |
+
+`method` is `dns` when DNS alone decided and `rdap` when the registry answered. The IANA TLD list is fetched once per run; a copy bundled in the Actor is used if it cannot be fetched.
+
+### Example output (illustrative, abridged)
 
 ```json
 {
-  "domain": "rentguitar.com",
-  "available": false,
-  "status": "registered",
+  "domain": "getrentguitar.io",
+  "tld": "io",
+  "keyword": "rentguitar",
+  "status": "available",
+  "available": true,
   "method": "rdap",
-  "parkedOrForSale": "Afternic (listed for sale)",
-  "registrar": "GoDaddy.com, LLC",
-  "createdDate": "2009-09-25",
-  "expiryDate": "2027-09-25",
-  "domainAgeYears": 17.17,
-  "nameservers": ["ns5.afternic.com", "ns6.afternic.com"],
-  "checkedAt": "2026-11-25T09:30:00+00:00"
+  "hasDns": false,
+  "registrar": null,
+  "checkedAt": "2026-11-26T10:00:00+00:00"
 }
 ```
+
+## What it does
+
+- **Bulk check**: DNS first. A name with nameservers is registered. A name without them is looked up at the registry's RDAP server (the modern replacement for WHOIS) for the TLDs that publish one in the [IANA RDAP bootstrap file](https://www.iana.org/assignments/rdap-dns/rdap-dns.xhtml), plus `.io`, `.co`, `.me` and `.de`.
+- **Registration details**: registrar, creation date, expiry date, age and status codes for registered names (switch on *Registration details for taken domains*).
+- **For-sale flag**: spots names parked at marketplaces such as Afternic, Sedo, Dan.com, Atom and HugeDomains, from their nameservers.
+- **Input clean-up**: URLs, emails, `www.`, upper case and international (IDN) names are normalised. Entries that are not a domain are skipped, listed in `INVALID_INPUTS` in the key-value store and not charged.
+
+## Input
 
 | Field | Meaning |
 |---|---|
-| `available` | `true` = not registered at the registry, `false` = registered, `null` = could not be determined |
-| `status` | `available`, `registered`, `unknown` or `invalid` |
-| `method` | `dns` (decided by nameservers) or `rdap` (confirmed by the registry) |
-| `parkedOrForSale` | Marketplace or parking service detected from nameservers |
-| `registrar`, `createdDate`, `expiryDate`, `domainAgeYears`, `rdapStatus` | From the registry's RDAP record |
+| `keywords`, `tlds`, `prefixes`, `suffixes` | Name generator (default TLD: `com`) |
+| `domains` | Finished names to check |
+| `onlyAvailable` | Only return names with status `available` (default off) |
+| `includeLikelyAvailable` | With `onlyAvailable`, also return `likely_available` names (default off) |
+| `lookupRegistered` | Registry details for registered names (default off) |
+| `maxDomains` | Cap per run, 1-50000 (default 5000) |
+| `concurrency` | Parallel DNS lookups, 1-50 (default 20) |
 
-## How much does it cost?
+## Limits to know
 
-You pay **per domain returned** (the `result` event on the Pricing tab), plus a small start fee. With **Return only available domains** switched on, registered names are not returned and not charged. There are no subscriptions or API keys to manage.
+- Registry-reserved or premium-priced names can show as available but cost more, or be blocked, at a registrar. Names in redemption or pending delete show as registered. Confirm the final price at your registrar before you buy.
+- This Actor does not show prices and does not register domains.
+- Registry lookups are throttled to a few requests per second per registry.
 
-Because prices can change, this page does not hard-code a per-1,000 figure. Open the **Pricing** tab for the live rate and any Bronze, Silver or Gold discounts. Apify's Free plan monthly credit is enough for a first test of a typical list at usual rates.
-
-## API, scheduling and export
-
-Run this Actor from [Apify Console](https://console.apify.com), from the [API](https://docs.apify.com/api/v2#/reference/actors/run-collection/run-actor) (`looped_kite/bulk-domain-availability-checker`), or from a language client. Schedule runs in Apify Console, and export results as JSON, CSV, Excel or HTML. You can also connect a webhook, Slack, Make, Zapier, n8n or Google Sheets.
-
-## How accurate is it?
-
-- A domain with live nameservers is registered. That answer comes from DNS.
-- A domain with no nameservers is checked at the registry's own RDAP server. A "not found" answer there means the name is not registered.
-- **Limits:** registry-reserved or premium-priced names can show as available but cost more, or be blocked, at a registrar. Names in redemption or pending delete show as registered. Always confirm the final price at your registrar before buying.
-
-## Fair use
-
-The Actor uses public DNS-over-HTTPS resolvers and the registries' public [RDAP](https://www.icann.org/rdap) services, which are listed in the [IANA RDAP DNS registry](https://www.iana.org/assignments/rdap-dns/rdap-dns.xhtml). Registry lookups are throttled to a few requests per second per registry, and DNS answers short-circuit most of them. Use the results for lawful purposes such as finding names to register. **Do not use them for spam or for unsolicited contact with domain owners.**
+Use the results for lawful purposes such as finding names to register. Do not use them for spam or for unsolicited contact with domain owners.
 
 ## FAQ
 
 **Can I check .com only?** Yes. `.com` is the default TLD for keywords.
 
-**How many domains can I check?** Up to 50,000 per run (`maxDomains`). For very large lists, split them across runs or schedule them.
+**What if Domains and Keywords are both empty?** The run stops with a message. Add at least one domain or one keyword.
 
-**Does it show prices?** No. Prices depend on the registrar. This Actor answers *is it free?* and *who owns it, and since when?*
+**Can I schedule it?** Yes, with Apify Schedules, for example to re-check a watch list.
 
-**Can I schedule it?** Yes. Use Apify Schedules to re-check a watch list daily and get notified by email, Slack or webhook when a name becomes available.
+## Other Actors by the same author
 
-**What if I leave both Domains and Keywords empty?** The run fails with a clear message. Add at least one domain or one keyword.
+- Bulk DNS & Email Auth Checker: SPF, DKIM, DMARC and MX for many domains.
+- Sitemap URL Extractor: every page URL from a website's sitemaps.
+- Domain Checkup Report: registration, DNS, safety and for-sale signals for a domain.
 
-## Other tools from this developer
+## Permissions
 
-- [Bulk DNS & Email Auth Checker](https://apify.com/looped_kite/bulk-dns-email-auth-checker) — SPF, DKIM, DMARC, MX, and a 0–100 email-auth score.
-- [Sitemap URL Extractor](https://apify.com/looped_kite/sitemap-url-extractor) — every page URL from a website's sitemaps.
-- [Domain Checkup Report](https://apify.com/looped_kite/domain-checkup-report) — registration, DNS, safety, for-sale signals, and a 0–100 score.
+This Actor needs only limited permissions: it reads its input and writes to its own default dataset. It also saves an `INVALID_INPUTS` record in its own default key-value store.

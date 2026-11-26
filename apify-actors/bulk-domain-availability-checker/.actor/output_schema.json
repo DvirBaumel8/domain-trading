@@ -1,6 +1,6 @@
 {
   "actorOutputSchemaVersion": 1,
-  "title": "Bulk Domain Availability Checker (DNS + RDAP) output",
+  "title": "Startup Name Checker output",
   "properties": {
     "results": {
       "type": "string",

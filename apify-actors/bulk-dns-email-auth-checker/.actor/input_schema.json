@@ -1,18 +1,18 @@
 {
-  "title": "Bulk DNS & Email Authentication Checker input",
+  "title": "Cold-Email List Pre-Check input",
   "type": "object",
   "schemaVersion": 1,
-  "description": "Paste the domains you want to check, then click Start. URLs and email addresses are turned into domains automatically. Each domain is looked up in public DNS only \u2014 the Actor never sends email and needs no API keys.",
+  "description": "Paste the prospect or client domains you want to check, one per line, then click Start. Websites and email addresses are reduced to their domain. Each domain is read from public DNS only: the Actor never sends email, never contacts the mail servers and needs no API keys.",
   "properties": {
     "domains": {
       "title": "Domains, URLs or emails",
       "type": "array",
-      "description": "Required. One domain, website URL or email address per line (for example apify.com, https://apify.com or hello@apify.com). Duplicates are ignored.",
+      "description": "Required. One entry per line: a domain (example.com), a website URL (https://www.example.org/pricing) or an email address (jane@example.net). URLs and emails are reduced to the domain, a leading www. is dropped and duplicates are checked once. Lines that are not a domain are skipped and are not checked. Only the first Max domains per run entries are checked.",
       "editor": "stringList",
       "prefill": [
-        "apify.com",
-        "google.com",
-        "example.com"
+        "example.com",
+        "https://www.example.org/pricing",
+        "jane@example.net"
       ]
     },
     "dkimSelectors": {
@@ -20,7 +20,7 @@
       "sectionDescription": "Leave these at the defaults for a first run. Add selectors only if a domain uses a custom DKIM selector.",
       "title": "DKIM selectors to test",
       "type": "array",
-      "description": "Host prefixes to query as <selector>._domainkey.<domain>. Common selectors are already included (google, selector1, k1, sendgrid, and others). Add your email provider's selector if a known domain shows no DKIM key.",
+      "description": "Optional. DKIM selector names to look up as <selector>._domainkey.<domain>, for example google or selector1. Default: 17 common selectors (google, selector1, selector2, default, k1, k2, s1, s2, mail, dkim, smtp, mandrill, mxvault, everlytickey1, zoho, sendgrid, sig1). A domain can sign with a selector that is not on the list, so a missing key is reported as 'not found on the tested selectors', not as 'no DKIM'. If you clear the list, the first four selectors are used.",
       "editor": "stringList",
       "default": [
         "google",
@@ -45,7 +45,7 @@
     "includeRecords": {
       "title": "Include A/AAAA/CAA records",
       "type": "boolean",
-      "description": "When on, the result also includes IPv4/IPv6 addresses and CAA records for each domain.",
+      "description": "Optional. When on (default), each row also lists the A (IPv4), AAAA (IPv6) and CAA records of the domain. Turn it off for a lighter run if you only need the email checks.",
       "default": true
     },
     "concurrency": {
@@ -53,7 +53,7 @@
       "sectionDescription": "Safety caps for large lists. You can leave these unchanged.",
       "title": "Concurrency",
       "type": "integer",
-      "description": "How many domains to look up in parallel. Higher is faster; stay within your plan's limits.",
+      "description": "Optional. How many domains are looked up at the same time. Default 10, allowed 1 to 30. Higher is faster.",
       "default": 10,
       "minimum": 1,
       "maximum": 30
@@ -64,7 +64,7 @@
       "default": 10000,
       "minimum": 1,
       "maximum": 100000,
-      "description": "Safety cap. If the list is longer, only the first N valid domains are checked."
+      "description": "Optional safety cap. Default 10000, allowed 1 to 100000. If the list is longer, only the first N valid, unique domains are checked."
     }
   },
   "required": [

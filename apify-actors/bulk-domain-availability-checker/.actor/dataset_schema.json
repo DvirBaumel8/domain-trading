@@ -8,28 +8,28 @@
           "string",
           "null"
         ],
-        "description": "Domain checked"
+        "description": "Domain checked (lower case, IDN names in xn-- form)"
       },
       "available": {
         "type": [
           "boolean",
           "null"
         ],
-        "description": "true = not registered, false = registered, null = unknown"
+        "description": "true = not registered, false = registered, null = not known (unknown, likely_available or invalid_tld)"
       },
       "status": {
         "type": [
           "string",
           "null"
         ],
-        "description": "available | registered | unknown | invalid"
+        "description": "available | likely_available | registered | unknown | invalid_tld. likely_available: real TLD without a public RDAP server and DNS says the name does not exist, so the registry could not confirm it. invalid_tld: the TLD is not in the IANA root zone list (not charged)"
       },
       "method": {
         "type": [
           "string",
           "null"
         ],
-        "description": "dns or rdap - how the answer was reached"
+        "description": "rdap = the registry's RDAP server answered, dns = decided from DNS only"
       },
       "hasDns": {
         "type": [
@@ -85,7 +85,7 @@
           "string",
           "null"
         ],
-        "description": "Source keyword when generated from keywords"
+        "description": "The keyword the name was generated from; null for names you pasted in Domains"
       },
       "tld": {
         "type": [
@@ -106,7 +106,7 @@
           "string",
           "null"
         ],
-        "description": "Error detail when status is unknown/invalid"
+        "description": "Reason or note when status is unknown, likely_available or invalid_tld; null otherwise"
       },
       "checkedAt": {
         "type": [
@@ -120,18 +120,27 @@
           "string",
           "null"
         ],
-        "description": "Marketplace/parking detected from nameservers (e.g. Afternic, Sedo, Dan.com)"
+        "description": "Parking or marketplace service detected from the nameservers (for example Afternic, Sedo, Dan.com); null if none"
       }
-    }
+    },
+    "required": [
+      "domain",
+      "available",
+      "status",
+      "method",
+      "tld",
+      "length",
+      "checkedAt"
+    ]
   },
   "views": {
     "overview": {
-      "title": "Overview",
+      "title": "Availability",
       "transformation": {
         "fields": [
           "domain",
-          "available",
           "status",
+          "available",
           "method",
           "registrar",
           "parkedOrForSale",
@@ -145,34 +154,34 @@
         "component": "table",
         "properties": {
           "domain": {
-            "label": "domain"
-          },
-          "available": {
-            "label": "available"
+            "label": "Domain"
           },
           "status": {
-            "label": "status"
+            "label": "Status"
+          },
+          "available": {
+            "label": "Available"
           },
           "method": {
-            "label": "method"
+            "label": "Method"
           },
           "registrar": {
-            "label": "registrar"
-          },
-          "createdDate": {
-            "label": "createdDate"
-          },
-          "expiryDate": {
-            "label": "expiryDate"
-          },
-          "domainAgeYears": {
-            "label": "domainAgeYears"
-          },
-          "error": {
-            "label": "error"
+            "label": "Registrar"
           },
           "parkedOrForSale": {
-            "label": "parkedOrForSale"
+            "label": "Parked / for sale"
+          },
+          "createdDate": {
+            "label": "Created"
+          },
+          "expiryDate": {
+            "label": "Expires"
+          },
+          "domainAgeYears": {
+            "label": "Age (yrs)"
+          },
+          "error": {
+            "label": "Note"
           }
         }
       }

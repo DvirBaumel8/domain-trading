@@ -1,5 +1,5 @@
 {
-  "title": "Bulk PageSpeed Checker",
+  "title": "Core Web Vitals Checker input",
   "type": "object",
   "schemaVersion": 1,
   "required": [
@@ -9,7 +9,7 @@
     "urls": {
       "title": "URLs",
       "type": "array",
-      "description": "Pages to test. https:// is added when missing.",
+      "description": "Required. Page URLs, one per line, for example https://example.com/pricing. A missing https:// is added. Only http and https URLs with a domain name are accepted; other lines are skipped. Duplicates are tested once. To start from a sitemap, list its URLs first (for example with the Sitemap URL Extractor Actor) and paste them here.",
       "editor": "stringList",
       "prefill": [
         "https://example.com/"
@@ -18,7 +18,7 @@
     "strategies": {
       "title": "Strategies",
       "type": "array",
-      "description": "Mobile, desktop or both.",
+      "description": "Which device profiles to test: mobile, desktop, or both. Each URL gives one row per strategy. Default: both.",
       "editor": "select",
       "items": {
         "type": "string",
@@ -35,7 +35,7 @@
     "categories": {
       "title": "Categories",
       "type": "array",
-      "description": "Lighthouse categories to score. Performance is always useful; the others are optional.",
+      "description": "Lighthouse categories to score: performance, accessibility, best-practices, seo. Default: performance only. Lab metrics and Core Web Vitals field data come with every run.",
       "editor": "select",
       "items": {
         "type": "string",
@@ -53,9 +53,10 @@
     "apiKey": {
       "title": "Google PageSpeed Insights API key",
       "type": "string",
-      "description": "Optional. Your own Google API key with the PageSpeed Insights API enabled. If left empty, a default key is used. It is never logged or written to the results.",
+      "description": "Optional. Your own Google API key with the PageSpeed Insights API enabled. With it there is no row limit from this Actor (Google's own quota applies). If you leave it empty, the Actor uses its own default key when one is configured, and tests at most 50 URL/strategy rows per run (the Actor's default cap); if no default key is configured, the run stops and asks for your key. The key is never logged or written to the results.",
       "editor": "textfield",
       "isSecret": true
     }
-  }
+  },
+  "description": "Paste the page URLs to test, one per line, then click Start. Each URL is tested once per strategy (mobile and desktop by default) with Google's PageSpeed Insights API. Add your own Google API key to test more than the free-run limit."
 }

@@ -1,5 +1,5 @@
 {
-  "title": "Broken Link Auditor",
+  "title": "Site Migration QA input",
   "type": "object",
   "schemaVersion": 1,
   "required": [
@@ -9,16 +9,17 @@
     "startUrls": {
       "title": "Start URLs",
       "type": "array",
-      "description": "A site, a sitemap URL, or a list of URLs.",
+      "description": "Required. One per line. In List mode: the URLs to check (for example your old URLs). In Sitemap mode: a site address (its sitemap is found in robots.txt or at /sitemap.xml) or a sitemap URL. In Crawl mode: the page to start from. Only http and https; a missing https:// is added. Anything else (ftp:, mailto:, javascript:, text that is not a URL) is skipped, saved to INVALID_INPUTS and not charged. Duplicates are merged.",
       "editor": "stringList",
       "prefill": [
-        "https://example.com/"
+        "https://example.com/",
+        "https://example.com/old-page"
       ]
     },
     "mode": {
       "title": "Mode",
       "type": "string",
-      "description": "list: check the given URLs. sitemap: expand sitemaps first. crawl: follow same-site links.",
+      "description": "list = check the given URLs (default). sitemap = expand the sitemap(s) of the given site first, then check every URL in them. crawl = follow links on the same site up to Max crawl depth.",
       "enum": [
         "list",
         "sitemap",
@@ -29,7 +30,7 @@
     "maxPages": {
       "title": "Max URLs",
       "type": "integer",
-      "description": "Stop after this many unique URLs.",
+      "description": "Safety cap: stop after this many unique URLs. Default 1000, allowed 1 to 100000.",
       "default": 1000,
       "minimum": 1,
       "maximum": 100000
@@ -37,7 +38,7 @@
     "maxDepth": {
       "title": "Max crawl depth",
       "type": "integer",
-      "description": "Crawl mode only.",
+      "description": "Crawl mode only. How many link levels to follow from the start page (0 = only the start page). Default 3, allowed 0 to 10.",
       "default": 3,
       "minimum": 0,
       "maximum": 10
@@ -45,13 +46,13 @@
     "checkExternal": {
       "title": "Check external links",
       "type": "boolean",
-      "description": "Crawl mode: also check links that point to other sites (they are not crawled).",
+      "description": "Crawl mode only. When on, links that point to other sites are checked too (they are checked, not crawled). Default: off.",
       "default": false
     },
     "maxConcurrency": {
       "title": "Concurrency",
       "type": "integer",
-      "description": "Parallel requests.",
+      "description": "How many URLs are checked at the same time. Default 5, allowed 1 to 20. Requests to one host are also spaced out.",
       "default": 5,
       "minimum": 1,
       "maximum": 20
@@ -59,14 +60,15 @@
     "respectRobots": {
       "title": "Respect robots.txt",
       "type": "boolean",
-      "description": "Skip URLs that robots.txt disallows.",
+      "description": "When on (default), URLs that robots.txt disallows for this Actor are not requested; they are returned with category robots_blocked and are not charged.",
       "default": true
     },
     "debugNetwork": {
       "title": "Debug network",
       "type": "boolean",
-      "description": "Log connect details for failed requests (host, attempt, reason, error classes). No headers, bodies, paths or query strings.",
+      "description": "Log connect details for failed requests (host, attempt, reason, error classes) to the run log. No headers, bodies, paths or query strings. Default: off.",
       "default": false
     }
-  }
+  },
+  "description": "Pick a mode and give the URLs. **List**: check exactly the URLs you give (the old URLs of a migration). **Sitemap**: read the site's sitemap and check every URL in it. **Crawl**: follow links on the same site and report the pages that link to broken URLs."
 }
