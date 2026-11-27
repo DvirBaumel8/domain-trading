@@ -44,10 +44,10 @@
     if (!n) return "";
     let h = `<h4 style="margin:14px 0 4px">${esc(n.heading)}</h4>`;
     if (n.based_on) h += `<p class="small">${esc(n.based_on)}</p>`;
-    if (n.answers) h += `<p class="small">Your business: ${n.named_in ? "named in " + n.named_in + " of " + n.answers + " answers" : "not named"}.</p>`;
+    if (n.answers) h += `<p class="small">Your business: ${n.named_in ? (n.answers === 1 ? "named in the AI's list" : "named in " + n.named_in + " of " + n.answers + " answers") : "not named"}.</p>`;
     if (n.names && n.names.length) {
       h += "<ul class='small' style='margin:4px 0 4px 18px'>" + n.names.map(x =>
-        `<li>${esc(x.name)} — ${x.answers} of ${n.answers} answers${x.match ? " (" + esc(x.match) + ")" : ""}</li>`).join("") + "</ul>";
+        `<li>${esc(x.name)} — ${n.answers > 1 ? x.answers + " of " + n.answers + " answers" : "named by the AI"}${x.match ? " (" + esc(x.match) + ")" : ""}</li>`).join("") + "</ul>";
     } else { h += `<p class="small">${esc(n.empty_note || "The AI did not name any businesses in its answers.")}</p>`; }
     return h + `<p class="small">${esc(n.register_note || "")}</p>`;
   }
@@ -84,7 +84,7 @@
       <a class="btn" data-pay="payLinkCheck" href="#pricing">Get the full report — $149</a>`;
     }
     if (j.status === "queued") {
-      return `<h3 style="margin-top:0">Got it — your free check is running</h3><p>We are asking an AI model ${j.prompts} questions customers ask about ${esc(j.niche_label)} in ${esc(d.city)}. This page updates when it finishes (about ${j.eta_min} minutes).</p><div id="poll" data-id="${esc(j.id)}"></div>`;
+      return `<h3 style="margin-top:0">Got it — your free check is running</h3><p>We are asking an AI model which businesses customers are given for ${esc(j.niche_label)} in ${esc(d.city)}. This page updates when it finishes (about ${j.eta_min} minutes).</p><div id="poll" data-id="${esc(j.id)}"></div>`;
     }
     return `<h3 style="margin-top:0">Thanks — request saved</h3><p>We don't have ${esc(d.city)} data yet. We saved your request.</p>`;
   }
@@ -95,7 +95,7 @@
     const t = setInterval(async () => {
       if (Date.now() - started > 5 * 60 * 1000) { return stop(t, "<p>This is taking longer than expected. Please try again in a few minutes.</p>"); }
       try { const r = await fetch((C.apiBase||"") + "/api/check/" + p.dataset.id); const j = await r.json();
-        if (j.status === "done") { stop(t, `<p><b>Done.</b> Named in ${j.named_in} of ${j.answers} answers. <a href="${esc(j.report)}" target="_blank">Open your free result</a></p>${namesHtml(j.names)}${liveHtml(j)}`); mountSuggestions(j, p); }
+        if (j.status === "done") { stop(t, `<p><b>Done.</b> ${j.answers === 1 ? (j.named_in ? "Your business was named in the AI's list." : "Your business was not named in the AI's list.") : "Named in " + j.named_in + " of " + j.answers + " answers."} <a href="${esc(j.report)}" target="_blank">Open your free result</a></p>${namesHtml(j.names)}${liveHtml(j)}`); mountSuggestions(j, p); }
         if (j.status === "partial") { stop(t, `<p><b>${esc(j.message)}</b> This is not a reliable check, so we are not showing a score. <a href="${esc(j.report)}" target="_blank">Open the partial result</a></p>${namesHtml(j.names)}${liveHtml(j)}`); mountSuggestions(j, p); }
         if (j.status === "failed") { stop(t, `<p>${esc(j.message || "We could not get answers from the AI model right now. Please try again in a few minutes.")} We saved your request.</p>`); }
         if (j.status === "unavailable") { stop(t, `<p><b>${esc(j.message || "The free check is temporarily unavailable. Please try again later.")}</b></p>`); }

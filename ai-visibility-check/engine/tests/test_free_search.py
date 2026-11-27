@@ -10,7 +10,7 @@ from aivis.providers.free_search import FreeSearchProvider, GeminiSearchProvider
 
 GKEY, OKEY = "test-key-not-real-gemini", "test-key-not-real-openai"
 SUGG = '<div class="container"><a class="chip" href="https://www.google.com/search?q=x">plumbers</a></div>'
-GROUNDED = "1. **Alpha Plumbing**\n2. **Beta Pipes**"
+GROUNDED = json.dumps({"businesses": ["Alpha Plumbing", "Beta Pipes"], "note": ""})
 
 
 def gemini_body(text=GROUNDED, rendered=SUGG, queries=("q1",), usage=True, grounded=True):
@@ -61,6 +61,8 @@ import urllib.parse
 
 def ledger(caps=None, t=None, **kw):
     now = [1_780_000_000.0 if t is None else t]
+    kw.setdefault("daily_caps", {"gemini": 1e9, "openai": 1e9})     # the daily limits have their own tests
+    kw.setdefault("daily_max", 10 ** 6)
     led = free_caps.CapLedger(caps=caps, clock=lambda: now[0], **kw)
     led.now = now
     return led
@@ -377,3 +379,19 @@ class PaidUnchanged(Env):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StructuredList(unittest.TestCase):
+    def test_names_from_json_fenced_json_and_junk(self):
+        from aivis.providers.free_search import _names_from_text, _as_list_text
+        self.assertEqual(_names_from_text('{"businesses": ["A Co", "a co", " B  Inc ", 3, ""]}'), ["A Co", "B Inc"])
+        self.assertEqual(_names_from_text('```json\n{"businesses": ["A Co"], "note": "x"}\n```'), ["A Co"])
+        self.assertEqual(_names_from_text('{"businesses": []}'), [])
+        for bad in ("", "1. A Co\n2. B Co", "{not json", '{"businesses": "A Co"}', "[1]"):
+            self.assertIsNone(_names_from_text(bad), bad)
+        self.assertEqual(_as_list_text(["A", "B"]), "1. A\n2. B")
+
+    def test_daily_defaults(self):
+        self.assertEqual(fc.DEFAULT_DAILY_MAX_CHECKS, 8)
+        led = free_caps.CapLedger(clock=lambda: 1_780_000_000.0)
+        self.assertAlmostEqual(led.daily_cap("gemini") + led.daily_cap("openai"), 15.0 / 31, places=6)

@@ -4,7 +4,7 @@ python3 server.py [--port 8080] [--free-run]
 
 POST /api/check   free self-check. Instant answer from data/markets/*.json when we
                   have that niche+city; else, with --free-run, a short free run
-                  (Gemini search with an OpenAI fallback, 8 questions, monthly spend caps) in the background; else the
+                  (Gemini search with an OpenAI fallback, one call, monthly spend caps) in the background; else the
                   request is just saved. Requests go to the private orders store (leads/).
                   Limits per client address: 5 checks an hour, 3 free jobs at once (429 beyond).
 GET  /api/check/<id>  status of a background free run.
@@ -47,9 +47,10 @@ BAD_FORM_MSG = "Please send the form again."
 BUSY_MSG = "Too many checks right now, try again in a few minutes."
 FREE_PER_HOUR = 5           # free checks per client address per hour
 FREE_CONCURRENT = 3         # free jobs running at once per client address
-FREE_QUESTIONS = 8          # questions in one free run
+FREE_QUESTIONS = 1          # one structured call per free run
 FAIL_MSG = "We could not get answers from the AI model right now. Please try again in a few minutes."
 UNAVAILABLE_MSG = "The free check is temporarily unavailable. Please try again later."
+DAILY_MSG = "We've reached today's free-check limit. Please try again tomorrow."
 LIVE_KEYS = ("names", "suggestions", "citations")    # shown once to the visitor who asked, never stored
 BYPASS_ENV = "AVC_TEST_BYPASS_TOKEN"
 BYPASS_HEADER = "X-AVC-Test-Token"
@@ -1004,12 +1005,24 @@ def _cap_save(provider, month, rec):
     Store().put(f"caps/{provider}-{month}.json", rec, overwrite=True)    # counts and estimated USD only
 
 
-free_caps.install(free_caps.CapLedger(clock=lambda: clock(), load=_cap_load, save=_cap_save, on_cap=free_cap_alert))
+def _day_load(day):
+    return Store().get(f"caps/daily-{day}.json")[0]
+
+
+def _day_save(day, rec):
+    Store().put(f"caps/daily-{day}.json", rec, overwrite=True)    # check count and estimated USD only
+
+
+free_caps.install(free_caps.CapLedger(clock=lambda: clock(), load=_cap_load, save=_cap_save, on_cap=free_cap_alert,
+                                      load_day=_day_load, save_day=_day_save))
 
 
 def free_refusal():
     """The reason code when no free provider can take a new check, else None. Calls no vendor."""
     try:
+        if free_caps.LEDGER.daily_checks_full():
+            free_caps.LEDGER.daily_refused("max_checks")
+            return "daily_cap_reached"
         from aivis import order
         pre = getattr(order.build_free_provider(), "preflight", None)
         return pre() if pre else None
@@ -1027,7 +1040,8 @@ def free_page(answers, expected, named_in, note, partial):
     if partial:
         h.append(f"<p><b>{E(partial)}</b> Do not rely on these numbers.</p>")
     else:
-        h.append(f"<p>Your business: {'named in %d of %d answers' % (named_in, answers) if named_in else 'not named'}.</p>")
+        named = ("named in the AI's list" if answers == 1 else 'named in %d of %d answers' % (named_in, answers)) if named_in else "not named"
+        h.append(f"<p>Your business: {named}.</p>")
     h.append("<p><small>AI output, not verified. The names the AI gave, with their sources, are shown once on the page "
              "where you ran the check and are not saved. Run the check again to see them again.</small></p>")
     return "".join(h)
@@ -1055,11 +1069,11 @@ def free_job(job_id, req):
         o = Order(order_id="FREE-" + job_id[:8], business_name=req["business"], city=req["city"],
                   niche=req["niche"], plan="free")
         register, roster = fetch_roster(get_niche(req["niche"]), req["city"])
-        note = "Free quick check: AI output with web search, 8 questions."
+        note = "Free quick check: AI output with web search."
 
         def paint(r):
             got = r.score.total_answers
-            part = f"Partial result: {got} of {expected} questions answered" if got < FREE_MIN_ANSWERS else ""
+            part = "Partial result: no usable answer" if got < FREE_MIN_ANSWERS else ""
             return free_page(got, expected, sum(p.target_hits for p in r.score.providers), note, part)
         res, lg = run_order(o, mode="free", out_dir=tmp, render=paint, **({"roster": roster} if roster else {}))
         answers = res.score.total_answers
@@ -1075,14 +1089,16 @@ def free_job(job_id, req):
                                                  asked=expected, min_answers=FREE_MIN_ANSWERS)
             out["suggestions"], out["citations"] = collect_live(records)
         if answers < FREE_MIN_ANSWERS:
-            out.update({"status": "partial", "message": f"Partial result: {answers} of {expected} questions answered"})
+            out.update({"status": "partial", "message": "Partial result: no usable answer"})
         else:
             out.update({"status": "done", "named_in": sum(p.target_hits for p in res.score.providers)})
         finish_job(job_id, out)
     except Exception as e:  # never leak internals to the browser
         if isinstance(e, FreeUnavailable):
             reasons = {e.reason: 1}
-            finish_job(job_id, {"status": "unavailable", "message": UNAVAILABLE_MSG, "answers": 0, "expected": expected})
+            free_caps.LEDGER.release_check()        # no vendor was called: give the daily slot back
+            msg = DAILY_MSG if e.reason == "daily_cap_reached" else UNAVAILABLE_MSG
+            finish_job(job_id, {"status": "unavailable", "message": msg, "answers": 0, "expected": expected})
         else:
             if isinstance(e, AnswerShortfall):
                 reasons = dict(e.reasons)
@@ -1321,8 +1337,12 @@ class H(http.server.BaseHTTPRequestHandler):
                 req = clean(body)
                 ip = client_ip(self.headers, self.client_address[0])
                 r = instant(req)
-                if FREE_RUN and not r and free_refusal() == "cap_reached":     # the test token does not skip this
-                    return self._json(503, {"error": UNAVAILABLE_MSG})
+                if FREE_RUN and not r:      # the test token does not skip these
+                    why = free_refusal()
+                    if why == "daily_cap_reached":
+                        return self._json(503, {"error": DAILY_MSG, "reason": why})
+                    if why == "cap_reached":
+                        return self._json(503, {"error": UNAVAILABLE_MSG})
                 bypass = bypass_ok(self.headers)
                 if bypass:
                     ip = "bypass"               # never counted against a real visitor's address
@@ -1340,6 +1360,8 @@ class H(http.server.BaseHTTPRequestHandler):
                         log("lead save failed: " + type(e).__name__)
                     return self._json(200, r)
                 if FREE_RUN:
+                    if not free_caps.LEDGER.claim_check():      # one daily slot per real free-run job
+                        return self._json(503, {"error": DAILY_MSG, "reason": "daily_cap_reached"})
                     job = str(uuid.uuid4())
                     with LOCK:
                         JOBS[job] = {"status": "running"}; JOB_META[job] = {"ip": ip, "started": clock()}
@@ -1348,7 +1370,7 @@ class H(http.server.BaseHTTPRequestHandler):
                         save_lead({**rec, "result": "free-run", "job": job})
                     except Exception as e:
                         log("lead save failed: " + type(e).__name__)
-                    return self._json(200, {"status": "queued", "id": job, "prompts": 8, "eta_min": 1,
+                    return self._json(200, {"status": "queued", "id": job, "prompts": FREE_QUESTIONS, "eta_min": 1,
                                             "niche_label": get_niche(req["niche"]).plural})
                 save_lead({**rec, "result": "saved"})
                 return self._json(200, {"status": "saved"})

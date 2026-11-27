@@ -13,6 +13,14 @@ Failures carry a short reason code (never a URL, prompt, body or key):
   model_unavailable        404 / 403 naming the model; permanent for that provider
   grounding_missing        Gemini 200 without grounding metadata or without Search Suggestions HTML
 
+One call per check: the prompt asks for the whole list of businesses as JSON ({"businesses": [...], "note": ""}) and
+the provider turns that list into a numbered text answer for the audit pipeline. A reply that is empty, not that JSON
+or has no names is empty_answer / parse_error (then the fallback, or a clean failure). Gemini has no documented
+per-request cap on search queries, so the prompt asks for a single search and cost is bounded by the reservation
+(3 searches) and the caps.
+
+  daily_cap_reached        today's free-check USD limit would be passed; permanent for that provider (until tomorrow)
+
 Live-only data (Gemini `searchEntryPoint.renderedContent`, OpenAI url_citation links) goes in `Answer.live` and is
 never written anywhere by this module.
 """
@@ -25,13 +33,46 @@ import urllib.request
 
 from .. import free_caps, free_config as fc
 from .base import Answer, Provider, ProviderError
-from .free import SUFFIX, MAX_TRIES, BUDGET_S, RETRY_AFTER_CAP_S, BACKOFF_BASE_S, _Transient, _retry_after
+from .free import MAX_TRIES, BUDGET_S, RETRY_AFTER_CAP_S, BACKOFF_BASE_S, _Transient, _retry_after
 
 FAIL_FAST_PERMANENT = 3             # permanent errors from one provider in one check before it is skipped
-DEAD_REASONS = {"cap_reached", "provider_not_configured", "gemini_quota_exhausted", "model_unavailable"}
+DEAD_REASONS = {"cap_reached", "daily_cap_reached", "provider_not_configured", "gemini_quota_exhausted", "model_unavailable"}
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 OPENAI_URL = "https://api.openai.com/v1/responses"
 MAX_LINKS = 12
+MAX_NAMES = 15
+FORMAT = (' Give the full list of specific business names a customer would be given, using one web search.'
+          ' Reply with only JSON like {"businesses": ["Name One", "Name Two"], "note": ""}.'
+          ' If you are not sure a business exists, say so in "note" instead of guessing;'
+          ' if you find no specific business, return an empty list.')
+
+
+def _names_from_text(text):
+    """The business names in a structured reply, or None when it is not the requested JSON."""
+    t = (text or "").strip()
+    if t.startswith("```"):
+        t = t.strip("`").strip()
+        t = t[4:].strip() if t[:4].lower() == "json" else t
+    a, b = t.find("{"), t.rfind("}")
+    if a < 0 or b <= a:
+        return None
+    try:
+        data = json.loads(t[a:b + 1])
+    except ValueError:
+        return None
+    items = data.get("businesses") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        return None
+    out = []
+    for x in items:
+        n = " ".join(x.split())[:120] if isinstance(x, str) else ""
+        if n and n.lower() not in (o.lower() for o in out):
+            out.append(n)
+    return out[:MAX_NAMES]
+
+
+def _as_list_text(names):
+    return "\n".join(f"{i}. {n}" for i, n in enumerate(names, 1))
 
 
 def _not_configured(name):
@@ -127,8 +168,9 @@ class _SearchProvider(Provider):
             left = self.budget_s - (self._clock() - start)
             if left <= 0:
                 break
-            if not led.try_reserve(self.name, reserve):
-                raise ProviderError(f"{self.name}: cap_reached", "cap_reached", "cap", permanent=True)
+            why = led.reserve_reason(self.name, reserve)
+            if why:
+                raise ProviderError(f"{self.name}: {why}", why, "cap", permanent=True)
             try:
                 data = self._once(key, prompt, city, min(self.timeout_s, left))
             except (_Transient, ProviderError) as e:
@@ -185,7 +227,7 @@ class GeminiSearchProvider(_SearchProvider):
         return fc.gemini_model()
 
     def _request(self, key, prompt, city):
-        body = {"contents": [{"parts": [{"text": prompt + SUFFIX}]}], "tools": [{"google_search": {}}],
+        body = {"contents": [{"parts": [{"text": prompt + FORMAT}]}], "tools": [{"google_search": {}}],
                 "generationConfig": {"maxOutputTokens": fc.EST_OUTPUT_TOKENS}}
         return urllib.request.Request(GEMINI_URL.format(model=self.model), data=json.dumps(body).encode(), method="POST",
                                       headers={"x-goog-api-key": key, "Content-Type": "application/json"})
@@ -215,6 +257,12 @@ class GeminiSearchProvider(_SearchProvider):
             return e
         if not text:
             raise fail("empty_answer")
+        names = _names_from_text(text)
+        if names is None:
+            raise fail("parse_error")
+        if not names:
+            raise fail("empty_answer")
+        text = _as_list_text(names)
         rendered = (meta.get("searchEntryPoint") or {}).get("renderedContent") if isinstance(meta.get("searchEntryPoint"), dict) else None
         if not isinstance(rendered, str) or not rendered.strip():
             raise fail("grounding_missing")     # no grounding, or Grounded Results without their Search Suggestions
@@ -231,7 +279,7 @@ class OpenAISearchProvider(_SearchProvider):
     def _request(self, key, prompt, city):
         tool = {"type": "web_search", "user_location": {"type": "approximate", "country": "US", "city": city}} if city \
             else {"type": "web_search"}
-        body = {"model": self.model, "input": prompt + SUFFIX, "tools": [tool], "max_output_tokens": 1500}
+        body = {"model": self.model, "input": prompt + FORMAT, "tools": [tool], "max_output_tokens": 1500}
         return urllib.request.Request(OPENAI_URL, data=json.dumps(body).encode(), method="POST",
                                       headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"})
 
@@ -260,8 +308,14 @@ class OpenAISearchProvider(_SearchProvider):
             return e
         if not text.strip():
             raise fail("empty_answer")
+        names = _names_from_text(text)
+        if names is None:
+            raise fail("parse_error")
+        if not names:
+            raise fail("empty_answer")
         if not calls and not links:
             raise fail("grounding_missing")     # an answer from model memory is not web-search output
+        text = _as_list_text(names)
         return Answer(self.name, self.model, prompt, text.strip(), [l["url"] for l in links], self.mode, 0.0, 0, {},
                       {"citations": links[:MAX_LINKS]}), usage
 
@@ -295,8 +349,13 @@ class FreeSearchProvider(Provider):
                 self._dead[m.name] = "cap_reached"
                 self.ledger.refuse_check(m.name)
                 capped = True
+            elif not self.ledger.daily_room(m.name, fc.check_usd(m.name)):
+                self._dead[m.name] = "daily_cap_reached"
         if len(self._dead) < len(self.members):
             return None
+        if "daily_cap_reached" in self._dead.values():
+            self.ledger.daily_refused("usd")
+            return "daily_cap_reached"
         return "cap_reached" if capped else "provider_not_configured"
 
     def _note(self, name, reason):
@@ -324,8 +383,9 @@ class FreeSearchProvider(Provider):
             return ans
         if last is None:        # every provider was already out
             reasons = list(self._dead.values())
-            reason = "cap_reached" if "cap_reached" in reasons else (reasons[-1] if reasons else "error")
-            raise ProviderError(f"{self.name}: {reason}", reason, "cap" if reason == "cap_reached" else reason, permanent=True)
+            reason = "daily_cap_reached" if "daily_cap_reached" in reasons else \
+                "cap_reached" if "cap_reached" in reasons else (reasons[-1] if reasons else "error")
+            raise ProviderError(f"{self.name}: {reason}", reason, "cap" if "cap" in reason else reason, permanent=True)
         out = len(self._dead) >= len(self.members)
         raise ProviderError(f"{self.name}: {last.reason}", last.reason, last.category, permanent=out)
 
