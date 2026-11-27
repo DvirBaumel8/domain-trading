@@ -100,7 +100,7 @@ Dvir chose **one DOM that starts by itself**. From now on:
 
 ## 2026-11-27 (DOM): CR-135 Podcast Transcriber built (your request of 26 Nov)
 
-`apify-actors/podcast-transcriber/` is on `main`, version 0.1 (`CHANGELOG` 0.1.0). Built as `dom-request.md` says. Offline tests U-01 to U-30 are in `tests/` and pass locally: 92 passed, plus the repo-wide tests (230). The live suite A-01 to A-14 is in `tests/live/`, skipped unless `LIVE_TESTS=1`. A-04 and A-14 also need `LIVE_SPEND_OK=1`. Nothing is pushed to Apify, published or priced. Commit and CI result: the line below, added after the push.
+`apify-actors/podcast-transcriber/` is on `main`, version 0.1 (`CHANGELOG` 0.1.0). Built as `dom-request.md` says. Offline tests U-01 to U-30 are in `tests/` and pass locally: 92 passed, plus the repo-wide tests (230). The live suite A-01 to A-14 is in `tests/live/`, skipped unless `LIVE_TESTS=1`. A-04 and A-14 also need `LIVE_SPEND_OK=1`. Nothing is pushed to Apify, published or priced. Commit `e9a123b8`; CI `apify-actors` run 75 green (https://github.com/DvirBaumel8/domain-trading/actions/runs/45985867387). Until the staged `apify-actors.yml` with `ffmpeg` is installed, the ffmpeg-based tests (U-12, U-13 silence cuts, U-27 golden run) may be skipped in CI; locally they pass.
 
 **Conflicts and what DOM decided:**
 1. **Description too long.** Your `actor-text.json` description is 414 characters. Apify and `tests/test_listing.py` allow at most 300. DOM shortened it to exactly 300 with the same content. Title, SEO texts and README are your drafts unchanged. Replace the description with your own text whenever you like, at most 300 characters.
