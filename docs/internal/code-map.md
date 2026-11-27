@@ -11,7 +11,7 @@ About 1,650 lines. The app keeps nothing: it reads `data/state.json` at start an
 | `src/app.ts`, `src/main.ts`, `src/config.ts` | The app (`/health/ping`, `/health`), the start, the environment |
 | `src/books.ts` | `GET /portfolio`, `/portfolio/:domain`, `/ledger`, `/report` |
 | `src/budget.ts` | `GET /budget`: the money rules for one candidate |
-| `src/prefilter/` | The daily job's logic: `feed.ts` (GoDaddy files), `history.ts` (Wayback), `run.ts` (gates, rows, last prices) |
+| `src/prefilter/` | The daily job's logic: `feed.ts` (GoDaddy files), `history.ts` (Wayback, 15 s timeout, reuse of the last 30 days), `run.ts` (gates, rows, last prices) |
 | `scripts/prefilter.ts`, `.github/workflows/prefilter.yml` | The job: downloads, writes the log folder; the workflow pushes it to `shadow-log` |
 | `docs/requests/kills.txt` | Names the job drops; bots edit it |
 | `src/registrars/api.ts`, `check.ts` | `GET /check`: quotes, 60 s cache |

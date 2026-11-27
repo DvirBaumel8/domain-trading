@@ -96,14 +96,18 @@ export async function runPrefilter(i: RunInput) {
   const loggedAt = toJerusalemIso(new Date(now));
   const rows: ShadowRow[] = [];
   const killed: { domain: string; source: ShadowRow['source']; by: 'web_risk' | 'history'; evidence: unknown }[] = [];
+  const seen: { domain: string; history: History }[] = [];
   const summary: Record<string, { file_built_at: string; counts: Feed['counts']; dropped: Drops; checked: number; logged: number }> = {};
   for (const [source, feed] of [['auction', i.auctions], ['closeout', i.closeouts]] as const) {
     const { left, dropped } = gate(source, feed, i, now);
     const before = rows.length;
+    // the archive is slow and the time is short: the auctions that end soonest are read first, then the closeouts (the file order of `left` is kept for ties)
+    if (source === 'auction') left.sort((a, b) => a.endsAt - b.endsAt);
     for (const l of left) {
       const risk = await i.webRisk(l.domain);
       if (risk.status === 'flagged') { killed.push({ domain: l.domain, source, by: 'web_risk', evidence: risk.threatTypes }); continue; }
       const history = await i.history(l.domain);
+      seen.push({ domain: l.domain, history });
       if (history.status === 'killed') { killed.push({ domain: l.domain, source, by: 'history', evidence: history.evidence }); continue; }
       rows.push({
         domain: l.domain, source, auction_id: l.auctionId, logged_at: loggedAt, file_built_at: toJerusalemIso(new Date(feed.builtAt)), ends_at: toJerusalemIso(new Date(l.endsAt)),
@@ -118,5 +122,23 @@ export async function runPrefilter(i: RunInput) {
     }
     summary[source] = { file_built_at: toJerusalemIso(new Date(feed.builtAt)), counts: feed.counts, dropped, checked: left.length, logged: rows.length - before };
   }
-  return { rows, closes: closes(i), killed, summary };
+  // names that errored get one more try at the end, if the 40 minutes are not used (a `not_checked` answer keeps the first error)
+  for (const s of seen) {
+    if (s.history.status !== 'error') continue;
+    const again = await i.history(s.domain);
+    if (again.status === 'not_checked') break;
+    s.history = again;
+    const row = rows.find((r) => r.domain === s.domain);
+    if (again.status === 'killed') {
+      rows.splice(rows.indexOf(row!), 1);
+      killed.push({ domain: s.domain, source: row!.source, by: 'history', evidence: again.evidence });
+      summary[row!.source]!.logged--;
+    } else if (row) {
+      row.checks.history = again;
+      row.open_checks = row.open_checks.filter((c) => c !== 'history').concat(['no_hits', 'no_snapshots'].includes(again.status) && !again.partial ? [] : ['history']);
+    }
+  }
+  const history_coverage = { checked: 0, reused: 0, not_checked: 0, error: 0 };
+  for (const { history } of seen) history_coverage[history.reused_from ? 'reused' : history.status === 'not_checked' ? 'not_checked' : history.status === 'error' ? 'error' : 'checked']++;
+  return { rows, history_coverage, closes: closes(i), killed, summary };
 }
