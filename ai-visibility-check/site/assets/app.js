@@ -30,6 +30,7 @@
     try {
       const r = await fetch((C.apiBase || "") + "/api/check", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data)});
       const j = await r.json();
+      if (r.status === 503) { out.innerHTML = "<b>" + esc(j.error || "The free check is temporarily unavailable. Please try again later.") + "</b>"; return; }
       if (!r.ok) throw new Error(j.error || "error");
       out.innerHTML = render(j, data);
       wirePay(out);
@@ -49,6 +50,29 @@
         `<li>${esc(x.name)} — ${x.answers} of ${n.answers} answers${x.match ? " (" + esc(x.match) + ")" : ""}</li>`).join("") + "</ul>";
     } else { h += `<p class="small">${esc(n.empty_note || "The AI did not name any businesses in its answers.")}</p>`; }
     return h + `<p class="small">${esc(n.register_note || "")}</p>`;
+  }
+  // Live only: the visitor who asked sees these once. Search Suggestions are Google's snippet, passed through
+  // unmodified inside a sandboxed frame (its own CSS stays inside; a tap opens the Google results page in a new tab).
+  function liveHtml(j){
+    let h = "";
+    if (j.citations && j.citations.length) {
+      h += "<h4 style='margin:14px 0 4px'>Sources the AI cited (AI output, not verified)</h4><ul class='small' style='margin:4px 0 4px 18px'>" +
+        j.citations.filter(c => /^https?:\/\//i.test(c.url || "")).map(c =>
+          `<li><a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">${esc(c.title || c.url)}</a></li>`).join("") + "</ul>";
+    }
+    if (j.suggestions && j.suggestions.length) { h += "<div class='search-suggestions' data-n='" + j.suggestions.length + "'></div>"; }
+    return h;
+  }
+  function mountSuggestions(j, root){
+    const box = root.querySelector(".search-suggestions"); if (!box || !j.suggestions) return;
+    j.suggestions.forEach(sug => {
+      const f = document.createElement("iframe");
+      f.setAttribute("sandbox", "allow-popups allow-popups-to-escape-sandbox");
+      f.setAttribute("title", "Search suggestions");
+      f.style.cssText = "width:100%;border:0;height:96px;display:block";
+      f.srcdoc = '<base target="_blank">' + sug;
+      box.appendChild(f);
+    });
   }
   function render(j, d){
     if (j.status === "instant") {
@@ -71,9 +95,10 @@
     const t = setInterval(async () => {
       if (Date.now() - started > 5 * 60 * 1000) { return stop(t, "<p>This is taking longer than expected. Please try again in a few minutes.</p>"); }
       try { const r = await fetch((C.apiBase||"") + "/api/check/" + p.dataset.id); const j = await r.json();
-        if (j.status === "done") { stop(t, `<p><b>Done.</b> Named in ${j.named_in} of ${j.answers} answers. <a href="${esc(j.report)}" target="_blank">Open your free result</a></p>${namesHtml(j.names)}`); }
-        if (j.status === "partial") { stop(t, `<p><b>${esc(j.message)}</b> This is not a reliable check, so we are not showing a score. <a href="${esc(j.report)}" target="_blank">Open the partial result</a></p>${namesHtml(j.names)}`); }
+        if (j.status === "done") { stop(t, `<p><b>Done.</b> Named in ${j.named_in} of ${j.answers} answers. <a href="${esc(j.report)}" target="_blank">Open your free result</a></p>${namesHtml(j.names)}${liveHtml(j)}`); mountSuggestions(j, p); }
+        if (j.status === "partial") { stop(t, `<p><b>${esc(j.message)}</b> This is not a reliable check, so we are not showing a score. <a href="${esc(j.report)}" target="_blank">Open the partial result</a></p>${namesHtml(j.names)}${liveHtml(j)}`); mountSuggestions(j, p); }
         if (j.status === "failed") { stop(t, `<p>${esc(j.message || "We could not get answers from the AI model right now. Please try again in a few minutes.")} We saved your request.</p>`); }
+        if (j.status === "unavailable") { stop(t, `<p><b>${esc(j.message || "The free check is temporarily unavailable. Please try again later.")}</b></p>`); }
         if (j.status === "unknown") { stop(t, "<p>This check expired. Please run it again.</p>"); }
       } catch(e) {}
     }, 5000);
