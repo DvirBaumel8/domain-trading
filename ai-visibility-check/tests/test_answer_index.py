@@ -1,9 +1,10 @@
-import copy, html as htmllib, http.client, json, os, re, socket, subprocess, sys, tempfile, unittest
+import copy, html as htmllib, http.client, json, os, re, subprocess, sys, tempfile, unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 SITE = os.path.join(HERE, "..", "site")
 sys.path.insert(0, SITE)
 os.environ["ORDERS_LOCAL_DIR"] = os.path.join(tempfile.mkdtemp(), "orders")
-import server, discovery, answer_index  # noqa: E402
+import server  # noqa: E402,F401  (registers the /ai-answers route used via ServerCase)
+import discovery, answer_index  # noqa: E402
 from server_base import ServerCase  # noqa: E402
 
 DATA = os.path.join(SITE, "data", "answer-index", "phoenix-az.json")
@@ -37,7 +38,6 @@ class PageTests(Base):
 
     def test_renders_with_every_name_and_counts(self):
         self.assertEqual(self.st, 200)
-        text = htmllib.unescape(self.html)
         sections = text_sections(htmllib.unescape(self.html))
         for t, sec in zip(self.d["trades"].values(), sections):
             for name, o, c in t["counts"]:

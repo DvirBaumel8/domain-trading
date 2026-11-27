@@ -189,7 +189,7 @@ def _trade_section(m, key, t):
     qs = "".join(f"<li>{e(q)}</li>" for q in t["questions"])
     rows = "".join(f"<tr><td>{e(nm)}</td><td>{o}</td><td>{c}</td></tr>" for nm, o, c in t["rows"])
     both = "".join(f"<li>{e(x)}</li>" for x in t["both"])
-    both_block = (f'<p>Named by both:</p>\n<ul class="both">{both}</ul>\n' if both else "")
+    both_block = (f'<p>The {len(t["both"])} names given by both:</p>\n<ul class="both">{both}</ul>\n' if both else "")
     return (f'<h2>{e(t["label"][0].upper() + t["label"][1:])} in {e(m["city"].split(",")[0])} — AI output, checked on {e(when)}</h2>\n'
             f'<h3>Questions asked</h3>\n<ol class="questions">{qs}</ol>\n'
             f'<h3>Facts computed from the answers</h3>\n<ul>'
@@ -221,8 +221,6 @@ def page(m, base):
             f'<p class="sub"><strong>AI output, checked on {e(when)}.</strong> This page shows what two AI assistants '
             f'answered to {total_q} fixed questions. It is not our recommendation and not a ranking of business quality.</p>\n'
             f'<div class="card"><h2>Method</h2>\n<p>Engines: {e(eng)}.</p>\n<p>{e(m["method"])}</p>\n'
-            f'<p>Each question was asked once to each assistant. Answers change from one ask to the next. A mention can be '
-            f'a caveat, not a recommendation. We did not verify the businesses.</p>\n'
             f'<p>What the run used: {e(use)}.</p></div>\n'
             f'{sections}'
             f'<h2>What this shows</h2>\n<ul>{shows}</ul>\n'
