@@ -87,7 +87,19 @@ def test_a22_spend_guard_marks_remaining_rows_budget_cap(monkeypatch):
     res = drive(inp(promptCount=3, engines=["chatgpt"]))
     assert sorted(r["status"] for r in res.rows) == ["error", "ok", "ok"]
     assert [r["errorCode"] for r in res.rows if r["status"] == "error"] == ["budget_cap"] and len(res.charged) == 2
-    assert res.fake.count("chatgpt") == 2
+    assert res.fake.count("chatgpt") == 2 and res.fake.count("extractor") == 2  # no call at all for the capped row
+    assert res.fake.calls.count("chatgpt") + res.fake.calls.count("extractor") == len(res.fake.calls) == 4
+
+
+def test_a22_cap_stops_every_engine_and_no_provider_call_follows(monkeypatch):
+    # 0.016 covers one chatgpt row (0.015 + 0.001) and nothing else: every other engine is capped without a call.
+    monkeypatch.setenv("MAX_PROVIDER_COST_PER_RUN_USD", "0.016")
+    res = drive(inp(promptCount=2))
+    ok = [r for r in res.rows if r["status"] == "ok"]
+    capped = [r for r in res.rows if r["errorCode"] == "budget_cap"]
+    assert len(ok) == 1 and len(capped) == len(res.rows) - 1 == 5
+    assert sorted(res.fake.calls) == ["chatgpt", "extractor"]  # exactly the one affordable row reached a provider
+    assert all(r["mentioned"] is None for r in capped) and len(res.charged) == 1
 
 
 def test_a22_failed_calls_are_refunded_in_the_guard(monkeypatch):
@@ -102,6 +114,10 @@ def test_a23_free_plan_cap(monkeypatch):
     monkeypatch.delenv("APIFY_USER_IS_PAYING")
     res = drive(inp(promptCount=3))
     assert res.ok and len(res.rows) == 6 and "free plan" in res.msg and "3 of 9" in res.msg
+    assert "at most 6 rows" in res.msg and "not run" in res.msg
+    asks = [c for c in res.fake.calls if c != "extractor"]
+    assert len(asks) == 6 and len(res.fake.calls) == 12  # the three extra rows never reached a provider
+    assert {(r["promptIndex"], r["engine"]) for r in res.rows} == {(i, e) for i in (1, 2) for e in ("chatgpt", "gemini", "claude")}
     monkeypatch.setenv("APIFY_USER_IS_PAYING", "1")
     res = drive(inp(promptCount=3))
     assert len(res.rows) == 9 and "not run" not in res.msg
@@ -119,6 +135,8 @@ def test_a24_kill_switch(monkeypatch):
     gem = [r for r in res.rows if r["engine"] == "gemini"]
     assert len(gem) == 2 and all(r["errorCode"] == "engine_not_configured" for r in gem)
     assert res.fake.count("gemini") == 0 and len(res.charged) == 4
+    assert "gemini" not in res.fake.calls and sorted(set(res.fake.calls)) == ["chatgpt", "claude", "extractor"]
+    assert all(r["status"] == "error" and not r["mentioned"] for r in gem) and all(c is False for r, c in res.pushes if r in gem)
 
 
 def test_quota_message_is_quota_exhausted_and_stops_that_engine():

@@ -1,24 +1,28 @@
-# AI Brand Mention Check: ChatGPT, Gemini & Claude
+# AI Brand Mention Check: AI Assistant Answers
 
-Is your brand named when people ask AI? The Actor asks ChatGPT, Gemini and Claude buyer-style questions through their official APIs, with web search on, and tells you per question and engine whether your brand appears, at which rank, and who else is named. Export the dataset as CSV, Excel or JSON.
+Is your brand named when people ask AI? The Actor asks AI assistants buyer-style questions through their official APIs, with web search on, and tells you per question and engine whether your brand appears, at which rank and how many other brands are named. Export the dataset as CSV, Excel or JSON.
 
-**Returns** one row per question and engine: `brand`, `engine`, `prompt`, `status`, `mentioned`, `mentionType`, `rank`, `listLength`, `snippet`, `competitors`, `brandCited`, `citedUrls`, `searchUsed`, `sentiment`, `answerText`, `errorCode`, `checkedAt`. A SUMMARY record in the key-value store holds the mention rate and average rank per engine and the top competitors.
+**Returns** one row per question and engine: `brand`, `engine`, `prompt`, `status`, `mentioned`, `mentionType`, `rank`, `listLength`, `competitorCount`, `brandCited`, `searchUsed`, `sentiment`, `errorCode`, `checkedAt`. A SUMMARY record in the key-value store holds the mention rate and average rank per engine. Derived fields only: see the next section.
 
 **Cost:** pay per result. An answer that came back is a result; error rows are not charged. See the Pricing tab for current prices.
 
 ```json
-{ "brand": "Asana", "domain": "asana.com", "category": "project management software", "promptCount": 3, "engines": ["chatgpt", "gemini", "claude"], "includeAnswerText": true }
+{ "brand": "Asana", "domain": "asana.com", "category": "project management software", "promptCount": 3, "engines": ["chatgpt", "gemini", "claude"] }
 ```
 
 ## What it is, and what it is not
 
-This is a fast sampling check. It asks small, low-cost models through their APIs, one answer per question. API answers differ from the consumer apps (the ChatGPT, Gemini and Claude that people open in a browser or on a phone), and the same question can get a different answer on another run. Use it to see patterns across many questions and engines, not to prove what one person would see.
+This is a fast sampling check. It asks small, low-cost models through their APIs, one answer per question. API answers differ from the consumer apps people open in a browser or on a phone, and the same question can get a different answer on another run. Use it to see patterns across many questions and engines, not to prove what one person would see.
+
+## What is not exported
+
+The Actor writes a dataset and a SUMMARY record only. It has no page where search suggestions or clickable citations can be shown next to an answer, so it never exports answer text, quoted lines, cited URLs or the names of other brands. The answer is read in memory to decide the derived fields above, then discarded. `includeAnswerText` is kept so old inputs still work, but it is ignored. `competitorCount` is a count only, and `brandCited` is a yes or no.
 
 ## How a row is decided
 
-- **Questions.** Give your own in `prompts` (up to 20), or give a `category` and the Actor asks the first `promptCount` of eight fixed buyer-style questions, for example "Which project management software would you recommend?". Add a `location` to ask for a place; ChatGPT and Claude also get it as the approximate search location.
+- **Questions.** Give your own in `prompts` (up to 20), or give a `category` and the Actor asks the first `promptCount` of eight fixed buyer-style questions, for example "Which project management software would you recommend?". Add a `location` to ask for a place; engines that support it also get it as the approximate search location.
 - **Mentioned yes or no** is plain text matching, never an AI. A name matches on whole words, in any letter case, when it has several words, a digit, a dot or a hyphen, or is not an everyday English word. A name that is also an everyday word (such as Linear, Notion or Apple) counts only when it is written exactly as you typed it and stands in a list item, bold text, heading or table cell, or when your `domain` appears in the answer or in a cited URL. "A linear workflow" is not Linear.
-- **Rank and competitors** are read from the answer by a small model that treats the answer as data only. Every name it returns must appear in the answer text, and it can never change `mentioned`. If that call fails, a simple list parser is used instead and the row says `extraction: heuristic`.
+- **Rank and competitor count** are read from the answer by a small model that treats the answer as data only. Every name it returns must appear in the answer text, and it can never change `mentioned`. If that call fails, a simple list parser is used instead and the row says `extraction: heuristic`.
 - **Sentiment** is an AI judgement of the tone toward your brand, not a measurement. It is empty when the brand is not mentioned.
 - **Web search.** `searchUsed` tells you whether the engine searched. Answers without a search are counted in the summary warnings.
 - **`brandCited`** is true when a cited URL is on your domain or one of its subdomains.
@@ -28,7 +32,7 @@ This is a fast sampling check. It asks small, low-cost models through their APIs
 - Up to 60 rows per run (20 questions on 3 engines). A run on the free plan covers a small number of rows; the final message says how many were not run.
 - Each engine gets at most 2 requests at a time, each request has a 60 second limit, and a timeout, a rate limit or a server error is tried once more.
 - An engine can be switched off on the server; its rows then carry `engine_not_configured`.
-- Not included: Perplexity, Grok, Copilot, Google AI Overviews, repeated asks of the same question, history, and your own provider keys.
+- Not included: other AI search products, repeated asks of the same question, history, and your own provider keys.
 
 ## Error codes
 

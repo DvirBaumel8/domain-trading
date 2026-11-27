@@ -11,7 +11,7 @@
     "summary": {
       "type": "string",
       "title": "Summary",
-      "description": "Mention rate and average rank per engine, top competitors, warnings and notes",
+      "description": "Mention rate and average rank per engine, warnings and notes",
       "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/SUMMARY"
     }
   }
