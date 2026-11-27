@@ -13,10 +13,10 @@ event, fake_apis, PID = ta.event, ta.fake_apis, ta.PID
 
 class SlowStore(server.Store):
     def get(self, path):
-        time.sleep(0.2); return super().get(path)
+        time.sleep(0.05); return super().get(path)
 
     def put(self, path, obj, overwrite=False):
-        time.sleep(0.2); return super().put(path, obj, overwrite)
+        time.sleep(0.05); return super().put(path, obj, overwrite)
 
 
 class PaymentBase(ta.Base):

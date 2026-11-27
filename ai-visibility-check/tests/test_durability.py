@@ -7,6 +7,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import test_delivery as td  # noqa: E402  (sets up the path, env and the fake vendor APIs)
 import server, delivery  # noqa: E402
+from server_base import ServerCase  # noqa: E402
 from site_config import SUPPORT_EMAIL  # noqa: E402
 
 fake_apis = td.fake_apis
@@ -58,16 +59,10 @@ def ago(**kw):
     return (datetime.datetime.now() - datetime.timedelta(**kw)).isoformat(timespec="seconds")
 
 
-class Durability(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.httpd = server.http.server.ThreadingHTTPServer(("127.0.0.1", 0), server.H)
-        cls.port = cls.httpd.server_address[1]
-        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
-
+class Durability(ServerCase):
     @classmethod
     def tearDownClass(cls):
-        cls.httpd.shutdown(); cls.httpd.server_close()
+        super().tearDownClass()
 
     def setUp(self):
         self.saved = (server.http_call, delivery.SYNC, dict(os.environ))
