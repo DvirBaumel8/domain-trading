@@ -28,14 +28,14 @@ def test_a27_summary_3x3_with_an_engine_with_no_mentions():
     assert s["engines"]["gemini"] == {"rowsOk": 3, "rowsError": 0, "mentionRate": 0.0, "avgRank": None, "mentionedCount": 0}
     assert s["engines"]["claude"] == {"rowsOk": 2, "rowsError": 1, "mentionRate": 1.0, "avgRank": 2.0, "mentionedCount": 2}
     assert s["overall"] == {"rowsOk": 8, "rowsError": 1, "mentionRate": 0.5, "avgRank": 2.0, "mentionedCount": 4}
-    top = s["topCompetitors"]
-    assert top[0] == {"name": "Trello", "rows": 3, "avgRank": 1.0} and top[1]["name"] == "Jira" and top[1]["rows"] == 2 and top[1]["avgRank"] == 1.5
+    assert "topCompetitors" not in s and "Trello" not in str(s)
     assert any("claude: 1 rows not answered (timeout)" in w for w in s["warnings"])
-    assert "differ from the consumer apps" in s["notes"] and len(top) <= 10
+    assert "differ from the consumer apps" in s["notes"]
 
 
 def test_a27_summary_is_saved_by_the_run():
     res = drive(inp(promptCount=2))
     s = res.summary
     assert set(s["engines"]) == {"chatgpt", "gemini", "claude"} and s["overall"]["rowsOk"] == 6 and s["overall"]["mentionRate"] == 1.0
-    assert s["overall"]["avgRank"] == 1.0 and {c["name"] for c in s["topCompetitors"]} == {"Trello", "Monday.com"}
+    assert s["overall"]["avgRank"] == 1.0
+    assert "topCompetitors" not in s and "Trello" not in str(s)

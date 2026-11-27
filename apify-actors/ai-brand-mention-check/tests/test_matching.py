@@ -30,7 +30,7 @@ def test_a1_bold_list_item_is_listed_with_fixture_rank():
     res = drive(inp(engines=["chatgpt"], promptCount=1), fake)
     row = res.rows[0]
     assert row["mentioned"] is True and row["mentionType"] == "listed" and row["rank"] == 2 and row["listLength"] == 3
-    assert [c["name"] for c in row["competitors"]] == ["Trello", "Monday.com"]
+    assert row["competitorCount"] == 2
 
 
 def test_a2_linear_workflow_is_not_the_brand():
@@ -83,9 +83,9 @@ def test_a7_snippet_is_a_verbatim_substring_and_short():
     assert mention("nothing here", "Asana").snippet is None
 
 
-def test_a7_snippet_in_row_is_in_answer_text():
+def test_a7_row_has_no_quoted_line_or_answer_text():
     row = drive(inp(engines=["claude"], promptCount=1)).rows[0]
-    assert re.sub(r"\s+", " ", row["snippet"]) in re.sub(r"\s+", " ", row["answerText"])
+    assert row["mentioned"] is True and not {"snippet", "answerText", "citedUrls", "competitors"} & set(row)
 
 
 def test_common_word_list_is_bundled():

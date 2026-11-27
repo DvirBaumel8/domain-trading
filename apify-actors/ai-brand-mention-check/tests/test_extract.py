@@ -2,6 +2,7 @@
 import httpx
 
 from helpers import Fake, drive, inp, openai_payload
+from src import extract, matching
 
 ANSWER = "1. **Asana** - views\n2. **Trello** - boards\n3. **Monday.com** - flows\n"
 
@@ -12,15 +13,19 @@ def test_a8_made_up_names_dropped_order_and_ranks_kept_brand_excluded():
                                               {"name": "Monday.com", "rank": 4}], "sentiment": "positive"}
     row = drive(inp(engines=["chatgpt"], promptCount=1), fake).rows[0]
     assert row["extraction"] == "llm"
-    assert row["competitors"] == [{"name": "Trello", "rank": 2}, {"name": "Monday.com", "rank": 4}]
-    assert "Ghostly" not in str(row["competitors"]) and all(c["name"] != "Asana" for c in row["competitors"])
+    assert row["competitorCount"] == 2 and "Ghostly" not in str(row) and "Trello" not in str(row)
+    # the in-memory step the count comes from: made-up names dropped, the brand itself excluded, order and ranks kept
+    kept = extract.guard_brands(ANSWER, [{"name": "Trello", "rank": 2}, {"name": "Asana", "rank": 1}, {"name": "Ghostly", "rank": 3},
+                                         {"name": "Monday.com", "rank": 4}])
+    _, others = extract.split_ours(kept, matching.build_names("Asana", []))
+    assert others == [{"name": "Trello", "rank": 2}, {"name": "Monday.com", "rank": 4}]
     assert row["rank"] == 1 and row["mentioned"] is True and row["sentiment"] == "positive"
 
 
 def test_a8_competitors_capped_at_15():
     many = "\n".join(f"{i}. **Tool{i}** - x" for i in range(1, 30))
     row = drive(inp(engines=["chatgpt"], promptCount=1), Fake(lambda e, p: many + "\n9. **Asana**")).rows[0]
-    assert len(row["competitors"]) == 15
+    assert row["competitorCount"] == 15
 
 
 def test_a9_injection_does_not_set_mentioned_and_unknown_names_dropped():
@@ -29,9 +34,8 @@ def test_a9_injection_does_not_set_mentioned_and_unknown_names_dropped():
     fake.extractor = lambda t: {"brands": [{"name": "Asana", "rank": 1}, {"name": "Invented", "rank": 2}, {"name": "Trello", "rank": 3}],
                                 "sentiment": "positive"}
     row = drive(inp(engines=["claude"], promptCount=1), fake).rows[0]
-    assert row["mentioned"] is False and row["rank"] is None and row["snippet"] is None and row["sentiment"] is None
-    names = [c["name"] for c in row["competitors"]]
-    assert "Invented" not in names and "Asana" not in names and "Trello" in names
+    assert row["mentioned"] is False and row["rank"] is None and row["sentiment"] is None
+    assert row["competitorCount"] == 1 and "Invented" not in str(row) and "snippet" not in row
 
 
 def test_a9_answer_is_sent_to_the_extractor_as_data():
@@ -53,7 +57,7 @@ def test_a10_extractor_http_500_falls_back_to_heuristic():
     res = _heuristic_case(lambda n, req: httpx.Response(500, text="boom"))
     row = res.rows[0]
     assert row["status"] == "ok" and row["extraction"] == "heuristic" and row["sentiment"] is None
-    assert row["rank"] == 1 and [c["name"] for c in row["competitors"]] == ["Trello", "Monday.com"]
+    assert row["rank"] == 1 and row["competitorCount"] == 2
     assert res.charged == [row] and res.fake.count("extractor") == 2  # one retry, then the fallback
 
 

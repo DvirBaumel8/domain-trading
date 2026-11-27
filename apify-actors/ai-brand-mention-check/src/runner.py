@@ -1,4 +1,6 @@
-"""The run loop without the Apify SDK: `push(row, charge)` decides what is charged. No key, header or provider text is kept."""
+"""The run loop without the Apify SDK: `push(row, charge)` decides what is charged. No key, header or provider text is kept.
+
+Rows carry derived fields only (counts, flags, rank, labels): never answer text, quotes, cited URLs or names taken from them."""
 from __future__ import annotations
 
 import asyncio
@@ -104,7 +106,7 @@ def validate_input(inp: dict) -> tuple[dict | None, str | None]:
         return None, "engines: choose at least one of chatgpt, gemini, claude."
     if any(e not in config.ENGINES for e in engines):
         return None, "engines: only chatgpt, gemini and claude are supported."
-    include = inp.get("includeAnswerText", True)
+    include = inp.get("includeAnswerText", True)  # kept for compatibility; answer text is never exported
     if not isinstance(include, bool):
         return None, "includeAnswerText: true or false."
     questions = custom or prompts.generate_prompts(category, count, location)
@@ -116,8 +118,8 @@ def blank_row(cfg: dict, engine: str, index: int, prompt: str, code: str | None,
     return {
         "brand": cfg["brand"], "domain": cfg["domain"], "category": cfg["category"], "promptIndex": index, "prompt": prompt,
         "engine": engine, "model": config.model_for(engine), "status": "error" if code else "ok", "errorCode": code,
-        "mentioned": None, "mentionType": None, "rank": None, "listLength": None, "snippet": None, "competitors": [],
-        "brandCited": None, "citedUrls": [], "searchUsed": None, "sentiment": None, "extraction": None, "answerText": None,
+        "mentioned": None, "mentionType": None, "rank": None, "listLength": None, "competitorCount": None,
+        "brandCited": None, "searchUsed": None, "sentiment": None, "extraction": None,
         "latencyMs": None, "checkedAt": checked_at,
     }
 
@@ -217,9 +219,10 @@ async def run(inp: dict, *, client, push, set_status, set_summary, pricing: Pric
             row.update(
                 mentioned=mention.mentioned, mentionType=mention.mention_type,
                 rank=ours["rank"] if mention.mentioned and ours else None, listLength=len(brands) or None,
-                snippet=mention.snippet, competitors=others, brandCited=matching.brand_cited(ans.urls, cfg["domain"]),
-                citedUrls=ans.urls, searchUsed=ans.search_used, sentiment=sentiment if mention.mentioned else None,
-                extraction=method, answerText=ans.text if cfg["include_answer"] else None, latencyMs=latency)
+                competitorCount=len(others), brandCited=matching.brand_cited(ans.urls, cfg["domain"]),
+                searchUsed=ans.search_used, sentiment=sentiment if mention.mentioned else None,
+                extraction=method, latencyMs=latency)
+            # The answer text, quoted lines, cited URLs and competitor names stay in memory only: never exported.
             return row
 
     async def one(i: int, prompt: str, engine: str) -> None:

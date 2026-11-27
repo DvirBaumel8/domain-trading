@@ -58,7 +58,7 @@
     "location": {
       "title": "Location",
       "type": "string",
-      "description": "Optional. City and country, for example Austin, US. Generated questions then ask for that place, and ChatGPT and Claude receive it as the approximate search location.",
+      "description": "Optional. City and country, for example Austin, US. Generated questions then ask for that place, and engines that support it receive it as the approximate search location.",
       "editor": "textfield",
       "maxLength": 80,
       "default": ""
@@ -66,7 +66,7 @@
     "engines": {
       "title": "Engines",
       "type": "array",
-      "description": "Which AI engines to ask: chatgpt, gemini, claude. Choose at least one. Default: all three. Each question and engine gives one result row.",
+      "description": "Which AI engines to ask. Choose at least one. Default: all three. Each question and engine gives one result row.",
       "editor": "select",
       "items": {
         "type": "string",
@@ -90,11 +90,11 @@
     "includeAnswerText": {
       "title": "Include answer text",
       "type": "boolean",
-      "description": "Put the full answer of the engine in each result row (the answerText field). Turn it off for smaller exports. Default: on.",
+      "description": "Kept for compatibility and ignored: answer text is never put in a result row or the summary. Default: on.",
       "editor": "checkbox",
       "default": true,
       "prefill": true
     }
   },
-  "description": "Enter your brand, its website and what it sells, then click Start. The Actor asks ChatGPT, Gemini and Claude buyer-style questions with web search on and tells you where the brand is named. It is a sample on small, low-cost models, not a view of the consumer apps."
+  "description": "Enter your brand, its website and what it sells, then click Start. The Actor asks AI assistants buyer-style questions with web search on and tells you where the brand is named. It is a sample on small, low-cost models, not a view of the consumer apps."
 }

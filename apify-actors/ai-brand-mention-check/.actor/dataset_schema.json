@@ -31,7 +31,7 @@
       },
       "engine": {
         "type": "string",
-        "description": "chatgpt, gemini or claude"
+        "description": "The engine id, as given in the input"
       },
       "model": {
         "type": "string",
@@ -76,33 +76,19 @@
         ],
         "description": "How many brands the answer lists, the brand included; null when no list was found"
       },
-      "snippet": {
+      "competitorCount": {
         "type": [
-          "string",
+          "integer",
           "null"
         ],
-        "description": "A verbatim line from the answer that names the brand, at most 300 characters; null when not mentioned"
-      },
-      "competitors": {
-        "type": "array",
-        "description": "Other brands the answer names, in order, up to 15, each with name and rank. The brand itself is never included",
-        "items": {
-          "type": "object"
-        }
+        "description": "How many other brands the answer names, up to 15; a count only, no names. null on error"
       },
       "brandCited": {
         "type": [
           "boolean",
           "null"
         ],
-        "description": "true when one of the cited URLs is on the brand's domain; null on error or without a domain"
-      },
-      "citedUrls": {
-        "type": "array",
-        "description": "URLs the engine cited, without duplicates, up to 20",
-        "items": {
-          "type": "string"
-        }
+        "description": "true when one of the engine's cited URLs is on the brand's domain; the URLs themselves are not exported; null on error or without a domain"
       },
       "searchUsed": {
         "type": [
@@ -124,13 +110,6 @@
           "null"
         ],
         "description": "llm = competitors and rank read by a small model; heuristic = by a simple list parser; null on error"
-      },
-      "answerText": {
-        "type": [
-          "string",
-          "null"
-        ],
-        "description": "The full answer text, when Include answer text is on; otherwise null"
       },
       "latencyMs": {
         "type": [
@@ -165,10 +144,8 @@
           "mentionType",
           "rank",
           "listLength",
-          "snippet",
-          "competitors",
+          "competitorCount",
           "brandCited",
-          "citedUrls",
           "searchUsed",
           "sentiment",
           "errorCode"
@@ -201,17 +178,8 @@
           "listLength": {
             "label": "List length"
           },
-          "snippet": {
-            "label": "Quoted line"
-          },
-          "competitors": {
-            "label": "Competitors"
-          },
           "brandCited": {
             "label": "Brand cited"
-          },
-          "citedUrls": {
-            "label": "Cited URLs"
           },
           "searchUsed": {
             "label": "Web search used"
@@ -221,6 +189,9 @@
           },
           "errorCode": {
             "label": "Error"
+          },
+          "competitorCount": {
+            "label": "Competitor count"
           }
         }
       }
