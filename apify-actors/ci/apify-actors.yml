@@ -1,0 +1,31 @@
+name: apify-actors
+
+# Offline tests for every actor. No network, no token, no deploy (apify push is by hand from Dvir's machine).
+on:
+  push:
+    paths: ['apify-actors/**', '.github/workflows/apify-actors.yml']
+  pull_request:
+    paths: ['apify-actors/**', '.github/workflows/apify-actors.yml']
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install
+        run: |
+          pip install pytest ruff
+          for r in apify-actors/*/requirements.txt; do pip install -r "$r"; done
+      - name: Lint (ruff.toml)
+        run: ruff check ai-visibility-check apify-actors
+      - name: Repo-wide contract (charging, schemas, no prices, bot guard, store sync)
+        run: cd apify-actors && python -m pytest -q tests
+      - name: Each actor
+        run: |
+          for d in apify-actors/*/; do
+            [ -d "$d/tests" ] || continue
+            echo "== $d"; (cd "$d" && python -m pytest -q tests)
+          done

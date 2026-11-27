@@ -1,0 +1,36 @@
+name: ci
+
+# Types, tests, build and the rules of data/state.json. Render deploys a push only after this passes (autoDeployTrigger: checksPass).
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['docs/**', 'CLAUDE.md', 'ai-visibility-check/**', 'apify-actors/**', '.github/workflows/apify-*.yml', '.github/workflows/avc-tests.yml', '.github/workflows/claude*.yml']
+  pull_request:
+    branches: [main]
+    paths-ignore: ['docs/**', 'CLAUDE.md', 'ai-visibility-check/**', 'apify-actors/**', '.github/workflows/apify-*.yml', '.github/workflows/avc-tests.yml', '.github/workflows/claude*.yml']
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # check-state compares data/state.json with every earlier version
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
+      - run: npm run build
+      - run: npm run check-state
