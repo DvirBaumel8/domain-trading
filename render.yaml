@@ -44,3 +44,34 @@ services:
         sync: false
       - key: USPTO_API_KEY
         sync: false
+
+  - type: web
+    name: ghl-app
+    runtime: python
+    plan: free
+    region: frankfurt
+    rootDir: ghl-app
+    branch: main
+    buildCommand: "python3 -m compileall -q ."
+    startCommand: "python3 app.py --host 0.0.0.0"
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      # Set in the Render dashboard only (sync: false). Never in git.
+      - key: GHL_CLIENT_ID
+        sync: false
+      - key: GHL_CLIENT_SECRET
+        sync: false
+      - key: GHL_SHARED_SECRET
+        sync: false
+      - key: GHL_WEBHOOK_PUBLIC_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: PERPLEXITY_API_KEY
+        sync: false
