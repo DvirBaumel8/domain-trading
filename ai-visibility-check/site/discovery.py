@@ -259,8 +259,13 @@ def city_paths():
     return cities.public_paths()
 
 
+def answer_index_paths():
+    import answer_index                  # lazy, like cities
+    return answer_index.public_paths()
+
+
 def sitemap_xml(origin=""):
-    paths = list(PUBLIC_PAGES) + trade_paths() + city_paths()
+    paths = list(PUBLIC_PAGES) + trade_paths() + city_paths() + answer_index_paths()
     urls = "".join(f"<url><loc>{_xml(origin + p)}</loc></url>" for p in paths)
     return ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
             + urls + "</urlset>\n")
@@ -290,6 +295,9 @@ def llms_txt(origin=""):
     if cp:
         import cities
         lines += ["", "## City snapshots (dated, not rankings)"] + [f"- [{t}]({o}{p})" for p, t in cities.public_entries()]
+    if answer_index_paths():
+        import answer_index
+        lines += ["", "## AI answer index"] + [f"- [{t}]({o}{p})" for p, t in answer_index.public_entries()]
     lines += ["", "## Help",
               f"- [Honest answers (FAQ)]({o}/#faq)",
               f"- [Refund policy]({o}/refunds.html)",

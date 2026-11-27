@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "site"))
 os.environ["ORDERS_LOCAL_DIR"] = os.path.join(tempfile.mkdtemp(), "orders")
-import server, discovery, cities, products  # noqa: E402
+import server, discovery, cities, answer_index, products  # noqa: E402
 from server_base import ServerCase  # noqa: E402
 
 
@@ -78,7 +78,7 @@ class SitemapRobotsLlms(Base):
         self.assertTrue(all(l.startswith("https://example.org/") for l in locs))
         for p in discovery.PUBLIC_PAGES + tuple(discovery.trade_paths()):
             self.assertIn(p, paths)
-        self.assertEqual(len(locs), 7 + 15 + len(cities.public_paths()))     # + /city and the dated city pages
+        self.assertEqual(len(locs), 7 + 15 + len(cities.public_paths()) + len(answer_index.public_paths()))     # + /city, the dated city pages, the AI answer index
         for p in cities.public_paths():
             self.assertIn(p, paths)
         for bad in PRIVATE:
