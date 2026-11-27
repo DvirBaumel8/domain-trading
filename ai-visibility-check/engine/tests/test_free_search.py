@@ -13,7 +13,10 @@ SUGG = '<div class="container"><a class="chip" href="https://www.google.com/sear
 GROUNDED = json.dumps({"businesses": ["Alpha Plumbing", "Beta Pipes"], "note": ""})
 
 
-def gemini_body(text=GROUNDED, rendered=SUGG, queries=("q1",), usage=True, grounded=True):
+LIST = "1. Alpha Plumbing\n2. Beta Pipes"
+
+
+def gemini_body(text=LIST, rendered=SUGG, queries=("q1",), usage=True, grounded=True):
     meta = {"webSearchQueries": list(queries), "searchEntryPoint": {"renderedContent": rendered}} if grounded else {}
     cand = {"content": {"parts": [{"text": text}]}, **({"groundingMetadata": meta} if grounded else {})}
     d = {"candidates": [cand]}
@@ -96,7 +99,11 @@ class GeminiShape(Env):
         self.assertNotIn(GKEY, r.full_url)
         body = json.loads(r.data)
         self.assertEqual(body["tools"], [{"google_search": {}}])
-        self.assertIn("specific business names", body["contents"][0]["parts"][0]["text"])
+        text = body["contents"][0]["parts"][0]["text"]
+        self.assertIn("specific business names", text)
+        self.assertNotIn("Reply with only JSON", text)
+        self.assertIn("You must run one Google Search", text)
+        self.assertIn("numbered list", text)
         self.assertEqual(o.reqs, [])
         self.assertEqual(a.live["suggestions"], SUGG)           # exact string, unmodified
         self.assertEqual(a.provider, "ai-search")
@@ -379,6 +386,66 @@ class PaidUnchanged(Env):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def openai_sources_body(urls, text=GROUNDED):
+    srcs = [{"type": "url", "url": u} for u in urls]
+    return {"output": [{"type": "web_search_call", "action": {"type": "search", "sources": srcs}},
+                       {"type": "message", "content": [{"type": "output_text", "text": text, "annotations": []}]}],
+            "usage": {"input_tokens": 300, "output_tokens": 100}}
+
+
+class GeminiList(Env):
+    def test_list_parsing(self):
+        from aivis.providers.free_search import _names_from_list, MAX_NAMES
+        self.assertEqual(_names_from_list("1. A Co\n2) B Co\n- C Co\n* D Co\n\n3.  \n1. a co"), ["A Co", "B Co", "C Co", "D Co"])
+        for none in ("NONE", "none", " None \n"):
+            self.assertEqual(_names_from_list(none), [])
+        for junk in ("", "Sorry, no list here", "Alpha Plumbing is good"):
+            self.assertIsNone(_names_from_list(junk), junk)
+        self.assertEqual(len(_names_from_list("\n".join(f"{i}. N{i}" for i in range(1, 40)))), MAX_NAMES)
+
+    def test_list_with_entry_point_gives_suggestions(self):
+        p, g, _, _ = providers([gemini_body(text="1. Alpha Plumbing\n2. Beta Pipes")])
+        a = p.ask("q")
+        self.assertEqual(a.text, "1. Alpha Plumbing\n2. Beta Pipes")
+        self.assertEqual(a.live["suggestions"], SUGG)
+
+    def test_list_without_entry_point_is_grounding_missing(self):
+        p, g, _, _ = providers([gemini_body(grounded=False)] * 3)
+        with self.assertRaises(ProviderError) as cm:
+            p.members[0].ask("q")
+        self.assertEqual((cm.exception.reason, len(g.reqs)), ("grounding_missing", 3))
+
+    def test_none_and_junk_reasons(self):
+        for text, reason in (("NONE", "empty_answer"), ("no idea", "parse_error")):
+            p, *_ = providers([gemini_body(text=text)] * 3)
+            with self.assertRaises(ProviderError) as cm:
+                p.members[0].ask("q")
+            self.assertEqual(cm.exception.reason, reason)
+
+
+class OpenAISources(Env):
+    def test_request_body(self):
+        p, g, o, _ = providers([http_err(500)] * 3, [openai_body()])
+        p.ask("q")
+        body = json.loads(o.reqs[0].data)
+        self.assertEqual(body["tool_choice"], "required")
+        self.assertEqual(body["include"], ["web_search_call.action.sources"])
+
+    def test_sources_become_citations(self):
+        from aivis.providers.free_search import MAX_LINKS
+        urls = ["https://a.example/1", "ftp://x/y", "javascript:alert(1)", "https://a.example/1", "http://b.example/2"] + \
+               [f"https://c.example/{i}" for i in range(30)]
+        p, g, o, _ = providers([http_err(500)] * 3, [openai_sources_body(urls)])
+        a = p.ask("q")
+        want = ["https://a.example/1", "http://b.example/2"] + [f"https://c.example/{i}" for i in range(30)]
+        self.assertEqual([c["url"] for c in a.live["citations"]], want[:MAX_LINKS])
+        self.assertEqual(a.citations, want[:MAX_LINKS])
+
+    def test_sources_count_as_grounded_without_annotations(self):
+        p, g, o, _ = providers([http_err(500)] * 3, [openai_sources_body(["https://a.example/1"])])
+        self.assertEqual(len(p.ask("q").live["citations"]), 1)
 
 
 class StructuredList(unittest.TestCase):
