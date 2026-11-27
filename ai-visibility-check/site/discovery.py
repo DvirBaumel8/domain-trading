@@ -283,7 +283,7 @@ def llms_txt(origin=""):
              f"- [{cfg['brand']}]({o}/): what the check does and the free quick check",
              f"- [Pricing]({o}/#pricing): one-time products; the monthly plans are coming soon",
              f"- [Sample report]({o}/sample-report.html): an example report with business names hidden",
-             f"- [For agencies]({o}/agency.html): white-label reports", "",
+             f"- [For agencies]({o}/agency.html): reports under your own logo", "",
              "## Trades"]
     lines += [f"- [AI visibility for {n.plural}]({o}/for/{s})" for s, n in trades()]
     cp = city_paths()

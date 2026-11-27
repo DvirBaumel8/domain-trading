@@ -58,9 +58,9 @@ ROSTER_OPENER = None        # tests inject a fake
 JOB_KEEP_SECONDS = 3600     # finished JOBS entries are dropped after this
 JOB_META = {}               # job id -> {"ip", "started", "finished"}; never sent to the browser
 CHECK_LOG = {}              # client address -> start times of recent checks
-PUBLIC_FILES = {"index.html", "agency.html", "agency-terms.html", "privacy.html", "refunds.html", "sample-report.html",
+PUBLIC_FILES = {"index.html", "agency.html", "agency-terms.html", "agency-thanks.html", "privacy.html", "refunds.html", "sample-report.html",
                 "sample-report.pdf", "terms.html", "thanks.html", "favicon.ico"}
-AGENCY_ONLY_FILES = {"agency-terms.html"}    # served only while AIVIS_AGENCY=1
+AGENCY_ONLY_FILES = {"agency-terms.html", "agency-thanks.html"}    # served only while AIVIS_AGENCY=1
 PUBLIC_DIRS = {"assets": {".css", ".js", ".png"}}   # direct children only, these extensions only
 LOCAL_ORDERS = os.environ.get("ORDERS_LOCAL_DIR") or os.path.join(HERE, "..", "private-orders")
 

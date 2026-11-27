@@ -25,6 +25,7 @@ A run takes the next free slot (`bundle_runs/<bundle>/<n>`, create-only, server-
 | `POST .../rebrand` `{order_id, mode, name, accent, contact_line}` | Regenerates from the stored result: no engine call, no slot, at most 5 per report |
 | `GET /r/<report-token>` and `/r/<report-token>.pdf` | The report (HTML or PDF) in the chosen brand |
 | `GET /agency-terms.html` | Neutral terms page |
+| `GET /agency-thanks.html` | Order confirmation page (`noindex`): the bundle wording and a form (order id, purchase email) that posts to `/agency/claim` and then opens the returned portal link. 404 while the flag is off |
 
 Limits: 30 bad portal tokens a minute per address, 20 run submissions a minute per token (429, nothing consumed). The existing `MAX_BODY` (4,096) holds for every other route.
 
