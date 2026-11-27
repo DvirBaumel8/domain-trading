@@ -1,0 +1,131 @@
+{
+ "actor": "bulk-dns-email-auth-checker",
+ "title": "Cold-Email List Pre-Check: DMARC, SPF & MX in Bulk",
+ "tasks": [
+  {
+   "name": "Pre-send check for 5 prospect domains",
+   "description": "Paste prospect domains and see which have no MX or no DMARC before you send.",
+   "input": {
+    "domains": [
+     "stripe.com",
+     "notion.so",
+     "linear.app",
+     "vercel.com",
+     "figma.com"
+    ],
+    "includeRecords": false
+   }
+  },
+  {
+   "name": "Lead list with mixed emails and URLs",
+   "description": "Addresses and website URLs are reduced to their domain and checked once each.",
+   "input": {
+    "domains": [
+     "info@shopify.com",
+     "https://www.hubspot.com/pricing",
+     "hello@mailchimp.com",
+     "https://www.intercom.com/"
+    ],
+    "includeRecords": false
+   }
+  },
+  {
+   "name": "Audit SPF, DKIM and DMARC for client domains",
+   "description": "One row per domain with SPF, DKIM, DMARC, MX, provider and a 0-100 score.",
+   "input": {
+    "domains": [
+     "github.com",
+     "shopify.com",
+     "hubspot.com"
+    ],
+    "includeRecords": true
+   }
+  },
+  {
+   "name": "Find domains that cannot receive email",
+   "description": "Spot domains with no MX record in a list before sending.",
+   "input": {
+    "domains": [
+     "example.com",
+     "example.org",
+     "example.net",
+     "iana.org"
+    ],
+    "includeRecords": false
+   }
+  },
+  {
+   "name": "Test your own DKIM selectors",
+   "description": "Add the selector your sender uses and see if a key is published.",
+   "input": {
+    "domains": [
+     "mailchimp.com",
+     "sendgrid.com"
+    ],
+    "dkimSelectors": [
+     "k1",
+     "s1",
+     "s2",
+     "mandrill"
+    ],
+    "includeRecords": false
+   }
+  },
+  {
+   "name": "Check one domain quickly",
+   "description": "A single-domain run to see the output format.",
+   "input": {
+    "domains": [
+     "example.com"
+    ]
+   }
+  },
+  {
+   "name": "Google Workspace domains: check SPF and DMARC",
+   "description": "See how a Google-hosted domain publishes its email authentication.",
+   "input": {
+    "domains": [
+     "google.com",
+     "withgoogle.com"
+    ],
+    "includeRecords": false
+   }
+  },
+  {
+   "name": "Microsoft 365 domains: check SPF and DMARC",
+   "description": "See how a Microsoft-hosted domain publishes its email authentication.",
+   "input": {
+    "domains": [
+     "microsoft.com",
+     "office.com"
+    ],
+    "includeRecords": false
+   }
+  },
+  {
+   "name": "Newsletter platforms: DMARC policy audit",
+   "description": "Compare DMARC policies across a group of domains.",
+   "input": {
+    "domains": [
+     "substack.com",
+     "beehiiv.com",
+     "kit.com"
+    ],
+    "includeRecords": false
+   }
+  },
+  {
+   "name": "Gentle run: low concurrency",
+   "description": "Same check with fewer parallel lookups for slow networks.",
+   "input": {
+    "domains": [
+     "stripe.com",
+     "notion.so",
+     "linear.app"
+    ],
+    "concurrency": 3,
+    "includeRecords": false
+   }
+  }
+ ]
+}

@@ -1,0 +1,122 @@
+{
+ "actor": "broken-link-auditor",
+ "title": "Site Migration QA: Check Old URLs Redirect to Live Pages",
+ "tasks": [
+  {
+   "name": "Check a list of old URLs",
+   "description": "List mode: final status and redirect chain for each URL.",
+   "input": {
+    "startUrls": [
+     "https://example.com/",
+     "https://example.com/old-page"
+    ],
+    "mode": "list"
+   }
+  },
+  {
+   "name": "See a 3-step redirect chain",
+   "description": "Shows the chain of 301/302 hops for one URL.",
+   "input": {
+    "startUrls": [
+     "https://httpbin.org/redirect/3"
+    ],
+    "mode": "list"
+   }
+  },
+  {
+   "name": "Find a 404",
+   "description": "One URL that returns 404 and one that returns 200.",
+   "input": {
+    "startUrls": [
+     "https://httpbin.org/status/404",
+     "https://httpbin.org/status/200"
+    ],
+    "mode": "list"
+   }
+  },
+  {
+   "name": "Redirect to a different host",
+   "description": "Confirm that an old URL lands on the new site.",
+   "input": {
+    "startUrls": [
+     "https://httpbin.org/redirect-to?url=https%3A%2F%2Fexample.com%2F"
+    ],
+    "mode": "list"
+   }
+  },
+  {
+   "name": "Check every URL in a sitemap",
+   "description": "Sitemap mode: expand the sitemap, then check each URL (capped).",
+   "input": {
+    "startUrls": [
+     "https://www.sitemaps.org/"
+    ],
+    "mode": "sitemap",
+    "maxPages": 50
+   }
+  },
+  {
+   "name": "Crawl a small site, depth 1",
+   "description": "Crawl mode: find broken links and the pages that link to them.",
+   "input": {
+    "startUrls": [
+     "https://example.com/"
+    ],
+    "mode": "crawl",
+    "maxDepth": 1,
+    "maxPages": 20
+   }
+  },
+  {
+   "name": "Crawl docs, 50 pages",
+   "description": "A bounded crawl of a documentation site.",
+   "input": {
+    "startUrls": [
+     "https://docs.apify.com/"
+    ],
+    "mode": "crawl",
+    "maxDepth": 1,
+    "maxPages": 50
+   }
+  },
+  {
+   "name": "Include external links",
+   "description": "Also check links that point to other websites.",
+   "input": {
+    "startUrls": [
+     "https://example.com/"
+    ],
+    "mode": "crawl",
+    "maxDepth": 1,
+    "maxPages": 20,
+    "checkExternal": true
+   }
+  },
+  {
+   "name": "Gentle run: 2 requests at a time",
+   "description": "Low concurrency for sites that rate-limit.",
+   "input": {
+    "startUrls": [
+     "https://example.com/",
+     "https://example.org/"
+    ],
+    "mode": "list",
+    "maxConcurrency": 2
+   }
+  },
+  {
+   "name": "Redirect map: 5 old paths",
+   "description": "Paste old paths from a redirect map and check where each one lands.",
+   "input": {
+    "startUrls": [
+     "https://example.com/",
+     "https://example.com/about",
+     "https://example.com/pricing",
+     "https://example.com/blog",
+     "https://example.com/contact"
+    ],
+    "mode": "list"
+   }
+  }
+ ]
+}

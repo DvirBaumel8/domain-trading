@@ -69,6 +69,21 @@ Input is checked before any request is made:
 - If a site has no sitemap, the run log says so and nothing is charged for that site.
 - Without a `lastmod` in the sitemap, **modified since** cannot match the URL.
 
+## Example tasks
+
+These ready-made inputs are saved as tasks on this Actor's page; open one and press Start.
+
+- **Apify docs: first 200 URLs**: Follow a sitemap index and return up to 200 URLs with lastmod.
+- **Apify blog: only /blog/ posts**: Filter a sitemap with an include regex.
+- **Kubernetes docs: skip translations**: Exclude URLs matching a language-folder regex.
+- **Single sitemap file: all URLs**: A plain urlset sitemap with no index.
+- **MDN: first 100 URLs**: Large index with many files; limit the number of sitemap files read.
+- **web.dev: HTTP status of 50 URLs**: Add the HTTP status of each URL to the output for an audit.
+- **FastAPI docs: pages changed since 2025**: Keep only URLs with a lastmod on or after a date.
+- **Two sites in one run**: Several websites at once, each with its own cap.
+- **Start from a site address, not a sitemap**: Give a homepage; the Actor looks for the sitemap in robots.txt.
+- **Sitemap export for an AI-audit crawler**: A small list of URLs to feed a crawler or an AI-readiness audit.
+
 ## FAQ
 
 **Can I watch a site for new pages?** Yes. Schedule the Actor with Apify Schedules and set **modifiedSince** to a recent date.
@@ -79,9 +94,11 @@ Input is checked before any request is made:
 
 ## Other Actors by the same author
 
-- Broken Link Auditor: status, redirects and 404s for many URLs.
-- Bulk PageSpeed Checker: Core Web Vitals for many pages.
-- Bulk DNS & Email Auth Checker: SPF, DKIM, DMARC and MX for many domains.
+- [Cold-Email List Pre-Check: DMARC, SPF & MX in Bulk](https://apify.com/looped_kite/bulk-dns-email-auth-checker)
+- [Check 1,000 Startup Name Ideas at Once (DNS + RDAP)](https://apify.com/looped_kite/bulk-domain-availability-checker)
+- [Domain Due Diligence Report: Check a Domain Before You Buy](https://apify.com/looped_kite/domain-checkup-report)
+- [Site Migration QA: Check Old URLs Redirect to Live Pages](https://apify.com/looped_kite/broken-link-auditor)
+- [Core Web Vitals for Every Page in Your Sitemap, as CSV](https://apify.com/looped_kite/bulk-pagespeed-checker)
 
 ## Permissions
 

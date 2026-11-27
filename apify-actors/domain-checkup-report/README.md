@@ -63,6 +63,21 @@ A made-up domain parked at a marketplace. A real run returns the live facts of y
 }
 ```
 
+## Example tasks
+
+These ready-made inputs are saved as tasks on this Actor's page; open one and press Start.
+
+- **Due diligence on two domains**: One-row report per domain with age, registrar, DNS and score.
+- **Check a domain before you buy**: The report for a single domain you are thinking of buying.
+- **Fast run: skip the landing page**: Registration and DNS only, without opening the site.
+- **Skip RDAP, check DNS and site**: Use when you only need DNS and landing-page signals.
+- **Compare 5 candidate domains**: Score several candidates side by side.
+- **Check a domain's email setup**: Includes SPF and DMARC in the report.
+- **Look for for-sale signals**: The landing-page check looks for for-sale pages and asking prices.
+- **Trademark-risk hint on a brand-like name**: The report includes a hint, not legal advice.
+- **Gentle run: low concurrency**: Fewer parallel lookups.
+- **Report for a list of 10 domains**: A typical small batch.
+
 ## FAQ
 
 **Is the trademark flag a real trademark search?** No. It is a small built-in list of well-known brand tokens only, and it is not legal advice. Always run a proper trademark search before you buy or use a name.
@@ -83,9 +98,11 @@ DNS answers come from public DNS-over-HTTPS resolvers ([Cloudflare 1.1.1.1](http
 
 ## Other Actors by the same author
 
-- Bulk DNS & Email Auth Checker: SPF, DKIM, DMARC and MX for many domains.
-- Bulk Domain Availability Checker: DNS plus official RDAP registry checks.
-- Sitemap URL Extractor: every page URL from a website's sitemaps.
+- [Cold-Email List Pre-Check: DMARC, SPF & MX in Bulk](https://apify.com/looped_kite/bulk-dns-email-auth-checker)
+- [Sitemap URL Extractor: Every URL of a Site for Audits](https://apify.com/looped_kite/sitemap-url-extractor)
+- [Check 1,000 Startup Name Ideas at Once (DNS + RDAP)](https://apify.com/looped_kite/bulk-domain-availability-checker)
+- [Site Migration QA: Check Old URLs Redirect to Live Pages](https://apify.com/looped_kite/broken-link-auditor)
+- [Core Web Vitals for Every Page in Your Sitemap, as CSV](https://apify.com/looped_kite/bulk-pagespeed-checker)
 
 ## Permissions
 

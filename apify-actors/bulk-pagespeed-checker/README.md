@@ -63,10 +63,28 @@ Lab metrics come from a single simulated test, so they can differ between runs. 
 
 The Actor calls only Google's official PageSpeed Insights API v5, with requests spaced out and 3 at a time. It does not scrape anything. Lines that are not valid URLs are skipped; if none is valid, the run stops with a message and charges nothing.
 
+## Example tasks
+
+These ready-made inputs are saved as tasks on this Actor's page; open one and press Start.
+
+- **Mobile and desktop for one page**: Lighthouse performance and real-user data when Google has it.
+- **Mobile only: 3 pages**: Test mobile only to halve the number of rows.
+- **Desktop only: 3 pages**: Test desktop only.
+- **All four Lighthouse categories**: Performance, accessibility, best-practices and SEO for one URL.
+- **SEO score for a docs site**: SEO category only, on mobile.
+- **Accessibility check: 2 pages**: Accessibility category on two public pages.
+- **Compare a homepage and a blog page**: Two URLs from the same site side by side.
+- **Best-practices audit for 2 pages**: Best-practices category only.
+- **Five key pages, performance, mobile**: A typical small batch.
+- **Use your own Google API key**: Paste your own key in the apiKey field to lift the per-run cap.
+
 ## Other Actors by the same author
 
-- Sitemap URL Extractor: every page URL from a website's sitemaps.
-- Broken Link Auditor: status, redirects and 404s for many URLs.
+- [Cold-Email List Pre-Check: DMARC, SPF & MX in Bulk](https://apify.com/looped_kite/bulk-dns-email-auth-checker)
+- [Sitemap URL Extractor: Every URL of a Site for Audits](https://apify.com/looped_kite/sitemap-url-extractor)
+- [Check 1,000 Startup Name Ideas at Once (DNS + RDAP)](https://apify.com/looped_kite/bulk-domain-availability-checker)
+- [Domain Due Diligence Report: Check a Domain Before You Buy](https://apify.com/looped_kite/domain-checkup-report)
+- [Site Migration QA: Check Old URLs Redirect to Live Pages](https://apify.com/looped_kite/broken-link-auditor)
 
 ## Permissions
 

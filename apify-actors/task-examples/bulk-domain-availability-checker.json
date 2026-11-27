@@ -1,0 +1,169 @@
+{
+ "actor": "bulk-domain-availability-checker",
+ "title": "Check 1,000 Startup Name Ideas at Once (DNS + RDAP)",
+ "tasks": [
+  {
+   "name": "3 name ideas across 6 TLDs",
+   "description": "Names times TLDs, with DNS pre-check and RDAP confirmation.",
+   "input": {
+    "keywords": [
+     "rentguitar",
+     "solarpet",
+     "quietfalcon"
+    ],
+    "tlds": [
+     "com",
+     "net",
+     "org",
+     "io",
+     "ai",
+     "co"
+    ]
+   }
+  },
+  {
+   "name": "Only available .com names",
+   "description": "Return only names that look available on .com.",
+   "input": {
+    "keywords": [
+     "bluefalcon",
+     "nimbusdesk",
+     "paperkite",
+     "northpine"
+    ],
+    "tlds": [
+     "com"
+    ],
+    "onlyAvailable": true
+   }
+  },
+  {
+   "name": "Add a prefix: get + name",
+   "description": "Try a prefix in front of each name.",
+   "input": {
+    "keywords": [
+     "lumen",
+     "orbit",
+     "kindle"
+    ],
+    "tlds": [
+     "com",
+     "io"
+    ],
+    "prefixes": [
+     "get",
+     "try"
+    ]
+   }
+  },
+  {
+   "name": "Add a suffix: name + app",
+   "description": "Try a suffix after each name.",
+   "input": {
+    "keywords": [
+     "tidy",
+     "pixel",
+     "budget"
+    ],
+    "tlds": [
+     "com",
+     "app"
+    ],
+    "suffixes": [
+     "app",
+     "hq"
+    ]
+   }
+  },
+  {
+   "name": "Check an exact list of domains",
+   "description": "Give full domain names instead of keywords.",
+   "input": {
+    "domains": [
+     "example.com",
+     "example.org",
+     "iana.org"
+    ]
+   }
+  },
+  {
+   "name": "Who owns the taken names",
+   "description": "Registration details (registrar, created, expiry) for registered domains.",
+   "input": {
+    "keywords": [
+     "apple",
+     "stripe",
+     "notion"
+    ],
+    "tlds": [
+     "com"
+    ],
+    "lookupRegistered": true
+   }
+  },
+  {
+   "name": "Include likely-available names",
+   "description": "Also list names that probably are free, marked as likely.",
+   "input": {
+    "keywords": [
+     "quietharbor",
+     "mintorchard"
+    ],
+    "tlds": [
+     "com",
+     "net"
+    ],
+    "includeLikelyAvailable": true
+   }
+  },
+  {
+   "name": "Short .ai names",
+   "description": "A small .ai check for AI product names.",
+   "input": {
+    "keywords": [
+     "promptly",
+     "tokenly",
+     "agentic"
+    ],
+    "tlds": [
+     "ai"
+    ]
+   }
+  },
+  {
+   "name": "Brand names with prefix and suffix",
+   "description": "Combine prefixes and suffixes in one run.",
+   "input": {
+    "keywords": [
+     "nova",
+     "pulse"
+    ],
+    "tlds": [
+     "com"
+    ],
+    "prefixes": [
+     "get"
+    ],
+    "suffixes": [
+     "hq",
+     "labs"
+    ]
+   }
+  },
+  {
+   "name": "Gentle run: low concurrency",
+   "description": "Same check with fewer parallel lookups.",
+   "input": {
+    "keywords": [
+     "rentguitar",
+     "solarpet"
+    ],
+    "tlds": [
+     "com",
+     "net"
+    ],
+    "concurrency": 5
+   }
+  }
+ ]
+}

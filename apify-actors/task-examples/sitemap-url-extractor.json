@@ -1,0 +1,114 @@
+{
+ "actor": "sitemap-url-extractor",
+ "title": "Sitemap URL Extractor: Every URL of a Site for Audits",
+ "tasks": [
+  {
+   "name": "Apify docs: first 200 URLs",
+   "description": "Follow a sitemap index and return up to 200 URLs with lastmod.",
+   "input": {
+    "startUrls": [
+     "https://docs.apify.com/sitemap.xml"
+    ],
+    "maxUrlsPerSite": 200
+   }
+  },
+  {
+   "name": "Apify blog: only /blog/ posts",
+   "description": "Filter a sitemap with an include regex.",
+   "input": {
+    "startUrls": [
+     "https://blog.apify.com/sitemap.xml"
+    ],
+    "maxUrlsPerSite": 200,
+    "includeRegex": "blog\\.apify\\.com/[a-z0-9-]+/$"
+   }
+  },
+  {
+   "name": "Kubernetes docs: skip translations",
+   "description": "Exclude URLs matching a language-folder regex.",
+   "input": {
+    "startUrls": [
+     "https://kubernetes.io/sitemap.xml"
+    ],
+    "maxUrlsPerSite": 300,
+    "excludeRegex": "kubernetes\\.io/(de|es|fr|ja|ko|zh-cn|pt-br|id|it|ru|vi|uk|pl|hi|ar)/"
+   }
+  },
+  {
+   "name": "Single sitemap file: all URLs",
+   "description": "A plain urlset sitemap with no index.",
+   "input": {
+    "startUrls": [
+     "https://www.sitemaps.org/sitemap.xml"
+    ],
+    "maxUrlsPerSite": 200
+   }
+  },
+  {
+   "name": "MDN: first 100 URLs",
+   "description": "Large index with many files; limit the number of sitemap files read.",
+   "input": {
+    "startUrls": [
+     "https://developer.mozilla.org/sitemap.xml"
+    ],
+    "maxUrlsPerSite": 100,
+    "maxSitemaps": 3
+   }
+  },
+  {
+   "name": "web.dev: HTTP status of 50 URLs",
+   "description": "Add the HTTP status of each URL to the output for an audit.",
+   "input": {
+    "startUrls": [
+     "https://web.dev/sitemap.xml"
+    ],
+    "maxUrlsPerSite": 50,
+    "checkStatus": true,
+    "maxSitemaps": 2
+   }
+  },
+  {
+   "name": "FastAPI docs: pages changed since 2025",
+   "description": "Keep only URLs with a lastmod on or after a date.",
+   "input": {
+    "startUrls": [
+     "https://fastapi.tiangolo.com/sitemap.xml"
+    ],
+    "maxUrlsPerSite": 200,
+    "modifiedSince": "2025-01-01"
+   }
+  },
+  {
+   "name": "Two sites in one run",
+   "description": "Several websites at once, each with its own cap.",
+   "input": {
+    "startUrls": [
+     "https://docs.apify.com/sitemap.xml",
+     "https://fastapi.tiangolo.com/sitemap.xml"
+    ],
+    "maxUrlsPerSite": 100
+   }
+  },
+  {
+   "name": "Start from a site address, not a sitemap",
+   "description": "Give a homepage; the Actor looks for the sitemap in robots.txt.",
+   "input": {
+    "startUrls": [
+     "https://kubernetes.io"
+    ],
+    "maxUrlsPerSite": 100
+   }
+  },
+  {
+   "name": "Sitemap export for an AI-audit crawler",
+   "description": "A small list of URLs to feed a crawler or an AI-readiness audit.",
+   "input": {
+    "startUrls": [
+     "https://docs.apify.com/sitemap.xml"
+    ],
+    "maxUrlsPerSite": 50,
+    "includeRegex": "/academy/"
+   }
+  }
+ ]
+}

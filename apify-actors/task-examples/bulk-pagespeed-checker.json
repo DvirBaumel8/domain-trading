@@ -1,0 +1,143 @@
+{
+ "actor": "bulk-pagespeed-checker",
+ "title": "Core Web Vitals for Every Page in Your Sitemap, as CSV",
+ "tasks": [
+  {
+   "name": "Mobile and desktop for one page",
+   "description": "Lighthouse performance and real-user data when Google has it.",
+   "input": {
+    "urls": [
+     "https://example.com/"
+    ]
+   }
+  },
+  {
+   "name": "Mobile only: 3 pages",
+   "description": "Test mobile only to halve the number of rows.",
+   "input": {
+    "urls": [
+     "https://web.dev/",
+     "https://developer.mozilla.org/",
+     "https://kubernetes.io/"
+    ],
+    "strategies": [
+     "mobile"
+    ]
+   }
+  },
+  {
+   "name": "Desktop only: 3 pages",
+   "description": "Test desktop only.",
+   "input": {
+    "urls": [
+     "https://web.dev/",
+     "https://developer.mozilla.org/",
+     "https://kubernetes.io/"
+    ],
+    "strategies": [
+     "desktop"
+    ]
+   }
+  },
+  {
+   "name": "All four Lighthouse categories",
+   "description": "Performance, accessibility, best-practices and SEO for one URL.",
+   "input": {
+    "urls": [
+     "https://web.dev/"
+    ],
+    "categories": [
+     "performance",
+     "accessibility",
+     "best-practices",
+     "seo"
+    ]
+   }
+  },
+  {
+   "name": "SEO score for a docs site",
+   "description": "SEO category only, on mobile.",
+   "input": {
+    "urls": [
+     "https://docs.apify.com/"
+    ],
+    "categories": [
+     "seo"
+    ],
+    "strategies": [
+     "mobile"
+    ]
+   }
+  },
+  {
+   "name": "Accessibility check: 2 pages",
+   "description": "Accessibility category on two public pages.",
+   "input": {
+    "urls": [
+     "https://example.com/",
+     "https://www.sitemaps.org/"
+    ],
+    "categories": [
+     "accessibility"
+    ]
+   }
+  },
+  {
+   "name": "Compare a homepage and a blog page",
+   "description": "Two URLs from the same site side by side.",
+   "input": {
+    "urls": [
+     "https://blog.apify.com/",
+     "https://docs.apify.com/"
+    ],
+    "strategies": [
+     "mobile"
+    ]
+   }
+  },
+  {
+   "name": "Best-practices audit for 2 pages",
+   "description": "Best-practices category only.",
+   "input": {
+    "urls": [
+     "https://kubernetes.io/",
+     "https://fastapi.tiangolo.com/"
+    ],
+    "categories": [
+     "best-practices"
+    ],
+    "strategies": [
+     "mobile"
+    ]
+   }
+  },
+  {
+   "name": "Five key pages, performance, mobile",
+   "description": "A typical small batch.",
+   "input": {
+    "urls": [
+     "https://web.dev/",
+     "https://developer.mozilla.org/",
+     "https://kubernetes.io/",
+     "https://fastapi.tiangolo.com/",
+     "https://docs.apify.com/"
+    ],
+    "strategies": [
+     "mobile"
+    ]
+   }
+  },
+  {
+   "name": "Use your own Google API key",
+   "description": "Paste your own key in the apiKey field to lift the per-run cap.",
+   "input": {
+    "urls": [
+     "https://example.com/"
+    ],
+    "strategies": [
+     "mobile"
+    ]
+   }
+  }
+ ]
+}

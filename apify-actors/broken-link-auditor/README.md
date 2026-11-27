@@ -84,10 +84,28 @@ Use **crawl** mode and schedule the run with Apify Schedules. The Actor follows 
 | `respectRobots` | Obey robots.txt (default on) |
 | `debugNetwork` | Log connect details of failed requests (default off) |
 
+## Example tasks
+
+These ready-made inputs are saved as tasks on this Actor's page; open one and press Start.
+
+- **Check a list of old URLs**: List mode: final status and redirect chain for each URL.
+- **See a 3-step redirect chain**: Shows the chain of 301/302 hops for one URL.
+- **Find a 404**: One URL that returns 404 and one that returns 200.
+- **Redirect to a different host**: Confirm that an old URL lands on the new site.
+- **Check every URL in a sitemap**: Sitemap mode: expand the sitemap, then check each URL (capped).
+- **Crawl a small site, depth 1**: Crawl mode: find broken links and the pages that link to them.
+- **Crawl docs, 50 pages**: A bounded crawl of a documentation site.
+- **Include external links**: Also check links that point to other websites.
+- **Gentle run: 2 requests at a time**: Low concurrency for sites that rate-limit.
+- **Redirect map: 5 old paths**: Paste old paths from a redirect map and check where each one lands.
+
 ## Other Actors by the same author
 
-- Sitemap URL Extractor: every page URL from a website's sitemaps.
-- Bulk PageSpeed Checker: Core Web Vitals for many pages.
+- [Cold-Email List Pre-Check: DMARC, SPF & MX in Bulk](https://apify.com/looped_kite/bulk-dns-email-auth-checker)
+- [Sitemap URL Extractor: Every URL of a Site for Audits](https://apify.com/looped_kite/sitemap-url-extractor)
+- [Check 1,000 Startup Name Ideas at Once (DNS + RDAP)](https://apify.com/looped_kite/bulk-domain-availability-checker)
+- [Domain Due Diligence Report: Check a Domain Before You Buy](https://apify.com/looped_kite/domain-checkup-report)
+- [Core Web Vitals for Every Page in Your Sitemap, as CSV](https://apify.com/looped_kite/bulk-pagespeed-checker)
 
 ## Permissions
 

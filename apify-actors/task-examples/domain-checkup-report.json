@@ -1,0 +1,119 @@
+{
+ "actor": "domain-checkup-report",
+ "title": "Domain Due Diligence Report: Check a Domain Before You Buy",
+ "tasks": [
+  {
+   "name": "Due diligence on two domains",
+   "description": "One-row report per domain with age, registrar, DNS and score.",
+   "input": {
+    "domains": [
+     "example.com",
+     "google.com"
+    ]
+   }
+  },
+  {
+   "name": "Check a domain before you buy",
+   "description": "The report for a single domain you are thinking of buying.",
+   "input": {
+    "domains": [
+     "notion.so"
+    ]
+   }
+  },
+  {
+   "name": "Fast run: skip the landing page",
+   "description": "Registration and DNS only, without opening the site.",
+   "input": {
+    "domains": [
+     "stripe.com",
+     "linear.app"
+    ],
+    "fetchLandingPage": false
+   }
+  },
+  {
+   "name": "Skip RDAP, check DNS and site",
+   "description": "Use when you only need DNS and landing-page signals.",
+   "input": {
+    "domains": [
+     "github.com"
+    ],
+    "lookupRdap": false
+   }
+  },
+  {
+   "name": "Compare 5 candidate domains",
+   "description": "Score several candidates side by side.",
+   "input": {
+    "domains": [
+     "vercel.com",
+     "figma.com",
+     "notion.so",
+     "linear.app",
+     "stripe.com"
+    ]
+   }
+  },
+  {
+   "name": "Check a domain's email setup",
+   "description": "Includes SPF and DMARC in the report.",
+   "input": {
+    "domains": [
+     "shopify.com",
+     "hubspot.com"
+    ]
+   }
+  },
+  {
+   "name": "Look for for-sale signals",
+   "description": "The landing-page check looks for for-sale pages and asking prices.",
+   "input": {
+    "domains": [
+     "example.net",
+     "example.org"
+    ]
+   }
+  },
+  {
+   "name": "Trademark-risk hint on a brand-like name",
+   "description": "The report includes a hint, not legal advice.",
+   "input": {
+    "domains": [
+     "apple.com",
+     "microsoft.com"
+    ]
+   }
+  },
+  {
+   "name": "Gentle run: low concurrency",
+   "description": "Fewer parallel lookups.",
+   "input": {
+    "domains": [
+     "github.com",
+     "gitlab.com",
+     "bitbucket.org"
+    ],
+    "concurrency": 3
+   }
+  },
+  {
+   "name": "Report for a list of 10 domains",
+   "description": "A typical small batch.",
+   "input": {
+    "domains": [
+     "stripe.com",
+     "notion.so",
+     "linear.app",
+     "vercel.com",
+     "figma.com",
+     "github.com",
+     "gitlab.com",
+     "slack.com",
+     "zoom.us",
+     "dropbox.com"
+    ]
+   }
+  }
+ ]
+}

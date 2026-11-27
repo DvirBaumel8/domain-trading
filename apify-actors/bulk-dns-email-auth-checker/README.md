@@ -2,6 +2,8 @@
 
 Pre-send check for cold-email lead lists: paste a list of prospect domains and find which ones have no DMARC or no MX before you send. It is also a bulk email-auth audit (SPF, DKIM, DMARC, MX) for agencies.
 
+It checks each domain's public DNS (MX, SPF, DKIM, DMARC). It does not check whether an individual mailbox exists and does not send email. Addresses you paste are reduced to their domain.
+
 **Returns** one row per domain: `domain`, `resolves`, `mx`, `emailProvider`, `spf`, `spfAll`, `dmarc`, `dmarcPolicy`, `dmarcRua`, `dkimSelectorsFound`, `mtaSts`, `bimi`, `emailScore` (0-100), `issues` (plain English), plus `ns`, `a`, `aaaa`, `caa`, `parkedOrForSale`, `error`, `checkedAt`.
 
 **Cost:** pay per result, one result per domain checked. See the Pricing tab for current prices.
@@ -112,6 +114,21 @@ It reads public DNS only (DNS over HTTPS, Cloudflare with Google as fallback). I
 
 Lines that are not a domain are skipped. If nothing valid is left, the run stops with a message and charges nothing.
 
+## Example tasks
+
+These ready-made inputs are saved as tasks on this Actor's page; open one and press Start.
+
+- **Pre-send check for 5 prospect domains**: Paste prospect domains and see which have no MX or no DMARC before you send.
+- **Lead list with mixed emails and URLs**: Addresses and website URLs are reduced to their domain and checked once each.
+- **Audit SPF, DKIM and DMARC for client domains**: One row per domain with SPF, DKIM, DMARC, MX, provider and a 0-100 score.
+- **Find domains that cannot receive email**: Spot domains with no MX record in a list before sending.
+- **Test your own DKIM selectors**: Add the selector your sender uses and see if a key is published.
+- **Check one domain quickly**: A single-domain run to see the output format.
+- **Google Workspace domains: check SPF and DMARC**: See how a Google-hosted domain publishes its email authentication.
+- **Microsoft 365 domains: check SPF and DMARC**: See how a Microsoft-hosted domain publishes its email authentication.
+- **Newsletter platforms: DMARC policy audit**: Compare DMARC policies across a group of domains.
+- **Gentle run: low concurrency**: Same check with fewer parallel lookups for slow networks.
+
 ## FAQ
 
 **Does it send emails or touch mail servers?** No. It only reads public DNS records.
@@ -122,9 +139,11 @@ Lines that are not a domain are skipped. If nothing valid is left, the run stops
 
 ## Other Actors by the same author
 
-- Sitemap URL Extractor: every page URL from a website's sitemaps.
-- Bulk Domain Availability Checker: DNS plus official RDAP registry checks.
-- Domain Checkup Report: registration, DNS, safety and for-sale signals for a domain.
+- [Sitemap URL Extractor: Every URL of a Site for Audits](https://apify.com/looped_kite/sitemap-url-extractor)
+- [Check 1,000 Startup Name Ideas at Once (DNS + RDAP)](https://apify.com/looped_kite/bulk-domain-availability-checker)
+- [Domain Due Diligence Report: Check a Domain Before You Buy](https://apify.com/looped_kite/domain-checkup-report)
+- [Site Migration QA: Check Old URLs Redirect to Live Pages](https://apify.com/looped_kite/broken-link-auditor)
+- [Core Web Vitals for Every Page in Your Sitemap, as CSV](https://apify.com/looped_kite/bulk-pagespeed-checker)
 
 ## Permissions
 
