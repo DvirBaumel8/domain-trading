@@ -100,9 +100,10 @@ class GeminiShape(Env):
         body = json.loads(r.data)
         self.assertEqual(body["tools"], [{"google_search": {}}])
         text = body["contents"][0]["parts"][0]["text"]
-        self.assertIn("specific business names", text)
+        self.assertTrue(text.startswith("best plumber in Austin, TX?"))
+        self.assertIn("Search Google and Google Maps", text)
+        self.assertNotIn("You must run one Google Search", text)
         self.assertNotIn("Reply with only JSON", text)
-        self.assertIn("You must run one Google Search", text)
         self.assertIn("numbered list", text)
         self.assertEqual(o.reqs, [])
         self.assertEqual(a.live["suggestions"], SUGG)           # exact string, unmodified
