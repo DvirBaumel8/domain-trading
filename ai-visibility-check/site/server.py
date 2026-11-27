@@ -35,6 +35,7 @@ import agency_web                           # noqa: E402
 import discovery                            # noqa: E402
 import refs                                 # noqa: E402
 import cities                               # noqa: E402
+import guides                               # noqa: E402
 import html as _html
 
 DATA = os.path.join(HERE, "data")
@@ -1257,6 +1258,13 @@ class H(http.server.BaseHTTPRequestHandler):
         if path == "/for" or path.startswith("/for/"):     # trade pages: allow-listed slugs only
             m = re.fullmatch(r"/for/([a-z0-9-]{1,80})", path)
             page = discovery.trade_page(m.group(1), self._origin()) if m else None
+            if page is None:
+                return self._json(404, {"error": "not found"})
+            refs.record_page(self.path, path, DATA, save_line)
+            return self._send(200, "text/html; charset=utf-8", render_page(page, self._origin()), cache=True)
+        if path.startswith("/guide/"):                     # guide pages: allow-listed slugs only
+            slug = guides.route_slug(path)
+            page = guides.page(slug, self._origin()) if slug else None
             if page is None:
                 return self._json(404, {"error": "not found"})
             refs.record_page(self.path, path, DATA, save_line)

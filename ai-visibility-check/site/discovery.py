@@ -259,8 +259,13 @@ def city_paths():
     return cities.public_paths()
 
 
+def guide_paths():
+    import guides                       # lazy: guides imports this module
+    return guides.guide_paths()
+
+
 def sitemap_xml(origin=""):
-    paths = list(PUBLIC_PAGES) + trade_paths() + city_paths()
+    paths = list(PUBLIC_PAGES) + trade_paths() + city_paths() + guide_paths()
     urls = "".join(f"<url><loc>{_xml(origin + p)}</loc></url>" for p in paths)
     return ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
             + urls + "</urlset>\n")
@@ -286,6 +291,8 @@ def llms_txt(origin=""):
              f"- [For agencies]({o}/agency.html): reports under your own logo", "",
              "## Trades"]
     lines += [f"- [AI visibility for {n.plural}]({o}/for/{s})" for s, n in trades()]
+    import guides
+    lines += ["", "## Guides (examples only, no measured results)"] + [f"- [{t}]({o}{p})" for p, t in guides.guide_entries()]
     cp = city_paths()
     if cp:
         import cities
