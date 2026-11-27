@@ -13,10 +13,13 @@ sys.path.insert(0, str(ROOT / "tools"))
 import apify_guard as guard  # noqa: E402
 import apify_usage as usage  # noqa: E402
 import apify_memory as memory  # noqa: E402
+import apify_baseline as baseline  # noqa: E402
+import apify_changed as changed  # noqa: E402
 
 NOW = datetime(2026, 11, 27, 6, 0, tzinfo=timezone.utc)
 MEM = {"defaultRunOptions": {"memoryMbytes": 256}}
-NEW = {"wayback-domain-history", "broken-link-auditor", "bulk-pagespeed-checker", "ai-brand-mention-check"}  # CR-134 added the fourth
+PRIVATE = {"wayback-domain-history", "bulk-pagespeed-checker", "ai-brand-mention-check"}
+LIVE = {"bulk-domain-availability-checker", "sitemap-url-extractor", "broken-link-auditor"}
 
 
 # ---- post-push guard
@@ -39,7 +42,7 @@ def test_guard_fails_on_any_pricing(extra):
 
 def test_guard_main_fails_without_leaking_token(monkeypatch, capsys):
     monkeypatch.setenv("APIFY_TOKEN", "sekret-token")
-    assert guard.main(["broken-link-auditor"], fetch_fn=lambda n, t: {"id": "x", "name": n, "isPublic": True, **MEM}) == 1
+    assert guard.main(["wayback-domain-history"], fetch_fn=lambda n, t: {"id": "x", "name": n, "isPublic": True, **MEM}) == 1
     out = capsys.readouterr()
     assert "sekret-token" not in out.out + out.err
 
@@ -74,13 +77,129 @@ def test_guard_fetch_does_not_mask_other_errors():
         guard.fetch("broken-link-auditor", "tok", get_fn=fake_get)
 
 
-def test_guard_rejects_old_actors(monkeypatch):
+def test_guard_private_path_rejects_live_and_unknown_actors(monkeypatch):
     monkeypatch.setenv("APIFY_TOKEN", "t")
-    assert guard.main(["sitemap-url-extractor"], fetch_fn=lambda n, t: {}) == 2
+    for n in ("sitemap-url-extractor", "broken-link-auditor", "domain-checkup-report"):
+        assert guard.main([n], fetch_fn=lambda n, t: {}) == 2
 
 
-def test_guard_allow_list_is_the_new_actors():
-    assert set(guard.ALLOWED) == NEW
+def test_allow_lists():
+    assert set(guard.PRIVATE) == PRIVATE
+    assert set(guard.LIVE) == LIVE
+    assert not set(guard.PRIVATE) & set(guard.LIVE)
+    assert guard.LIVE_TIMEOUTS == {"broken-link-auditor": 7200}
+
+
+# ---- live guard
+PRICED = [{"pricingModel": "PAY_PER_EVENT", "pricingPerEvent": {"actorChargeEvents": {"result": {"eventPriceUsd": 0.5}}}}]
+LISTING = {"isPublic": True, "title": "T", "description": "D", "seoTitle": "ST", "seoDescription": "SD",
+           "categories": ["TOOLS"], "pricingInfos": PRICED}
+
+
+def live_actor(name="sitemap-url-extractor", **over):
+    opts = {"memoryMbytes": 256}
+    if name == "broken-link-auditor":
+        opts["timeoutSecs"] = 7200
+    return {"id": "x", "name": name, **LISTING, "defaultRunOptions": opts, **over}
+
+
+@pytest.mark.parametrize("name", sorted(LIVE))
+def test_live_guard_passes_public_priced_actor(name):
+    assert guard.live_problems(live_actor(name), guard.listing_view(live_actor(name)), name) == []
+
+
+@pytest.mark.parametrize("over", [
+    {"isPublic": False},
+    {"pricingInfos": []},
+    {"pricingInfos": [{"pricingModel": "FREE"}]},
+    {"title": "other"}, {"description": "other"}, {"seoTitle": "o"}, {"seoDescription": "o"}, {"categories": ["SEO_TOOLS"]},
+    {"actorPricing": {"x": 1}},
+    {"defaultRunOptions": {"memoryMbytes": 4096}},
+    {"defaultRunOptions": {}},
+])
+def test_live_guard_fails_on_change(over):
+    base = guard.listing_view(live_actor())
+    assert guard.live_problems(live_actor(**over), base, "sitemap-url-extractor")
+
+
+@pytest.mark.parametrize("timeout", [3600, None])
+def test_live_guard_requires_7200_for_site_migration_qa_only(timeout):
+    opts = {"memoryMbytes": 256, **({"timeoutSecs": timeout} if timeout else {})}
+    a = live_actor("broken-link-auditor", defaultRunOptions=opts)
+    assert any("timeoutSecs" in p for p in guard.live_problems(a, guard.listing_view(a), "broken-link-auditor"))
+    other = live_actor("sitemap-url-extractor", defaultRunOptions=opts)  # any timeout is kept for the others
+    assert guard.live_problems(other, guard.listing_view(other), "sitemap-url-extractor") == []
+
+
+def test_live_guard_main(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("APIFY_TOKEN", "sekret-token")
+    monkeypatch.chdir(tmp_path)
+    bl = tmp_path / "bl.json"
+    bl.write_text(json.dumps({"sitemap-url-extractor": guard.listing_view(live_actor())}))
+    assert guard.main(["--live", "--baseline", str(bl), "sitemap-url-extractor"], fetch_fn=lambda n, t: live_actor()) == 0
+    assert (tmp_path / "dom-to-gavriel-line.md").read_text().count("rebuilt LIVE") == 1
+    assert guard.main(["--live", "--baseline", str(bl), "sitemap-url-extractor"],
+                      fetch_fn=lambda n, t: live_actor(isPublic=False)) == 1
+    assert "sekret-token" not in capsys.readouterr().err
+    # not on the live list, or no baseline: fail closed
+    assert guard.main(["--live", "--baseline", str(bl), "wayback-domain-history"], fetch_fn=lambda n, t: {}) == 2
+    assert guard.main(["--live", "sitemap-url-extractor"], fetch_fn=lambda n, t: live_actor()) == 2
+    assert guard.main(["--live", "--baseline", str(bl), "broken-link-auditor"], fetch_fn=lambda n, t: live_actor()) == 2
+
+
+def test_baseline_records_listing_and_rejects_private(monkeypatch, tmp_path):
+    monkeypatch.setenv("APIFY_TOKEN", "t")
+    out = tmp_path / "b.json"
+    assert baseline.main([str(out), "sitemap-url-extractor"], fetch_fn=lambda n, t: live_actor()) == 0
+    assert json.loads(out.read_text())["sitemap-url-extractor"] == guard.listing_view(live_actor())
+    assert baseline.main([str(out), "sitemap-url-extractor"], fetch_fn=lambda n, t: live_actor(isPublic=False)) == 1
+    assert baseline.main([str(out), "wayback-domain-history"], fetch_fn=lambda n, t: {}) == 2
+
+
+# ---- change detection (merge to main)
+def test_select_only_changed_live_actor():
+    assert changed.select(["apify-actors/sitemap-url-extractor/src/core.py", "README.md"]) == ["sitemap-url-extractor"]
+
+
+def test_select_private_or_other_changes_select_nothing():
+    assert changed.select(["apify-actors/wayback-domain-history/src/core.py", "apify-actors/ai-brand-mention-check/x.py"]) == []
+    assert changed.select([".github/workflows/apify-push.yml", "apify-actors/tools/apify_guard.py", "src/app.ts"]) == []
+    assert changed.select(["apify-actors/sitemap-url-extractor-evil/x.py"]) == []
+
+
+def test_select_several_in_allow_list_order():
+    files = ["apify-actors/broken-link-auditor/a", "apify-actors/bulk-domain-availability-checker/b", "apify-actors/wayback-domain-history/c"]
+    assert changed.select(files) == ["bulk-domain-availability-checker", "broken-link-auditor"]
+
+
+def test_changed_files_from_a_real_fake_main(tmp_path):
+    import subprocess
+
+    def git(*a):
+        return subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *a], cwd=tmp_path, check=True,
+                              capture_output=True, text=True).stdout.strip()
+
+    git("init", "-q")
+    for d in ("sitemap-url-extractor", "wayback-domain-history"):
+        (tmp_path / "apify-actors" / d).mkdir(parents=True)
+        (tmp_path / "apify-actors" / d / "f.py").write_text("1")
+    git("add", "."), git("commit", "-qm", "base")
+    base = git("rev-parse", "HEAD")
+    (tmp_path / "apify-actors" / "sitemap-url-extractor" / "f.py").write_text("2")
+    git("commit", "-qam", "live only")
+    live = git("rev-parse", "HEAD")
+    (tmp_path / "apify-actors" / "wayback-domain-history" / "f.py").write_text("2")
+    git("commit", "-qam", "private only")
+    head = git("rev-parse", "HEAD")
+    cwd = Path.cwd()
+    import os
+    os.chdir(tmp_path)
+    try:
+        assert changed.select(changed.changed_files(base, live)) == ["sitemap-url-extractor"]
+        assert changed.select(changed.changed_files(live, head)) == []
+        assert changed.select(changed.changed_files(changed.ZERO, live)) == ["sitemap-url-extractor"]  # new-branch fallback
+    finally:
+        os.chdir(cwd)
 
 
 # ---- push workflow (static)
@@ -95,22 +214,33 @@ def read_workflow(name):
 WF = read_workflow("apify-push.yml")
 
 
-def test_push_workflow_manual_only():
+def test_push_workflow_triggers_manual_and_main_merge_only():
     on_block = WF.split("\non:")[1].split("\npermissions:")[0]
-    assert not re.search(r"^ +push *:", on_block, re.M)
     assert "schedule" not in WF and "pull_request" not in WF
     assert "workflow_dispatch" in WF
+    if re.search(r"^ +push *:", on_block, re.M):  # the installed copy may still be the old manual-only file
+        assert "branches: [main]" in on_block
+        for n in LIVE:
+            assert f"'apify-actors/{n}/**'" in on_block
+        assert not any(f"'apify-actors/{n}/**'" in on_block for n in PRIVATE)
 
 
 def _options(text):
     return set(re.findall(r"^\s+- ([\w-]+)\s*$", text.split("options:")[1].split("permissions:")[0], re.M))
 
 
-def test_push_workflow_allow_list_exactly_new_actors():
-    # CR-134: the bot cannot change .github/workflows, so the new allow-list line lives in the ci/ copy that Dvir installs.
-    # That copy must list exactly the new actors; the installed copy may lag behind (it must never list anything else).
-    assert _options((ROOT / "ci" / "apify-push.yml").read_text()) == NEW | {"all-new"}
-    assert _options(WF) <= NEW | {"all-new"}
+def test_push_workflow_allow_list_exactly_live_and_private_actors():
+    # The ci/ copy is the source; the installed copy may lag behind but must never list anything else.
+    assert _options((ROOT / "ci" / "apify-push.yml").read_text()) == LIVE | PRIVATE | {"all-new"}
+    assert _options(WF) <= LIVE | PRIVATE | {"all-new"}
+
+
+def test_ci_workflow_selects_changed_live_actors_and_fails_closed():
+    wf = (ROOT / "ci" / "apify-push.yml").read_text()
+    assert "apify_changed.py" in wf and "actor not allowed" in wf
+    assert wf.index("python -m pytest") < wf.index("apify push")  # pytest before any push
+    assert wf.index("apify_baseline.py") < wf.index("apify push")  # live baseline before the push
+    assert "--live" in wf and "secrets.APIFY_TOKEN" in wf
 
 
 def test_push_workflow_never_publishes_or_prices():
@@ -234,7 +364,7 @@ def test_guard_fails_when_memory_not_256(opts):
 def test_guard_main_fails_on_4096(monkeypatch, capsys):
     monkeypatch.setenv("APIFY_TOKEN", "sekret-token")
     bad = {"id": "x", "name": "n", "isPublic": False, "defaultRunOptions": {"memoryMbytes": 4096}}
-    assert guard.main(["broken-link-auditor"], fetch_fn=lambda n, t: bad) == 1
+    assert guard.main(["wayback-domain-history"], fetch_fn=lambda n, t: bad) == 1
     assert "sekret-token" not in capsys.readouterr().err
 
 
@@ -256,16 +386,34 @@ def test_memory_put_sends_only_run_options_and_keeps_others(monkeypatch):
     assert calls == [("/v2/acts/ID1", {"defaultRunOptions": {"build": "latest", "timeoutSecs": 3600, "memoryMbytes": 256}})]
 
 
-def test_memory_rejects_old_and_unknown_actors(monkeypatch):
+def test_memory_live_sets_7200_for_site_migration_qa_only(monkeypatch):
+    monkeypatch.setenv("APIFY_TOKEN", "t")
+    fetch_fn, put_fn, calls = _mock({"build": "latest", "timeoutSecs": 3600, "memoryMbytes": 4096})
+    assert memory.main(["--live", "broken-link-auditor"], fetch_fn=fetch_fn, put_fn=put_fn) == 0
+    assert calls[-1][1] == {"defaultRunOptions": {"build": "latest", "timeoutSecs": 7200, "memoryMbytes": 256}}
+    assert memory.main(["--live", "sitemap-url-extractor"], fetch_fn=fetch_fn, put_fn=put_fn) == 0
+    assert calls[-1][1] == {"defaultRunOptions": {"build": "latest", "timeoutSecs": 3600, "memoryMbytes": 256}}  # kept
+
+
+def test_memory_live_fails_if_timeout_not_applied(monkeypatch):
+    monkeypatch.setenv("APIFY_TOKEN", "t")
+    fetch_fn, _, _ = _mock({})
+    assert memory.main(["--live", "broken-link-auditor"], fetch_fn=fetch_fn,
+                       put_fn=lambda p, t, b: {"defaultRunOptions": {"memoryMbytes": 256, "timeoutSecs": 3600}}) == 1
+
+
+def test_memory_rejects_wrong_path_and_unknown_actors(monkeypatch):
     monkeypatch.setenv("APIFY_TOKEN", "t")
     fetch_fn, put_fn, calls = _mock({})
-    assert memory.main(["sitemap-url-extractor"], fetch_fn=fetch_fn, put_fn=put_fn) == 2
+    assert memory.main(["sitemap-url-extractor"], fetch_fn=fetch_fn, put_fn=put_fn) == 2  # live actor on the private path
+    assert memory.main(["--live", "wayback-domain-history"], fetch_fn=fetch_fn, put_fn=put_fn) == 2
+    assert memory.main(["--live", "domain-checkup-report"], fetch_fn=fetch_fn, put_fn=put_fn) == 2
     assert calls == []
 
 
 def test_memory_requires_token(monkeypatch):
     monkeypatch.delenv("APIFY_TOKEN", raising=False)
-    assert memory.main(["broken-link-auditor"]) == 2
+    assert memory.main(["wayback-domain-history"]) == 2
 
 
 def test_memory_failure_exit_1_without_leaking_token(monkeypatch, capsys):
@@ -275,7 +423,7 @@ def test_memory_failure_exit_1_without_leaking_token(monkeypatch, capsys):
         raise RuntimeError(f"https://x/?token={token}")
 
     fetch_fn, _, _ = _mock({})
-    assert memory.main(["broken-link-auditor"], fetch_fn=fetch_fn, put_fn=boom) == 1
+    assert memory.main(["wayback-domain-history"], fetch_fn=fetch_fn, put_fn=boom) == 1
     out = capsys.readouterr()
     assert "sekret-token" not in out.out + out.err
 
@@ -283,7 +431,7 @@ def test_memory_failure_exit_1_without_leaking_token(monkeypatch, capsys):
 def test_memory_fails_if_apify_reports_other_value(monkeypatch):
     monkeypatch.setenv("APIFY_TOKEN", "t")
     fetch_fn, _, _ = _mock({})
-    assert memory.main(["broken-link-auditor"], fetch_fn=fetch_fn,
+    assert memory.main(["wayback-domain-history"], fetch_fn=fetch_fn,
                        put_fn=lambda p, t, b: {"defaultRunOptions": {"memoryMbytes": 4096}}) == 1
 
 
