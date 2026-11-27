@@ -19,7 +19,7 @@ import apify_changed as changed  # noqa: E402
 NOW = datetime(2026, 11, 27, 6, 0, tzinfo=timezone.utc)
 MEM = {"defaultRunOptions": {"memoryMbytes": 256}}
 PRIVATE = {"wayback-domain-history", "bulk-pagespeed-checker", "ai-brand-mention-check"}
-LIVE = {"bulk-domain-availability-checker", "sitemap-url-extractor", "broken-link-auditor"}
+LIVE = {"bulk-domain-availability-checker", "sitemap-url-extractor", "broken-link-auditor", "domain-checkup-report"}
 
 
 # ---- post-push guard
@@ -79,7 +79,7 @@ def test_guard_fetch_does_not_mask_other_errors():
 
 def test_guard_private_path_rejects_live_and_unknown_actors(monkeypatch):
     monkeypatch.setenv("APIFY_TOKEN", "t")
-    for n in ("sitemap-url-extractor", "broken-link-auditor", "domain-checkup-report"):
+    for n in ("sitemap-url-extractor", "broken-link-auditor", "domain-checkup-report", "not-an-actor"):
         assert guard.main([n], fetch_fn=lambda n, t: {}) == 2
 
 
@@ -220,8 +220,9 @@ def test_push_workflow_triggers_manual_and_main_merge_only():
     assert "workflow_dispatch" in WF
     if re.search(r"^ +push *:", on_block, re.M):  # the installed copy may still be the old manual-only file
         assert "branches: [main]" in on_block
-        for n in LIVE:
-            assert f"'apify-actors/{n}/**'" in on_block
+        staged = (ROOT / "ci" / "apify-push.yml").read_text().split("\non:")[1].split("\npermissions:")[0]
+        for n in LIVE:  # the staged copy is the source; the installed one may lag until installed
+            assert f"'apify-actors/{n}/**'" in staged
         assert not any(f"'apify-actors/{n}/**'" in on_block for n in PRIVATE)
 
 
@@ -407,7 +408,7 @@ def test_memory_rejects_wrong_path_and_unknown_actors(monkeypatch):
     fetch_fn, put_fn, calls = _mock({})
     assert memory.main(["sitemap-url-extractor"], fetch_fn=fetch_fn, put_fn=put_fn) == 2  # live actor on the private path
     assert memory.main(["--live", "wayback-domain-history"], fetch_fn=fetch_fn, put_fn=put_fn) == 2
-    assert memory.main(["--live", "domain-checkup-report"], fetch_fn=fetch_fn, put_fn=put_fn) == 2
+    assert memory.main(["--live", "not-an-actor"], fetch_fn=fetch_fn, put_fn=put_fn) == 2
     assert calls == []
 
 
@@ -444,3 +445,34 @@ def test_memory_put_body_never_has_forbidden_fields():
 def test_push_workflow_sets_memory_before_guard():
     wf = (ROOT / "ci" / "apify-push.yml").read_text()
     assert "apify_memory.py" in wf and wf.index("apify_memory.py") < wf.index("apify_guard.py")
+
+
+# ---- domain-checkup-report is LIVE (U2)
+def test_select_domain_checkup_report():
+    assert changed.select(["apify-actors/domain-checkup-report/src/main.py"]) == ["domain-checkup-report"]
+
+
+def test_staged_push_workflow_includes_domain_checkup_report():
+    wf = (ROOT / "ci" / "apify-push.yml").read_text()
+    on_block = wf.split("\non:")[1].split("\npermissions:")[0]
+    assert "'apify-actors/domain-checkup-report/**'" in on_block
+    live_case = [ln for ln in wf.splitlines() if 'echo "MODE=live"' in ln and "case" not in ln and ")" in ln]
+    assert any("|domain-checkup-report)" in ln for ln in live_case)
+    assert _options(wf) == LIVE | PRIVATE | {"all-new"}
+
+
+def test_memory_live_domain_checkup_report_sets_memory_only(monkeypatch):
+    monkeypatch.setenv("APIFY_TOKEN", "t")
+    fetch_fn, put_fn, calls = _mock({"build": "latest", "memoryMbytes": 4096})
+    assert memory.main(["--live", "domain-checkup-report"], fetch_fn=fetch_fn, put_fn=put_fn) == 0
+    body = calls[-1][1]["defaultRunOptions"]
+    assert body["memoryMbytes"] == 256 and "timeoutSecs" not in body
+
+
+def test_live_guard_domain_checkup_report_listing_unchanged_and_changed():
+    a = live_actor("domain-checkup-report")
+    base = guard.listing_view(a)
+    assert guard.live_problems(a, base, "domain-checkup-report") == []
+    for field, value in (("title", "x"), ("description", "x"), ("seoTitle", "x"), ("seoDescription", "x"),
+                         ("categories", ["OTHER"]), ("pricingInfos", [])):
+        assert guard.live_problems(live_actor("domain-checkup-report", **{field: value}), base, "domain-checkup-report")

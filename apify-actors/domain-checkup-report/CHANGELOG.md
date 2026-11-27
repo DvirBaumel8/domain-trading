@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Now rebuilt by apify-push on merge (LIVE). Listing pinned to the live text by `tests/test_listing_pinned.py`.
 - Text only: re-angled as due diligence before buying a domain, README lists what the report contains, input descriptions, dataset schema with required keys and a view. No behaviour change.
 
 ## 0.1.1

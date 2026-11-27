@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 
 BASE = "https://api.apify.com"
 PRIVATE = ("wayback-domain-history", "bulk-pagespeed-checker", "ai-brand-mention-check")  # stay private and unpriced
-LIVE = ("bulk-domain-availability-checker", "sitemap-url-extractor", "broken-link-auditor")  # already public and priced
+LIVE = ("bulk-domain-availability-checker", "sitemap-url-extractor", "broken-link-auditor", "domain-checkup-report")  # already public and priced
 LIVE_TIMEOUTS = {"broken-link-auditor": 7200}  # timeoutSecs the live path sets and checks; other actors keep theirs
 LISTING_FIELDS = ("isPublic", "title", "description", "seoTitle", "seoDescription", "categories", "pricingInfos")
 PRICE_KEY_HINTS = ("pric", "monetiz")
