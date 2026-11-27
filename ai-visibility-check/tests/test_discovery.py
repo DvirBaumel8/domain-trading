@@ -1,9 +1,10 @@
-import html as htmllib, http.client, json, os, re, sys, tempfile, threading, unittest
+import html as htmllib, http.client, json, os, re, sys, tempfile, unittest
 import xml.etree.ElementTree as ET
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "site"))
 os.environ["ORDERS_LOCAL_DIR"] = os.path.join(tempfile.mkdtemp(), "orders")
 import server, discovery, cities, products  # noqa: E402
+from server_base import ServerCase  # noqa: E402
 
 
 def no_network(req, timeout=15):
@@ -50,16 +51,10 @@ class TradeData(unittest.TestCase):
             self.assertGreaterEqual(len(discovery.example_prompts(n)), 3, n.key)
 
 
-class Base(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.srv = server.http.server.ThreadingHTTPServer(("127.0.0.1", 0), server.H)
-        cls.port = cls.srv.server_address[1]
-        threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
-
+class Base(ServerCase):
     @classmethod
     def tearDownClass(cls):
-        cls.srv.shutdown(); cls.srv.server_close()
+        super().tearDownClass()
 
     def get(self, path, headers=None):
         c = http.client.HTTPConnection("127.0.0.1", self.port)

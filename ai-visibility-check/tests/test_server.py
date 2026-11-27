@@ -1,4 +1,4 @@
-import base64, hashlib, hmac, http.client, json, os, sys, tempfile, threading, time, unittest, urllib.parse
+import base64, hashlib, hmac, http.client, json, os, sys, tempfile, time, unittest, urllib.parse
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "site"))
 TMP = tempfile.mkdtemp()
@@ -7,6 +7,7 @@ for k in ("ORDERS_REPO", "ORDERS_GITHUB_TOKEN", "ORDER_ALERT_WEBHOOK_URL"):
     os.environ.pop(k, None)
 os.environ["POLAR_WEBHOOK_SECRET"] = "test-secret"
 import server  # noqa: E402
+from server_base import ServerCase  # noqa: E402
 import delivery  # noqa: E402
 server.LOCAL_ORDERS = os.environ["ORDERS_LOCAL_DIR"]
 
@@ -68,15 +69,10 @@ class VerifyPolarKeyTests(unittest.TestCase):
         self.assertFalse(server.verify_polar(s, self.hdrs(b"x"), self.BODY))
 
 
-class Base(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.srv = server.http.server.ThreadingHTTPServer(("127.0.0.1", 0), server.H)
-        cls.port = cls.srv.server_address[1]
-        threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
+class Base(ServerCase):
     @classmethod
     def tearDownClass(cls):
-        cls.srv.shutdown()
+        super().tearDownClass()
     def req(self, method, path, body=None, headers=None):
         c = http.client.HTTPConnection("127.0.0.1", self.port)
         c.request(method, path, body=body, headers=headers or {})

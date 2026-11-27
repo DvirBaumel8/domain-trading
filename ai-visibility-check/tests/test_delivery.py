@@ -1,5 +1,5 @@
 """Automatic report build + private link. Fake vendor APIs from docs/requests/avc-mock-run, no network, no keys."""
-import base64, hashlib, hmac, http.client, importlib.util, json, os, sys, tempfile, threading, time, unittest, urllib.error
+import base64, hashlib, hmac, http.client, importlib.util, json, os, sys, tempfile, time, unittest, urllib.error
 from types import SimpleNamespace
 from unittest import mock
 
@@ -10,6 +10,7 @@ os.environ.setdefault("ORDERS_LOCAL_DIR", tempfile.mkdtemp())
 for k in ("ORDERS_REPO", "ORDERS_GITHUB_TOKEN"):
     os.environ.pop(k, None)
 import server, delivery  # noqa: E402
+from server_base import ServerCase  # noqa: E402
 from aivis.reasons import build_findings  # noqa: E402
 from aivis.niches import get_niche  # noqa: E402
 from aivis.order import PAID_ENGINES  # noqa: E402
@@ -29,16 +30,10 @@ def sign(body, mid):
     return {"webhook-id": mid, "webhook-timestamp": ts, "webhook-signature": "v1," + base64.b64encode(mac).decode()}
 
 
-class DeliveryTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.httpd = server.http.server.ThreadingHTTPServer(("127.0.0.1", 0), server.H)
-        cls.port = cls.httpd.server_address[1]
-        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
-
+class DeliveryTests(ServerCase):
     @classmethod
     def tearDownClass(cls):
-        cls.httpd.shutdown(); cls.httpd.server_close()
+        super().tearDownClass()
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
