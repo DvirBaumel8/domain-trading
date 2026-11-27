@@ -18,6 +18,10 @@ services:
         - .claude/**
         - CLAUDE.md
         - ai-visibility-check/**
+        - apify-actors/**
+        - .github/workflows/apify-*.yml
+        - .github/workflows/avc-tests.yml
+        - .github/workflows/claude*.yml
     envVars:
       - key: NODE_VERSION
         value: "26"
