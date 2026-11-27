@@ -103,7 +103,7 @@ FAQ = (
 )
 _FAQ_LINKS = (("privacy policy", "/privacy.html"), ("refund policy", "/refunds.html"))
 
-PUBLIC_PAGES = ("/", "/agency.html", "/sample-report.html", "/privacy.html", "/terms.html", "/refunds.html")
+PUBLIC_PAGES = ("/", "/agency.html", "/reserve", "/sample-report.html", "/privacy.html", "/terms.html", "/refunds.html")
 
 # ---- origin helper -------------------------------------------------------------------------------
 _LABEL = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"

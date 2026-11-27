@@ -23,7 +23,7 @@
       var i = h.indexOf("#"), base = i < 0 ? h : h.slice(0, i), hash = i < 0 ? "" : h.slice(i);
       a.setAttribute("href", base + (base.indexOf("?") < 0 ? "?" : "&") + "ref=" + ref + hash);
     });
-    ["checkform", "intake"].forEach(function(id){
+    ["checkform", "intake", "reserve"].forEach(function(id){
       var f = document.getElementById(id);
       if (f && !f.querySelector("input[name=ref]")) {
         var i = document.createElement("input"); i.type = "hidden"; i.name = "ref"; i.value = ref; f.appendChild(i);

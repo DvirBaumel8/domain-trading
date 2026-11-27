@@ -78,7 +78,7 @@ class SitemapRobotsLlms(Base):
         self.assertTrue(all(l.startswith("https://example.org/") for l in locs))
         for p in discovery.PUBLIC_PAGES + tuple(discovery.trade_paths()):
             self.assertIn(p, paths)
-        self.assertEqual(len(locs), 6 + 15 + len(cities.public_paths()))     # + /city and the dated city pages
+        self.assertEqual(len(locs), 7 + 15 + len(cities.public_paths()))     # + /city and the dated city pages
         for p in cities.public_paths():
             self.assertIn(p, paths)
         for bad in PRIVATE:

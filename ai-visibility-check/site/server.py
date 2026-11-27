@@ -62,7 +62,7 @@ ROSTER_OPENER = None        # tests inject a fake
 JOB_KEEP_SECONDS = 3600     # finished JOBS entries are dropped after this
 JOB_META = {}               # job id -> {"ip", "started", "finished"}; never sent to the browser
 CHECK_LOG = {}              # client address -> start times of recent checks
-PUBLIC_FILES = {"index.html", "agency.html", "agency-terms.html", "agency-thanks.html", "privacy.html", "refunds.html", "sample-report.html",
+PUBLIC_FILES = {"index.html", "agency.html", "reserve.html", "agency-terms.html", "agency-thanks.html", "privacy.html", "refunds.html", "sample-report.html",
                 "sample-report.pdf", "terms.html", "thanks.html", "favicon.ico"}
 AGENCY_ONLY_FILES = {"agency-terms.html", "agency-thanks.html"}    # served only while AIVIS_AGENCY=1
 PUBLIC_DIRS = {"assets": {".css", ".js", ".png"}}   # direct children only, these extensions only
@@ -72,6 +72,7 @@ LOCAL_ORDERS = os.environ.get("ORDERS_LOCAL_DIR") or os.path.join(HERE, "..", "p
 def render_page(raw, origin=""):
     """Fill the {{BUSINESS_ADDRESS}} token (and the discovery tokens) of an HTML page; add-on buttons follow ADDONS_CHECKOUT."""
     raw = discovery.fill_tokens(render_addon_buttons(raw), origin)
+    raw = raw.replace(b"{{SUPPORT_EMAIL}}", _html.escape(SUPPORT_EMAIL).encode())
     return raw.replace(b"{{BUSINESS_ADDRESS}}", _html.escape(BUSINESS_ADDRESS).encode())
 
 
@@ -208,6 +209,8 @@ def public_file(raw):
         p = "index.html"
     if p == "agency-thanks":            # the checkout success URL has no extension; this one page only
         p = "agency-thanks.html"
+    if p == "reserve":
+        p = "reserve.html"
     if p in PUBLIC_FILES:
         return os.path.join(HERE, p)
     d, _, name = p.rpartition("/")
@@ -216,6 +219,66 @@ def public_file(raw):
         if os.path.isfile(f):
             return f
     return None
+
+
+RESERVE_PER_HOUR = 5
+RESERVE_ID = re.compile(r"\d{8}-[0-9a-f]{32}")
+RESERVE_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s.]+")
+RESERVE_OK = "Reserved. Nothing was charged. We'll email you before anything starts."
+
+
+def reserve_check(d):
+    """-> (clean fields, {field: message}). Every limit is checked after trimming."""
+    err, out = {}, {}
+    agency_name = d.get("agency")
+    agency_name = agency_name.strip() if isinstance(agency_name, str) else ""
+    if not 2 <= len(agency_name) <= 120:
+        err["agency"] = "Enter your agency name (2 to 120 characters)."
+    out["agency"] = agency_name
+    email = d.get("email")
+    email = email.strip() if isinstance(email, str) else ""
+    if not email or len(email) > 254 or not RESERVE_EMAIL.fullmatch(email) or re.search(r"[\x00-\x1f\x7f]", email):
+        err["email"] = "Enter a valid work email address."
+    out["email"] = email.lower()
+    c = d.get("clients")
+    if isinstance(c, str) and re.fullmatch(r"\s*[0-9]{1,6}\s*", c):
+        c = int(c)
+    if isinstance(c, bool) or not isinstance(c, int) or not 1 <= c <= 1000:
+        err["clients"] = "Enter a whole number of clients from 1 to 1000."
+        c = 0
+    out["clients"] = c
+    note = d.get("note")
+    note = note.strip() if isinstance(note, str) else ""
+    if len(note) > 1000:
+        err["note"] = "Keep the note under 1000 characters."
+    out["note"] = note
+    return out, err
+
+
+def reserve_admin(headers, peer=""):
+    """None when the operator token is accepted; else (status, message). 404 while the feature is off."""
+    want = os.environ.get("RESERVE_ADMIN_TOKEN", "")
+    if len(want) < 24:
+        return 404, "not found"
+    ip = client_ip(headers, peer)
+    if agency.limited("badtoken", ip, agency.BAD_TOKEN_PER_MINUTE):
+        return 429, "Too many attempts, try again in a minute."
+    h = headers.get("Authorization") or ""
+    got = h[7:].strip() if h.lower().startswith("bearer ") else ""
+    if not got or not hmac.compare_digest(got.encode(), want.encode()):
+        agency.note("badtoken", ip)
+        return 401, "unauthorized"
+    return None
+
+
+def reservation_list(store):
+    out = []
+    for p in store.list_prefix("reservations/"):
+        o = store.get(p)[0]
+        if isinstance(o, dict):
+            out.append(o)
+    return sorted(out, key=lambda o: (str(o.get("at", "")), str(o.get("id", ""))), reverse=True)
+
 
 
 class Store:
@@ -274,6 +337,27 @@ class Store:
         if st in (409, 422) and not overwrite:
             return False
         raise RuntimeError(f"orders store write failed ({st})")
+
+    def delete(self, path):
+        """Remove one file. True if it existed and is gone, False if there was nothing to remove."""
+        if not self.remote:
+            f = os.path.join(LOCAL_ORDERS, path)
+            with LOCK:
+                if not os.path.isfile(f):
+                    return False
+                os.remove(f)
+            return True
+        _, sha = self.get_raw(path)
+        if not sha:
+            return False
+        req = urllib.request.Request(self._url(path), data=json.dumps({"message": "order data", "sha": sha}).encode(),
+                                     method="DELETE", headers={**self._hdr(), "Content-Type": "application/json"})
+        st, _ = http_call(req)
+        if st == 200:
+            return True
+        if st == 404:
+            return False
+        raise RuntimeError(f"orders store delete failed ({st})")
 
     def list_prefix(self, prefix):
         """Paths of the files directly under a folder prefix like 'orders/' (paginated for the remote store)."""
@@ -360,7 +444,7 @@ def alert(text):
 ALERT_LOCK = threading.RLock()
 ALERT_TITLES = {"free_check": "free check degraded", "free_cap": "free check monthly cap reached", "new": "new order", "failed": "failed run", "blocked": "blocked run", "stuck": "stuck order",
                 "overdue": "overdue manual order", "unmatched": "unmatched payment", "held": "held payment",
-                "unknown_product": "unknown product payment", "webhook_failed": "webhook event failed"}
+                "unknown_product": "unknown product payment", "reservation": "new reservation", "webhook_failed": "webhook event failed"}
 
 
 def github_alert_token():
@@ -378,7 +462,9 @@ def alerts_configured():
 def alert_text(kind, oid="", status="", ptype="", ref="", detail=""):
     """-> (title, body). Only the internal order id, the status, the product type and (for a payment with
     no order) the opaque Polar order id and a reason code. Every value is checked against a fixed shape."""
-    oid = oid if re.fullmatch(r"(ORD-\d{6}-[a-f0-9]{6}|MAN-[a-f0-9]{12})", oid or "") else ""
+    oid = oid if re.fullmatch(r"(ORD-\d{6}-[a-f0-9]{6}|MAN-[a-f0-9]{12}|\d{8}-[0-9a-f]{32})", oid or "") else ""
+    if kind == "reservation":       # the id and the kind only: never the email or the agency name
+        return f"[AVC] new reservation {oid}".strip(), "\n".join([f"Reservation: {oid}", "Reason: reservation"])
     ptype = ptype if ptype in products.TYPES or ptype == "agency_bundle" else "unknown"
     status = re.sub(r"[^a-z_ ]", "", str(status or "").lower())[:30]
     ref = clean_ref(ref)
@@ -1154,9 +1240,11 @@ def start_maintenance():
 
 
 class H(http.server.BaseHTTPRequestHandler):
-    def _json(self, code, obj):
+    def _json(self, code, obj, no_store=False):
         b = json.dumps(obj).encode()
         self.send_response(code); self.send_header("Content-Type", "application/json")
+        if no_store:
+            self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(b))); self.end_headers()
         if self.command != "HEAD":
             self.wfile.write(b)
@@ -1244,6 +1332,83 @@ class H(http.server.BaseHTTPRequestHandler):
     def do_HEAD(self):
         self.do_GET()
 
+    def _reserve_admin(self):
+        """True when the request is allowed to go on; otherwise the refusal has been sent."""
+        r = reserve_admin(self.headers, self.client_address[0])
+        if r is None:
+            return True
+        self._json(r[0], {"ok": False, "error": r[1]} if r[0] != 404 else {"error": "not found"}, no_store=True)
+        return False
+
+    def _reserve_post(self):
+        """POST /api/reserve: JSON or urlencoded. Stores one private record; no payment, no IP kept."""
+        ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        html = ctype == "application/x-www-form-urlencoded" and "text/html" in (self.headers.get("Accept") or "")
+        try:
+            raw = self._body()
+        except ValueError as e:
+            return self._json(400, {"ok": False, "errors": {"form": str(e)}}, no_store=True)
+        if ctype == "application/x-www-form-urlencoded":
+            d = {k: v[0] for k, v in urllib.parse.parse_qs(raw.decode("utf-8", "replace"), keep_blank_values=True).items()}
+        else:
+            try:
+                d = json.loads(raw.decode("utf-8"))
+            except ValueError:
+                d = None
+            if not isinstance(d, dict):
+                return self._json(400, {"ok": False, "errors": {"form": BAD_FORM_MSG}}, no_store=True)
+        ip = client_ip(self.headers, self.client_address[0])
+        if agency.limited("reserve", ip, RESERVE_PER_HOUR, 3600):
+            return self._json(429, {"ok": False, "errors": {"form": "Too many requests, try again later."}}, no_store=True)
+        if str(d.get("website") or "").strip():         # honeypot: look successful, keep nothing
+            agency.note("reserve", ip)
+            return self._reserve_reply(html, 200, {"ok": True, "id": uuid.uuid4().hex})
+        rec, err = reserve_check(d)
+        if err:                                         # nothing is stored, so a typo does not use up the hour's allowance
+            return self._reserve_reply(html, 400, {"ok": False, "errors": err})
+        agency.note("reserve", ip)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        rid = now.strftime("%Y%m%d") + "-" + uuid.uuid4().hex
+        rec = {"id": rid, "at": now.isoformat(timespec="seconds"), **rec, "ref": refs.clean_ref(d.get("ref"))}
+        try:
+            Store().put(f"reservations/{rid}.json", rec)
+        except Exception as e:
+            print("error:", type(e).__name__, file=sys.stderr)
+            return self._json(500, {"ok": False, "errors": {"form": "Something went wrong. Please try again."}}, no_store=True)
+        notify_event("reservation", oid=rid, webhook=True)
+        return self._reserve_reply(html, 200, {"ok": True, "id": rid})
+
+    def _reserve_reply(self, html, code, obj):
+        if not html:
+            return self._json(code, obj, no_store=True)
+        if obj.get("ok"):
+            msg = _html.escape(RESERVE_OK)
+            body = f"<h1>Thank you</h1><p>{msg}</p><p><a href=\"reserve.html\">Back</a></p>"
+        else:
+            items = "".join(f"<li>{_html.escape(m)}</li>" for m in obj["errors"].values())
+            body = f"<h1>Please check the form</h1><ul>{items}</ul><p><a href=\"reserve.html\">Back</a></p>"
+        page = ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+                '<title>Reserve</title><link rel="stylesheet" href="assets/style.css"></head><body><section><div class="wrap">'
+                + body + "</div></section></body></html>")
+        return self._send(code, "text/html; charset=utf-8", page.encode(), private=True)
+
+    def do_DELETE(self):
+        path = urllib.parse.urlsplit(self.path).path
+        m = re.fullmatch(r"/api/reservations/(.*)", path)
+        if not m:
+            return self._json(404, {"error": "not found"})
+        if not self._reserve_admin():
+            return
+        rid = m.group(1)
+        if not RESERVE_ID.fullmatch(rid):
+            return self._json(400, {"ok": False, "error": "bad id"}, no_store=True)
+        try:
+            gone = Store().delete(f"reservations/{rid}.json")
+        except Exception as e:
+            print("error:", type(e).__name__, file=sys.stderr)
+            return self._json(500, {"ok": False, "error": "Something went wrong."}, no_store=True)
+        return self._json(200 if gone else 404, {"ok": gone} if gone else {"ok": False, "error": "not found"}, no_store=True)
+
     def do_GET(self):
         path = urllib.parse.urlsplit(self.path).path
         if path in ("/health", "/healthz"):
@@ -1254,6 +1419,15 @@ class H(http.server.BaseHTTPRequestHandler):
             return self._send(200, "application/xml; charset=utf-8", discovery.sitemap_xml(self._origin()).encode(), cache=True)
         if path == "/llms.txt":
             return self._send(200, "text/plain; charset=utf-8", discovery.llms_txt(self._origin()).encode(), cache=True)
+        if path == "/api/reservations":
+            if not self._reserve_admin():
+                return
+            try:
+                rows = reservation_list(Store())
+            except Exception as e:
+                print("error:", type(e).__name__, file=sys.stderr)
+                return self._json(500, {"ok": False, "error": "Something went wrong."}, no_store=True)
+            return self._json(200, {"ok": True, "count": len(rows), "reservations": rows}, no_store=True)
         if path == "/for" or path.startswith("/for/"):     # trade pages: allow-listed slugs only
             m = re.fullmatch(r"/for/([a-z0-9-]{1,80})", path)
             page = discovery.trade_page(m.group(1), self._origin()) if m else None
@@ -1376,6 +1550,8 @@ class H(http.server.BaseHTTPRequestHandler):
                                             "niche_label": get_niche(req["niche"]).plural})
                 save_lead({**rec, "result": "saved"})
                 return self._json(200, {"status": "saved"})
+            if self.path == "/api/reserve":
+                return self._reserve_post()
             if self.path == "/api/intake":
                 d = self._form()
                 oid, token = new_order(d, clean(d))

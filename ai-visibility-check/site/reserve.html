@@ -1,0 +1,52 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Monthly AI visibility tracking for your clients</title><link rel="stylesheet" href="assets/style.css"></head><body>
+<nav><div class="wrap"><a class="logo" href="index.html"><i></i>AI Visibility Check</a><div class="links"><a href="agency.html">For agencies</a><a href="index.html#faq">FAQ</a><a class="btn" href="#spot">Reserve a spot</a></div></div></nav>
+<header class="hero"><div class="wrap" style="grid-template-columns:1fr">
+ <div><span class="eyebrow">For agencies</span>
+ <h1>Monthly AI visibility tracking for your clients</h1>
+ <p class="lead">Each month we re-run the AI Visibility Check questions for each of your client businesses and give you a white-label report (your logo or none): does the AI assistant name the business for its category and city, who is named instead, and what changed since last month.</p>
+ <p><strong>$29 per client per month (planned price).</strong></p>
+ <p>Not live yet. Reserving is free: no payment, no card. We'll email you before anything starts, and you decide then.</p></div>
+</div></header>
+<section id="spot"><div class="wrap"><div class="check"><h2>Reserve a spot</h2>
+ <form id="reserve" method="post" action="/api/reserve" novalidate>
+  <p><label for="agency">Agency name</label><br><input id="agency" name="agency" type="text" required minlength="2" maxlength="120" autocomplete="organization"><br><span class="small err" id="e-agency"></span></p>
+  <p><label for="email">Work email</label><br><input id="email" name="email" type="email" required maxlength="254" autocomplete="email"><br><span class="small err" id="e-email"></span></p>
+  <p><label for="clients">Number of clients</label><br><input id="clients" name="clients" type="number" required min="1" max="1000" step="1" inputmode="numeric"><br><span class="small err" id="e-clients"></span></p>
+  <p><label for="note">Note (optional)</label><br><textarea id="note" name="note" rows="3" maxlength="1000"></textarea><br><span class="small err" id="e-note"></span></p>
+  <p style="position:absolute;left:-9999px" aria-hidden="true"><label for="website">Leave this empty</label><input id="website" name="website" type="text" tabindex="-1" autocomplete="off"></p>
+  <p><button class="btn" type="submit" id="go">Reserve a spot</button></p>
+  <p id="result" role="status"></p>
+ </form>
+ <p class="small">We store only what you type here, only to contact you about this offer. We never contact your clients. To have it deleted, email <a href="mailto:{{SUPPORT_EMAIL}}">{{SUPPORT_EMAIL}}</a>. See the <a href="privacy.html">privacy policy</a>.</p>
+</div></div></section>
+<footer><div class="wrap">
+ <p>© 2026 Dvir Baumel · <a href="mailto:{{SUPPORT_EMAIL}}">{{SUPPORT_EMAIL}}</a> · <span class="addr">{{BUSINESS_ADDRESS}}</span></p>
+ <p><a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="refunds.html">Refunds</a> · Not affiliated with OpenAI, Google or Anthropic.</p>
+</div></footer>
+<script src="assets/ref.js"></script>
+<script>
+(function(){
+  var f = document.getElementById("reserve"), out = document.getElementById("result"), go = document.getElementById("go");
+  var names = ["agency", "email", "clients", "note"];
+  f.addEventListener("submit", function(ev){
+    ev.preventDefault();
+    names.forEach(function(n){ document.getElementById("e-" + n).textContent = ""; });
+    out.textContent = "";
+    var body = {};
+    ["agency", "email", "clients", "note", "website", "ref"].forEach(function(n){ var el = f.elements[n]; if (el) body[n] = el.value; });
+    go.disabled = true;
+    fetch("/api/reserve", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)})
+      .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
+      .then(function(x){
+        if (x.ok && x.j.ok) { out.textContent = "Reserved. Nothing was charged. We'll email you before anything starts."; f.reset(); return; }
+        var errs = (x.j && x.j.errors) || {}, shown = false;
+        names.forEach(function(n){ if (errs[n]) { document.getElementById("e-" + n).textContent = errs[n]; shown = true; } });
+        if (!shown) out.textContent = errs.form || "Something went wrong. Please try again.";
+      })
+      .catch(function(){ out.textContent = "Something went wrong. Please try again."; })
+      .then(function(){ go.disabled = false; });
+  });
+})();
+</script>
+</body></html>
