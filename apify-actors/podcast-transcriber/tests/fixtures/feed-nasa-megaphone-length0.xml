@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:googleplay="http://www.google.com/schemas/play-podcasts/1.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <atom:link href="https://feeds.megaphone.fm/NATIONALAERONAUTICSANDSPACEADMINISTRATION1776343825" rel="self" type="application/rss+xml"/>
+    <title>Houston We Have a Podcast</title>
+    <link>https://www.nasa.gov/podcasts/houston-we-have-a-podcast/</link>
+    <language>en-US</language>
+    <copyright>NASA</copyright>
+    <description>From Earth orbit to the Moon and Mars, explore the world of human spaceflight with NASA each week on the official podcast of the Johnson Space Center in Houston, Texas. Listen to in-depth conversations with the astronauts, scientists and engineers who make it possible.</description>
+    <image>
+      <url>https://megaphone-images.spotifycdn.com/podcasts/65e4d56e-6a1b-11ef-b576-83eaa7bf6c9e/image/908e541f8bbe46d55e84129c5fb3d3c0.png?ixlib=rails-4.3.1&amp;max-w=3000&amp;max-h=3000&amp;fit=crop&amp;auto=format,compress</url>
+      <title>Houston We Have a Podcast</title>
+      <link>https://www.nasa.gov/podcasts/houston-we-have-a-podcast/</link>
+    </image>
+    <itunes:explicit>no</itunes:explicit>
+    <itunes:type>episodic</itunes:type>
+    <itunes:subtitle>Houston We Have a Podcast audio podcast episodes</itunes:subtitle>
+    <itunes:author>National Aeronautics and Space Administration (NASA)</itunes:author>
+    <itunes:summary>From Earth orbit to the Moon and Mars, explore the world of human spaceflight with NASA each week on the official podcast of the Johnson Space Center in Houston, Texas. Listen to in-depth conversations with the astronauts, scientists and engineers who make it possible.</itunes:summary>
+    <content:encoded>
+      <![CDATA[From Earth orbit to the Moon and Mars, explore the world of human spaceflight with NASA each week on the official podcast of the Johnson Space Center in Houston, Texas. Listen to in-depth conversations with the astronauts, scientists and engineers who make it possible.]]>
+    </content:encoded>
+    <itunes:owner>
+      <itunes:name>Katie Konans</itunes:name>
+      <itunes:email>katie.konans@nasa.gov</itunes:email>
+    </itunes:owner>
+    <itunes:image href="https://megaphone-images.spotifycdn.com/podcasts/65e4d56e-6a1b-11ef-b576-83eaa7bf6c9e/image/908e541f8bbe46d55e84129c5fb3d3c0.png?ixlib=rails-4.3.1&amp;max-w=3000&amp;max-h=3000&amp;fit=crop&amp;auto=format,compress"/>
+    <itunes:category text="Science">
+    </itunes:category>
+    <item>
+      <title>Capturing Artemis Return</title>
+      <link>https://www.nasa.gov/podcasts/houston-we-have-a-podcast/capturing-artemis-return/</link>
+      <description>NASA photographers James Blair and Josh Valcarcel share their experience capturing the historic return, splashdown, and recovery of the Artemis II crew. Episode 446.&amp;nbsp;</description>
+      <pubDate>Fri, 20 Nov 2026 14:42:00 -0000</pubDate>
+      <itunes:title>Capturing Artemis Return</itunes:title>
+      <itunes:episodeType>full</itunes:episodeType>
+      <itunes:season>1</itunes:season>
+      <itunes:episode>446</itunes:episode>
+      <itunes:author>National Aeronautics and Space Administration (NASA)</itunes:author>
+      <itunes:image href="https://megaphone-images.spotifycdn.com/podcasts/a2b4c2f6-e4ee-11f1-82d3-2bc24145e498/image/bbe7a6ccc21ae5847577036d0ec3b127.png?ixlib=rails-4.3.1&amp;max-w=3000&amp;max-h=3000&amp;fit=crop&amp;auto=format,compress"/>
+      <itunes:subtitle></itunes:subtitle>
+      <itunes:summary>NASA photographers James Blair and Josh Valcarcel share their experience capturing the historic return, splashdown, and recovery of the Artemis II crew. Episode 446.&amp;nbsp;</itunes:summary>
+      <content:encoded>
+        <![CDATA[<p>NASA photographers James Blair and Josh Valcarcel share their experience capturing the historic return, splashdown, and recovery of the Artemis II crew. Episode 446.&nbsp;</p>]]>
+      </content:encoded>
+      <itunes:duration>3586</itunes:duration>
+      <itunes:explicit>no</itunes:explicit>
+      <guid isPermaLink="false"><![CDATA[a2b4c2f6-e4ee-11f1-82d3-2bc24145e498]]></guid>
+      <enclosure url="https://traffic.megaphone.fm/NATIONALAERONAUTICSANDSPACEADMINISTRATION5999466310.mp3" length="0" type="audio/mpeg"/>
+    </item><item>
+      <title>Apply to be a Moonwalker</title>
+      <link>https://www.nasa.gov/podcasts/houston-we-have-a-podcast/apply-to-be-a-moonwalker/</link>
+      <description>NASA astronaut Nichole Stilwell and Acting Human Resources Director Tamsin Abotteen discuss the astronaut application process and what it takes to join NASA’s next class of explorers. Episode 445.&amp;nbsp;</description>
+      <pubDate>Fri, 13 Nov 2026 14:50:00 -0000</pubDate>
+      <itunes:title>Apply to be a Moonwalker</itunes:title>
+      <itunes:episodeType>full</itunes:episodeType>
+      <itunes:season>1</itunes:season>
+      <itunes:episode>445</itunes:episode>
+      <itunes:author>National Aeronautics and Space Administration (NASA)</itunes:author>
+      <itunes:image href="https://megaphone-images.spotifycdn.com/podcasts/8ce43bbe-df71-11f1-843f-33ccad1cb5f6/image/3eb2d19189d48056cd0c54d4b68d2fc1.png?ixlib=rails-4.3.1&amp;max-w=3000&amp;max-h=3000&amp;fit=crop&amp;auto=format,compress"/>
+      <itunes:subtitle></itunes:subtitle>
+      <itunes:summary>NASA astronaut Nichole Stilwell and Acting Human Resources Director Tamsin Abotteen discuss the astronaut application process and what it takes to join NASA’s next class of explorers. Episode 445.&amp;nbsp;</itunes:summary>
+      <content:encoded>
+        <![CDATA[<p>NASA astronaut Nichole Stilwell and Acting Human Resources Director Tamsin Abotteen discuss the astronaut application process and what it takes to join NASA’s next class of explorers. Episode 445.&nbsp;</p>]]>
+      </content:encoded>
+      <itunes:duration>2488</itunes:duration>
+      <itunes:explicit>no</itunes:explicit>
+      <guid isPermaLink="false"><![CDATA[8ce43bbe-df71-11f1-843f-33ccad1cb5f6]]></guid>
+      <enclosure url="https://traffic.megaphone.fm/NATIONALAERONAUTICSANDSPACEADMINISTRATION1369565567.mp3" length="0" type="audio/mpeg"/>
+    </item><item>
+      <title>The Gunslingers of White Sands</title>
+      <link>https://www.nasa.gov/podcasts/houston-we-have-a-podcast/the-gunslingers-of-white-sands/</link>
+      <description>NASA’s Houston We Have a Podcast kicks off a new series in collaboration with White Sands Test Facility, introducing series producer and host Kathryn Martinez and exploring the facility’s unique capabilities. Episode 444&amp;nbsp;</description>
+      <pubDate>Fri, 06 Nov 2026 14:19:00 -0000</pubDate>
+      <itunes:title>The Gunslingers of White Sands</itunes:title>
+      <itunes:episodeType>full</itunes:episodeType>
+      <itunes:season>1</itunes:season>
+      <itunes:episode>444</itunes:episode>
+      <itunes:author>National Aeronautics and Space Administration (NASA)</itunes:author>
+      <itunes:image href="https://megaphone-images.spotifycdn.com/podcasts/0c3cbec0-d9ed-11f1-aa44-6f7280e097f8/image/718f3852a6aaf9035eba47fb53577ca7.png?ixlib=rails-4.3.1&amp;max-w=3000&amp;max-h=3000&amp;fit=crop&amp;auto=format,compress"/>
+      <itunes:subtitle></itunes:subtitle>
+      <itunes:summary>NASA’s Houston We Have a Podcast kicks off a new series in collaboration with White Sands Test Facility, introducing series producer and host Kathryn Martinez and exploring the facility’s unique capabilities. Episode 444&amp;nbsp;</itunes:summary>
+      <content:encoded>
+        <![CDATA[<p>NASA’s Houston We Have a Podcast kicks off a new series in collaboration with White Sands Test Facility, introducing series producer and host Kathryn Martinez and exploring the facility’s unique capabilities. Episode 444&nbsp;</p>]]>
+      </content:encoded>
+      <itunes:duration>2568</itunes:duration>
+      <itunes:explicit>no</itunes:explicit>
+      <guid isPermaLink="false"><![CDATA[0c3cbec0-d9ed-11f1-aa44-6f7280e097f8]]></guid>
+      <enclosure url="https://traffic.megaphone.fm/NATIONALAERONAUTICSANDSPACEADMINISTRATION4098454952.mp3" length="0" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>

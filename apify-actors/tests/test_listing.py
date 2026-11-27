@@ -12,7 +12,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 IN_SCOPE = ["broken-link-auditor", "bulk-dns-email-auth-checker", "bulk-domain-availability-checker",
-            "bulk-pagespeed-checker", "domain-checkup-report", "sitemap-url-extractor", "ai-brand-mention-check"]
+            "bulk-pagespeed-checker", "domain-checkup-report", "sitemap-url-extractor", "ai-brand-mention-check",
+            "podcast-transcriber"]
 PERMISSION_SENTENCE = "This Actor needs only limited permissions: it reads its input and writes to its own default dataset."
 ALLOWED_ACTOR_CALLS = {"get_input", "push_data", "fail", "set_value", "set_status_message", "log"}
 ALLOWED_ENV = {"PAGESPEED_API_KEY", "PAGESPEED_FALLBACK_ROW_CAP"}
@@ -21,11 +22,19 @@ ALLOWED_ENV = {"PAGESPEED_API_KEY", "PAGESPEED_FALLBACK_ROW_CAP"}
 # from the environment, never logged or returned), the paid-plan flag and the user's maximum charge, its own run limits and kill
 # switch, the model ids, and the local fake-provider switch (refused when APIFY_IS_AT_HOME is set). It still uses only the default
 # dataset and key-value store, never ApifyClient and never an Apify token.
-EXTRA_ACTOR_CALLS = {"ai-brand-mention-check": {"get_charging_manager"}}
+EXTRA_ACTOR_CALLS = {"ai-brand-mention-check": {"get_charging_manager"}, "podcast-transcriber": {"charge", "get_charging_manager"}}
 EXTRA_ENV = {"ai-brand-mention-check": {
     "OPENAI_API_KEY", "GEMINI_API_KEY", "ANTHROPIC_API_KEY", "APIFY_USER_IS_PAYING", "ACTOR_MAX_TOTAL_CHARGE_USD", "FREE_PLAN_MAX_ROWS",
     "MAX_PROVIDER_COST_PER_RUN_USD", "DISABLED_ENGINES", "MODEL_CHATGPT", "MODEL_GEMINI", "MODEL_CLAUDE", "MODEL_EXTRACTOR",
-    "USE_FAKE_PROVIDERS", "APIFY_IS_AT_HOME"}}
+    "USE_FAKE_PROVIDERS", "APIFY_IS_AT_HOME"},
+    # Named exception for podcast-transcriber (CR-135): speech-to-text and summary keys (environment only, never logged), the engine
+    # order and summary model, the operator ids that bypass the free-plan cap, the paid-plan flag, and the default key-value store id
+    # (to link the transcript files in each row). It charges through `Actor.charge` in src/billing.py only.
+    "podcast-transcriber": {
+        "GROQ_API_KEY", "ASSEMBLYAI_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY", "STT_ENGINE_ORDER", "SUMMARY_MODEL", "OPERATOR_USER_IDS",
+        "APIFY_USER_IS_PAYING", "APIFY_META_ORIGIN", "APIFY_USER_ID", "ACTOR_MAX_TOTAL_CHARGE_USD", "ACTOR_DEFAULT_KEY_VALUE_STORE_ID"}}
+# Memory per Actor: 256 MB everywhere except podcast-transcriber (ffmpeg and audio files), which runs at 1024 (minimum 512).
+MEMORY = {"podcast-transcriber": (512, 1024)}
 
 
 def load(name, rel):
@@ -87,7 +96,8 @@ def test_no_dollar_amounts_or_unsupported_claims(name):
 @pytest.mark.parametrize("name", IN_SCOPE)
 def test_memory_is_256(name):
     a = load(name, "actor.json")
-    assert a["minMemoryMbytes"] == 256 and a["defaultRunOptions"]["memoryMbytes"] == 256
+    lo, default = MEMORY.get(name, (256, 256))
+    assert a["minMemoryMbytes"] == lo and a["defaultRunOptions"]["memoryMbytes"] == default
 
 
 @pytest.mark.parametrize("name", IN_SCOPE)
@@ -176,6 +186,19 @@ def test_logo_generator_reproduces_the_committed_file(tmp_path):
     assert m.png(m.render()) == (ROOT / "broken-link-auditor" / "logo.png").read_bytes()
 
 
+def test_podcast_logo():
+    w, h = png_size(ROOT / "podcast-transcriber" / "logo.png")
+    assert w == h and w >= 256
+
+
+def test_podcast_logo_generator_reproduces_the_committed_file():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("plogo", ROOT / "tools" / "make_podcast_logo.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert m.png(m.render()) == (ROOT / "podcast-transcriber" / "logo.png").read_bytes()
+
+
 def test_requirements_unchanged_and_no_pillow():
     for name in IN_SCOPE:
         assert "pillow" not in (ROOT / name / "requirements.txt").read_text().lower()
@@ -193,6 +216,7 @@ LIVE_DESCRIPTIONS = {
     "domain-checkup-report": "Due diligence before you buy a domain: a one-row report with registration age, registrar and expiry (RDAP), DNS and provider, for-sale signals with asking price, SPF/DMARC, a Cloudflare Security DNS check, a trademark-risk hint and a 0-100 score. No API keys. Export JSON, CSV or Excel.",
     "broken-link-auditor": "Site migration QA: check that every old URL redirects to a live page. Paste old URLs, a sitemap or a site address and get the final status, 301/302 chain, redirect loops and 404s per URL. Crawl mode also reports the page and anchor text that link to each broken URL.",
     "ai-brand-mention-check": "Is your brand named when people ask AI? Asks AI assistants buyer-style questions with web search on, and returns per question and engine: mentioned yes/no, rank, mention type, competitor count and sentiment. A fast sample on small models. Export CSV, Excel or JSON.",
+    "podcast-transcriber": "Turn podcast episodes into text. Paste an RSS feed, an Apple Podcasts link or an audio file URL and get the transcript with timestamps, SRT and VTT subtitles, and an optional summary, chapters and key quotes. The publisher's own transcript is used first. Public RSS audio only: no YouTube or Spotify.",
     "bulk-pagespeed-checker": "Core Web Vitals for every page in your sitemap, as CSV. Give a list of URLs and get Lighthouse category scores, lab metrics and, when Google has them, real-user Core Web Vitals for mobile and desktop. Uses the official Google PageSpeed Insights API v5. Export CSV, Excel or JSON.",
 }
 ALL_ACTORS = sorted(p.parent.parent.name for p in ROOT.glob("*/.actor/actor.json"))

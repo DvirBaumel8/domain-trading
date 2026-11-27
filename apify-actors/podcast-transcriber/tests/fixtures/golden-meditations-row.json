@@ -1,0 +1,75 @@
+{
+ "source": "https://librivox.org/rss/1095",
+ "feedUrl": "https://librivox.org/rss/1095",
+ "feedTitle": "Meditations, The by Marcus Aurelius (121 - 180)",
+ "episodeTitle": "Introduction",
+ "episodeGuid": null,
+ "episodeUrl": "https://librivox.org/the-meditations-of-marcus-aurelius/",
+ "publishedAt": null,
+ "audioUrl": "https://www.archive.org/download/meditations_0708_librivox/meditations_00_marcusaurelius_64kb.mp3",
+ "durationSeconds": 30,
+ "language": null,
+ "transcriptSource": "stt",
+ "engine": "gemini-3.5-transcribe",
+ "text": "Introduction to the Meditations of Marcus Aurelius. This is an LibriVox recording. All LibriVox recordings are in the public domain. For more information, to volunteer, please visit librivox.org. Recording by Shane Greenup. The Meditations of Marcus Aurelius by Marcus Aurelius Antoninus, translated by George Long. Introduction. Marcus Annius Verus was born in Rome in AD 121 and assumed the name of Marcus Aurelius Antoninus, by which he is known to history on his adoption by the Emperor T.",
+ "segments": [
+  {
+   "start": 0.8,
+   "end": 3.4,
+   "text": "Introduction to the Meditations of Marcus Aurelius.",
+   "speaker": null
+  },
+  {
+   "start": 4.0,
+   "end": 5.5,
+   "text": "This is an LibriVox recording.",
+   "speaker": null
+  },
+  {
+   "start": 5.7,
+   "end": 8.0,
+   "text": "All LibriVox recordings are in the public domain.",
+   "speaker": null
+  },
+  {
+   "start": 8.3,
+   "end": 12.3,
+   "text": "For more information, to volunteer, please visit librivox.org.",
+   "speaker": null
+  },
+  {
+   "start": 13.1,
+   "end": 14.4,
+   "text": "Recording by Shane Greenup.",
+   "speaker": null
+  },
+  {
+   "start": 15.1,
+   "end": 20.5,
+   "text": "The Meditations of Marcus Aurelius by Marcus Aurelius Antoninus, translated by George Long.",
+   "speaker": null
+  },
+  {
+   "start": 21.5,
+   "end": 22.1,
+   "text": "Introduction.",
+   "speaker": null
+  },
+  {
+   "start": 23.2,
+   "end": 34.6,
+   "text": "Marcus Annius Verus was born in Rome in AD 121 and assumed the name of Marcus Aurelius Antoninus, by which he is known to history on his adoption by the Emperor T.",
+   "speaker": null
+  }
+ ],
+ "summary": null,
+ "chapters": [],
+ "keyQuotes": [],
+ "wordCount": 78,
+ "files": null,
+ "billedMinutes": 1,
+ "license": null,
+ "status": "ok",
+ "errorCode": null,
+ "errorMessage": null
+}

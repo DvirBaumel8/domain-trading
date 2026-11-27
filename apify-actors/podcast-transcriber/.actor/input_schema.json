@@ -1,0 +1,153 @@
+{
+  "title": "Podcast Transcriber input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "sources": {
+      "title": "Sources",
+      "type": "array",
+      "editor": "stringList",
+      "description": "One per line: a podcast RSS or Atom feed URL, an Apple Podcasts show or episode link (used only to find the public feed), or a direct audio or video file URL. YouTube, Spotify and other platforms are refused.",
+      "prefill": [
+        "https://www.archive.org/download/meditations_0708_librivox/meditations_00_marcusaurelius_64kb.mp3"
+      ]
+    },
+    "maxEpisodesPerFeed": {
+      "title": "Max episodes per feed",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "default": 3,
+      "prefill": 1,
+      "description": "How many episodes to take from each feed, newest first by publish date (feed order when dates are missing)."
+    },
+    "publishedAfter": {
+      "title": "Published after",
+      "type": "string",
+      "editor": "datepicker",
+      "description": "Optional date (YYYY-MM-DD). Episodes published before it are skipped before anything is downloaded."
+    },
+    "language": {
+      "title": "Language",
+      "type": "string",
+      "default": "auto",
+      "prefill": "auto",
+      "editor": "textfield",
+      "description": "auto detects the spoken language from the audio (the feed's language tag is not trusted). Or a two-letter ISO 639-1 code such as en or he."
+    },
+    "preferPublisherTranscript": {
+      "title": "Prefer the publisher's transcript",
+      "type": "boolean",
+      "default": true,
+      "prefill": true,
+      "description": "Use the transcript the publisher lists in the feed (podcast:transcript, VTT, SRT, JSON or text) when it is valid, instead of transcribing the audio."
+    },
+    "addOns": {
+      "title": "Add-ons",
+      "type": "array",
+      "editor": "select",
+      "items": {
+        "type": "string",
+        "enum": [
+          "summary",
+          "chapters",
+          "keyQuotes"
+        ],
+        "enumTitles": [
+          "Summary",
+          "Chapters",
+          "Key quotes"
+        ]
+      },
+      "default": [],
+      "prefill": [
+        "summary",
+        "chapters"
+      ],
+      "description": "Optional summary, chapters and key quotes per episode. Key quotes are kept only when they appear word for word in the transcript."
+    },
+    "speakerLabels": {
+      "title": "Speaker labels",
+      "type": "boolean",
+      "default": false,
+      "description": "Label speaker turns (spk_1, spk_2, ...). Uses an engine that supports speakers and adds the speaker-minute event."
+    },
+    "wordTimestamps": {
+      "title": "Word timestamps",
+      "type": "boolean",
+      "default": false,
+      "description": "Adds a words array with a start and end time for every word to the JSON file (not to the dataset row)."
+    },
+    "outputFormats": {
+      "title": "Output files",
+      "type": "array",
+      "editor": "select",
+      "items": {
+        "type": "string",
+        "enum": [
+          "txt",
+          "srt",
+          "vtt",
+          "json"
+        ],
+        "enumTitles": [
+          "TXT",
+          "SRT",
+          "VTT",
+          "JSON"
+        ]
+      },
+      "default": [
+        "txt",
+        "srt"
+      ],
+      "prefill": [
+        "txt",
+        "srt"
+      ],
+      "description": "Transcript files saved in the run's key-value store; their links are in the files field of each row."
+    },
+    "maxAudioMinutesPerEpisode": {
+      "title": "Longest episode (minutes)",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 600,
+      "default": 240,
+      "description": "Episodes longer than this are skipped with episode_too_long and are not charged."
+    },
+    "maxTotalAudioMinutes": {
+      "title": "Max audio minutes per run",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 6000,
+      "default": 600,
+      "description": "A run-wide guard: once this many audio minutes are used, further episodes are skipped with run_minute_cap."
+    },
+    "downloadStallSeconds": {
+      "title": "Download stall time (seconds)",
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 120,
+      "default": 30,
+      "description": "If the audio host sends no data for this many seconds, the episode fails with download_stall_timeout."
+    },
+    "episodeTimeoutMinutes": {
+      "title": "Episode time limit (minutes)",
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 180,
+      "default": 45,
+      "description": "Wall-clock limit per episode, from download to result. A slower episode fails with episode_timeout; the rest continue."
+    },
+    "confirmRights": {
+      "title": "I may transcribe these recordings",
+      "type": "boolean",
+      "prefill": true,
+      "description": "Required. Confirm the recordings are yours, licensed to you, or used for permitted personal, research or accessibility purposes."
+    }
+  },
+  "required": [
+    "sources",
+    "confirmRights"
+  ]
+}

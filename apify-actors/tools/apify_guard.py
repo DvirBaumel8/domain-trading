@@ -3,7 +3,7 @@
 
 Usage: apify_guard.py [--live --baseline FILE] <actor-folder-name> ...   (token from APIFY_TOKEN, never printed)
 Private path (default, PRIVATE allow-list): fails (exit 1) if isPublic is true, any pricing info exists, or
-defaultRunOptions.memoryMbytes != 256.
+defaultRunOptions.memoryMbytes != 256 (podcast-transcriber: 1024, and timeoutSecs 7200).
 Live path (--live, LIVE allow-list, already public and priced): fails if isPublic is not true, if any listing field
 (title, description, SEO text, categories, pricing) differs from the baseline taken before the push, if memory != 256, or if
 broken-link-auditor timeoutSecs != 7200. Being public or priced is fine there.
@@ -21,15 +21,21 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 BASE = "https://api.apify.com"
-PRIVATE = ("wayback-domain-history", "bulk-pagespeed-checker", "ai-brand-mention-check")  # stay private and unpriced
+PRIVATE = ("wayback-domain-history", "bulk-pagespeed-checker", "ai-brand-mention-check", "podcast-transcriber")  # stay private, unpriced
 LIVE = ("bulk-domain-availability-checker", "sitemap-url-extractor", "broken-link-auditor", "domain-checkup-report")  # already public and priced
 LIVE_TIMEOUTS = {"broken-link-auditor": 7200}  # timeoutSecs the live path sets and checks; other actors keep theirs
 LISTING_FIELDS = ("isPublic", "title", "description", "seoTitle", "seoDescription", "categories", "pricingInfos")
 PRICE_KEY_HINTS = ("pric", "monetiz")
 TARGET_MEMORY_MB = 256
+MEMORY_MB = {"podcast-transcriber": 1024}  # ffmpeg and audio files; every other actor stays at TARGET_MEMORY_MB
+PRIVATE_TIMEOUTS = {"podcast-transcriber": 7200}  # timeoutSecs the private path sets and checks
 
 
-def problems(actor: dict) -> list[str]:
+def target_memory(name: str) -> int:
+    return MEMORY_MB.get(name, TARGET_MEMORY_MB)
+
+
+def problems(actor: dict, name: str = "") -> list[str]:
     """Reasons this actor is not private-and-unpriced (empty list = ok)."""
     out = []
     if actor.get("isPublic") is True:
@@ -39,9 +45,13 @@ def problems(actor: dict) -> list[str]:
     for key, value in actor.items():
         if key != "pricingInfos" and any(h in key.lower() for h in PRICE_KEY_HINTS) and value not in (None, False, [], {}, ""):
             out.append(f"pricing field set: {key}")
-    memory = (actor.get("defaultRunOptions") or {}).get("memoryMbytes")
-    if memory != TARGET_MEMORY_MB:
-        out.append(f"defaultRunOptions.memoryMbytes is {memory}, expected {TARGET_MEMORY_MB}")
+    options = actor.get("defaultRunOptions") or {}
+    memory, want_mb = options.get("memoryMbytes"), target_memory(name)
+    if memory != want_mb:
+        out.append(f"defaultRunOptions.memoryMbytes is {memory}, expected {want_mb}")
+    want = PRIVATE_TIMEOUTS.get(name)
+    if want is not None and options.get("timeoutSecs") != want:
+        out.append(f"defaultRunOptions.timeoutSecs is {options.get('timeoutSecs')}, expected {want}")
     return out
 
 
@@ -140,7 +150,7 @@ def main(argv: list[str], fetch_fn=fetch) -> int:
             print(f"{name}: GET failed ({type(e).__name__})", file=sys.stderr)
             bad = 1
             continue
-        found = live_problems(actor, baselines[name], name) if live else problems(actor)
+        found = live_problems(actor, baselines[name], name) if live else problems(actor, name)
         if found:
             print(f"{name}: FAIL: {'; '.join(found)}", file=sys.stderr)
             bad = 1

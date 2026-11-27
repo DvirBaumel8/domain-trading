@@ -18,7 +18,7 @@ import apify_changed as changed  # noqa: E402
 
 NOW = datetime(2026, 11, 27, 6, 0, tzinfo=timezone.utc)
 MEM = {"defaultRunOptions": {"memoryMbytes": 256}}
-PRIVATE = {"wayback-domain-history", "bulk-pagespeed-checker", "ai-brand-mention-check"}
+PRIVATE = {"wayback-domain-history", "bulk-pagespeed-checker", "ai-brand-mention-check", "podcast-transcriber"}
 LIVE = {"bulk-domain-availability-checker", "sitemap-url-extractor", "broken-link-auditor", "domain-checkup-report"}
 
 
@@ -476,3 +476,18 @@ def test_live_guard_domain_checkup_report_listing_unchanged_and_changed():
     for field, value in (("title", "x"), ("description", "x"), ("seoTitle", "x"), ("seoDescription", "x"),
                          ("categories", ["OTHER"]), ("pricingInfos", [])):
         assert guard.live_problems(live_actor("domain-checkup-report", **{field: value}), base, "domain-checkup-report")
+
+
+# ---- podcast-transcriber: 1024 MB and 7200 s on the private path; every other actor stays at 256
+def test_podcast_transcriber_memory_1024_others_256(monkeypatch):
+    monkeypatch.setenv("APIFY_TOKEN", "t")
+    fetch_fn, put_fn, calls = _mock({"build": "latest", "memoryMbytes": 4096})
+    assert memory.main(["podcast-transcriber"], fetch_fn=fetch_fn, put_fn=put_fn) == 0
+    assert calls[-1][1] == {"defaultRunOptions": {"build": "latest", "memoryMbytes": 1024, "timeoutSecs": 7200}}
+    assert memory.main(["ai-brand-mention-check"], fetch_fn=fetch_fn, put_fn=put_fn) == 0
+    assert calls[-1][1] == {"defaultRunOptions": {"build": "latest", "memoryMbytes": 256}}
+    ok = {"isPublic": False, "defaultRunOptions": {"memoryMbytes": 1024, "timeoutSecs": 7200}}
+    assert guard.problems(ok, "podcast-transcriber") == []
+    assert guard.problems({"isPublic": False, "defaultRunOptions": {"memoryMbytes": 256, "timeoutSecs": 7200}}, "podcast-transcriber")
+    assert guard.problems(ok, "ai-brand-mention-check")  # 1024 is not allowed for any other actor
+    assert guard.problems({"isPublic": True, "defaultRunOptions": ok["defaultRunOptions"]}, "podcast-transcriber")

@@ -1,6 +1,6 @@
-# CR-NNN: Podcast Transcriber Apify actor (`apify-actors/podcast-transcriber/`)
+# CR-135: Podcast Transcriber Apify actor (`apify-actors/podcast-transcriber/`)
 
-**Status:** ready to file (DOM assigns the CR number). Drafted 26 Nov 2026 by Gavriel. **From:** Gavriel, for Dvir. **To:** DOM (Claude Code).
+**Status:** built by DOM on 27 Nov 2026 as CR-135 (not pushed to Apify; see `DOM-TO-GAVRIEL.md`). Drafted 26 Nov 2026 by Gavriel. **From:** Gavriel, for Dvir. **To:** DOM (Claude Code).
 **Decided by Dvir (26 Nov 2026, via Gavriel, answer to "which of the three to build first"):** he chose to build the podcast transcription tool (together with the AI brand check tool and the agency check pack).
 **Full spec:** `docs/requests/podcast-transcriber/spec.md` (evidence, engine choice with prices and sources, legal check, pricing proposal, acceptance table). **If this request and the spec disagree, this request wins for code and tests; tell Gavriel.**
 **Files Gavriel will add next to this request in `docs/requests/podcast-transcriber/`:** `spec.md`, `listing/` (README draft, actor text, example input), `fixtures/` (real public feeds trimmed to 2–3 items, one real 30-second public-domain recording, real engine answers, a real publisher transcript). Fixtures are small (about 290 KB).

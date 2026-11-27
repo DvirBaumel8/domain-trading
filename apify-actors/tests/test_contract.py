@@ -8,6 +8,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 ACTORS = sorted(p.parent.parent.name for p in ROOT.glob("*/.actor/actor.json"))
+CHARGES_VIA_BILLING = {"podcast-transcriber"}  # charges per event through src/billing.py, not one charged push_data
 CLEAN_EXIT = {"broken-link-auditor", "bulk-domain-availability-checker", "sitemap-url-extractor"}
 PRICE = re.compile(r"(?<!\\)\$\s?\d|eventTieredPricingUsd|pricePerUnit|pricingPerEvent")
 
@@ -15,8 +16,14 @@ PRICE = re.compile(r"(?<!\\)\$\s?\d|eventTieredPricingUsd|pricePerUnit|pricingPe
 @pytest.mark.parametrize("name", ACTORS)
 def test_charge_once_per_row_and_empty_input_fails(name):
     src = (ROOT / name / "src" / "main.py").read_text()
-    assert len(re.findall(r"charged_event_name=", src)) == 1, "one charged push_data call"
-    assert re.search(r"charged_event_name='(result|report)'", src)
+    if name in CHARGES_VIA_BILLING:
+        code = "".join(p.read_text() for p in (ROOT / name / "src").glob("*.py"))
+        assert "charged_event_name=" not in code
+        billing = (ROOT / name / "src" / "billing.py").read_text()
+        assert code.count("Actor.charge(") == billing.count("Actor.charge(") == 1, "billing.py is the only place that charges"
+    else:
+        assert len(re.findall(r"charged_event_name=", src)) == 1, "one charged push_data call"
+        assert re.search(r"charged_event_name='(result|report)'", src)
     if name in CLEAN_EXIT:
         assert "Actor.fail(" not in src and "'invalid_input'" in src, "bad input exits cleanly with a STATUS record"
     else:

@@ -1,0 +1,214 @@
+{
+  "actorSpecification": 1,
+  "fields": {
+    "type": "object",
+    "properties": {
+      "source": {
+        "type": "string",
+        "description": "The input line this row came from"
+      },
+      "feedUrl": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "The RSS feed the episode came from; null for a direct file URL"
+      },
+      "feedTitle": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "The show title from the feed"
+      },
+      "episodeTitle": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "The episode title from the feed"
+      },
+      "episodeGuid": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "The episode guid from the feed"
+      },
+      "episodeUrl": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "The episode web page from the feed"
+      },
+      "publishedAt": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Publish date (ISO 8601); null when the feed date cannot be read"
+      },
+      "audioUrl": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "The audio file that was fetched"
+      },
+      "durationSeconds": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "description": "Audio length measured on the downloaded file, not taken from the feed"
+      },
+      "language": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Spoken language (ISO 639-1) as detected by the engine"
+      },
+      "transcriptSource": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "stt = transcribed from the audio; publisher = the feed's own transcript"
+      },
+      "engine": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "The speech-to-text model that produced most of the text, or publisher-vtt and similar"
+      },
+      "text": {
+        "type": "string",
+        "description": "The full transcript"
+      },
+      "segments": {
+        "type": "array",
+        "description": "Transcript segments: start and end in seconds from the start of the episode, text, speaker (null without speaker labels)"
+      },
+      "summary": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Summary in the transcript's language; null when not asked for or not available"
+      },
+      "chapters": {
+        "type": "array",
+        "description": "Chapters with start (seconds) and title, ascending"
+      },
+      "keyQuotes": {
+        "type": "array",
+        "description": "Quotes with start (seconds) and text; each appears word for word in the transcript"
+      },
+      "wordCount": {
+        "type": "integer",
+        "description": "Number of words in the transcript"
+      },
+      "files": {
+        "type": "object",
+        "description": "Links to the TXT, SRT, VTT and JSON files in the key-value store"
+      },
+      "billedMinutes": {
+        "type": "integer",
+        "description": "Audio minutes charged for this episode (rounded up); 0 when the publisher transcript was used"
+      },
+      "license": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "The podcast:license the feed states, if any"
+      },
+      "status": {
+        "type": "string",
+        "description": "ok, error or skipped; error and skipped rows are not charged"
+      },
+      "errorCode": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Stable reason code when status is error or skipped, for example feed_http_404, not_audio or episode_too_long"
+      },
+      "errorMessage": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "What went wrong, in plain words"
+      }
+    },
+    "required": [
+      "source",
+      "status"
+    ]
+  },
+  "views": {
+    "overview": {
+      "title": "Episodes",
+      "transformation": {
+        "fields": [
+          "episodeTitle",
+          "publishedAt",
+          "durationSeconds",
+          "language",
+          "transcriptSource",
+          "engine",
+          "wordCount",
+          "billedMinutes",
+          "status",
+          "errorCode",
+          "source"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "episodeTitle": {
+            "label": "Episode"
+          },
+          "publishedAt": {
+            "label": "Published"
+          },
+          "durationSeconds": {
+            "label": "Seconds",
+            "format": "number"
+          },
+          "language": {
+            "label": "Language"
+          },
+          "transcriptSource": {
+            "label": "Source"
+          },
+          "engine": {
+            "label": "Engine"
+          },
+          "wordCount": {
+            "label": "Words",
+            "format": "number"
+          },
+          "billedMinutes": {
+            "label": "Billed min",
+            "format": "number"
+          },
+          "status": {
+            "label": "Status"
+          },
+          "errorCode": {
+            "label": "Error"
+          },
+          "source": {
+            "label": "Input"
+          }
+        }
+      }
+    }
+  }
+}

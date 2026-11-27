@@ -1,0 +1,21 @@
+{
+  "synthetic": true,
+  "_note": "Shape written from AssemblyAI's documentation (GET /v2/transcript/{id}, completed, speaker_labels on). Replace with a real recorded answer from the live suite.",
+  "id": "synthetic-id",
+  "status": "completed",
+  "language_code": "en",
+  "speech_model": "universal",
+  "text": "Introduction to the Meditations of Marcus Aurelius. This is a LibriVox recording.",
+  "words": [
+    {"text": "Introduction", "start": 800, "end": 1400, "confidence": 0.99, "speaker": "A"}, {"text": "to", "start": 1400, "end": 1500, "confidence": 0.99, "speaker": "A"},
+    {"text": "the", "start": 1500, "end": 1600, "confidence": 0.99, "speaker": "A"}, {"text": "Meditations", "start": 1600, "end": 2300, "confidence": 0.99, "speaker": "A"},
+    {"text": "of", "start": 2300, "end": 2400, "confidence": 0.99, "speaker": "A"}, {"text": "Marcus", "start": 2400, "end": 2800, "confidence": 0.99, "speaker": "A"},
+    {"text": "Aurelius.", "start": 2800, "end": 3400, "confidence": 0.99, "speaker": "A"}, {"text": "This", "start": 4000, "end": 4200, "confidence": 0.99, "speaker": "B"},
+    {"text": "is", "start": 4200, "end": 4300, "confidence": 0.99, "speaker": "B"}, {"text": "a", "start": 4300, "end": 4400, "confidence": 0.99, "speaker": "B"},
+    {"text": "LibriVox", "start": 4400, "end": 5000, "confidence": 0.99, "speaker": "B"}, {"text": "recording.", "start": 5000, "end": 5500, "confidence": 0.99, "speaker": "B"}
+  ],
+  "utterances": [
+    {"speaker": "A", "start": 800, "end": 3400, "text": "Introduction to the Meditations of Marcus Aurelius.", "confidence": 0.99, "words": []},
+    {"speaker": "B", "start": 4000, "end": 5500, "text": "This is a LibriVox recording.", "confidence": 0.99, "words": []}
+  ]
+}

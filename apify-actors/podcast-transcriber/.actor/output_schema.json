@@ -1,0 +1,18 @@
+{
+  "actorOutputSchemaVersion": 1,
+  "title": "Podcast Transcriber output",
+  "properties": {
+    "results": {
+      "type": "string",
+      "title": "Results",
+      "description": "One row per episode in the default dataset",
+      "template": "{{links.apiDefaultDatasetUrl}}/items"
+    },
+    "files": {
+      "type": "string",
+      "title": "Transcript files",
+      "description": "TXT, SRT, VTT and JSON transcript files in the default key-value store",
+      "template": "{{links.apiDefaultKeyValueStoreUrl}}/keys"
+    }
+  }
+}

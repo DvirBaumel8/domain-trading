@@ -97,3 +97,22 @@ Dvir chose **one DOM that starts by itself**. From now on:
 3. **Commit as one of Dvir's bots** (author name with "Grok Bot", or "Buyer"). Pushes by anyone else start a session that ends at once.
 4. Money actions still need Dvir's own line for that action, now typed in the DOM session. DOM writes here what the line must name.
 5. No DOM pushes between 23:45 and 01:00 UTC. A request sent then is handled after 01:00.
+
+## 2026-11-27 (DOM): CR-135 Podcast Transcriber built (your request of 26 Nov)
+
+`apify-actors/podcast-transcriber/` is on `main`, version 0.1 (`CHANGELOG` 0.1.0). Built as `dom-request.md` says. Offline tests U-01 to U-30 are in `tests/` and pass locally: 92 passed, plus the repo-wide tests (230). The live suite A-01 to A-14 is in `tests/live/`, skipped unless `LIVE_TESTS=1`. A-04 and A-14 also need `LIVE_SPEND_OK=1`. Nothing is pushed to Apify, published or priced. Commit and CI result: the line below, added after the push.
+
+**Conflicts and what DOM decided:**
+1. **Description too long.** Your `actor-text.json` description is 414 characters. Apify and `tests/test_listing.py` allow at most 300. DOM shortened it to exactly 300 with the same content. Title, SEO texts and README are your drafts unchanged. Replace the description with your own text whenever you like, at most 300 characters.
+2. **Version.** The Apify CLI takes only `MAJOR.MINOR`, so `actor.json` says `0.1`. The `CHANGELOG` says 0.1.0.
+3. **One extra environment variable:** `ACTOR_DEFAULT_KEY_VALUE_STORE_ID`. Without it, the `files` links in each row could not point to the stored transcript files. It is a platform variable, not a secret. It is named in `tests/test_listing.py` next to your list.
+4. **`all-new` in `apify-push` keeps its three Actors.** Push `podcast-transcriber` by choosing its own name.
+5. **The Gemini request body is a best guess.** The answer parser is tested on your recorded answer. The request fields (`audioTranscriptionConfig`, `wordTimestamps`) still need checking. Please check them on the first live A-01 run and tell DOM if Gemini answers 400.
+6. **Language detection falls back to null.** When the engine gives no language, the row's `language` is null; there is no separate 60-second language-id call in 0.1.
+7. **Some A-tests need the platform.** A-13 (spending limit) and the "charged events" checks in A-01 to A-03 only mean something on a private Apify run with pay-per-event set. On a local `apify run`, check the rows only.
+
+**Needs Dvir (through you):**
+- **Copy two staged workflow files** over the ones in `.github/workflows/`: `apify-actors/ci/apify-actors.yml` (installs `ffmpeg`, so the audio tests run in CI instead of being skipped) and `apify-actors/ci/apify-push.yml` (adds `podcast-transcriber` to the private allow-list and sets 1024 MB and 7200 s after the push).
+- **Then the private push:** run `apify-push` with `podcast-transcriber`, or `apify push` from Dvir's machine. This needs Dvir's OK. Afterwards, add the actor id here and to `tools/sync-store-meta.py`.
+- Engine accounts and keys (D1 Groq, D2 AssemblyAI, D3 secrets on Apify), price (D4) and publish (D6) are Dvir's decisions, as in the spec. Nothing here needs them yet: with only `GEMINI_API_KEY` set, Gemini is the engine.
+

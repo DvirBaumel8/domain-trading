@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Post-push step: set defaultRunOptions.memoryMbytes = 256 on a pushed actor.
+"""Post-push step: set defaultRunOptions.memoryMbytes = 256 on a pushed actor (podcast-transcriber: 1024 and timeoutSecs 7200).
 
 `apify push` does not apply actor.json defaultRunOptions, so Apify keeps 4096.
 Usage: apify_memory.py [--live] <actor-folder-name> ...   (token from APIFY_TOKEN, never printed)
@@ -15,9 +15,9 @@ import os
 import sys
 import urllib.request
 
-from apify_guard import BASE, LIVE, LIVE_TIMEOUTS, PRIVATE, fetch
+from apify_guard import BASE, LIVE, LIVE_TIMEOUTS, PRIVATE, PRIVATE_TIMEOUTS, fetch, target_memory
 
-TARGET_MB = 256
+TARGET_MB = 256  # every actor except the ones in apify_guard.MEMORY_MB (podcast-transcriber: 1024)
 
 
 def put(path: str, token: str, body: dict) -> dict:
@@ -32,8 +32,8 @@ def set_memory(name: str, token: str, fetch_fn=fetch, put_fn=put, live: bool = F
     """Set memory (live: and the actor's timeout, if it has one) for one actor; returns the memory Apify reports afterwards."""
     actor = fetch_fn(name, token)
     options = dict(actor.get("defaultRunOptions") or {})
-    options["memoryMbytes"] = TARGET_MB
-    timeout = LIVE_TIMEOUTS.get(name) if live else None
+    options["memoryMbytes"] = target_memory(name)
+    timeout = LIVE_TIMEOUTS.get(name) if live else PRIVATE_TIMEOUTS.get(name)
     if timeout is not None:
         options["timeoutSecs"] = timeout
     updated = put_fn(f"/v2/acts/{actor['id']}", token, {"defaultRunOptions": options})
@@ -61,11 +61,11 @@ def main(argv: list[str], fetch_fn=fetch, put_fn=put) -> int:
             print(f"{name}: memory update failed ({type(e).__name__})", file=sys.stderr)
             bad = 1
             continue
-        if got != TARGET_MB:
-            print(f"{name}: memory is {got} MB after update, expected {TARGET_MB}", file=sys.stderr)
+        if got != target_memory(name):
+            print(f"{name}: memory is {got} MB after update, expected {target_memory(name)}", file=sys.stderr)
             bad = 1
             continue
-        print(f"{name}: defaultRunOptions.memoryMbytes = {TARGET_MB}")
+        print(f"{name}: defaultRunOptions.memoryMbytes = {target_memory(name)}")
     return bad
 
 

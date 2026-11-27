@@ -1,7 +1,7 @@
 name: apify-push
 
 # Two paths, one allow-list each (allow-lists live in apify-actors/tools). Never publishes or unpublishes, never sets prices or Store listing.
-# PRIVATE (manual): wayback-domain-history, bulk-pagespeed-checker, ai-brand-mention-check. Pushed private and unpriced; the guard fails if public or priced.
+# PRIVATE (manual): wayback-domain-history, bulk-pagespeed-checker, ai-brand-mention-check, podcast-transcriber. Pushed private and unpriced; the guard fails if public or priced.
 # LIVE (manual, or on merge to main): bulk-domain-availability-checker, sitemap-url-extractor, broken-link-auditor, domain-checkup-report. Already public and priced;
 #   the guard fails if visibility, listing fields or price changed. A merge rebuilds only the live actors whose folder changed.
 # Manual runs need Dvir's OK through Gavriel.
@@ -28,6 +28,7 @@ on:
           - wayback-domain-history
           - bulk-pagespeed-checker
           - ai-brand-mention-check
+          - podcast-transcriber
           - all-new
 
 permissions:
@@ -63,7 +64,7 @@ jobs:
           else
             case "$ACTOR" in
               bulk-domain-availability-checker|sitemap-url-extractor|broken-link-auditor|domain-checkup-report) echo "MODE=live" >> "$GITHUB_ENV"; echo "ACTORS=$ACTOR" >> "$GITHUB_ENV" ;;
-              wayback-domain-history|bulk-pagespeed-checker|ai-brand-mention-check) echo "MODE=private" >> "$GITHUB_ENV"; echo "ACTORS=$ACTOR" >> "$GITHUB_ENV" ;;
+              wayback-domain-history|bulk-pagespeed-checker|ai-brand-mention-check|podcast-transcriber) echo "MODE=private" >> "$GITHUB_ENV"; echo "ACTORS=$ACTOR" >> "$GITHUB_ENV" ;;
               all-new) echo "MODE=private" >> "$GITHUB_ENV"; echo "ACTORS=wayback-domain-history bulk-pagespeed-checker ai-brand-mention-check" >> "$GITHUB_ENV" ;;
               *) echo "actor not allowed"; exit 1 ;;
             esac
@@ -74,6 +75,7 @@ jobs:
       - name: Pytest first (stop if red)
         if: env.ACTORS != ''
         run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
           pip install pytest
           for a in $ACTORS; do
             pip install -r "apify-actors/$a/requirements.txt"
@@ -103,7 +105,7 @@ jobs:
             printf '%s\n' "$out" | sed "s|$APIFY_TOKEN|***|g"
             echo "pushed $a"
           done
-      - name: Set run memory to 256 MB (apify push ignores actor.json defaultRunOptions; live broken-link-auditor also 7200 s)
+      - name: Set run memory to 256 MB (apify push ignores actor.json defaultRunOptions; live broken-link-auditor also 7200 s; podcast-transcriber 1024 MB, 7200 s)
         if: env.ACTORS != ''
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
