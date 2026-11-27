@@ -56,7 +56,8 @@ class PageTests(ReserveCase):
             st, b, _ = self.req("GET", p)
             text = b.decode()
             self.assertEqual(st, 200, p)
-            self.assertIn("$29 per client per month", text)
+            self.assertIn("Founding price: $29 per client per month, kept for life if you reserve now (regular price $49).", text)
+            self.assertNotIn("planned price", text)
             self.assertIn("no payment", text)
             self.assertIn("We never contact your clients. To have it deleted, email", text)
             self.assertIn(SUPPORT_EMAIL, text)
@@ -101,9 +102,28 @@ class StoreTests(ReserveCase):
         files = stored()
         self.assertEqual(files, [j["id"] + ".json"])
         rec = json.load(open(os.path.join(server.LOCAL_ORDERS, "reservations", files[0])))
-        self.assertEqual(set(rec), {"id", "at", "agency", "email", "clients", "note", "ref"})
+        self.assertEqual(set(rec), {"id", "at", "agency", "email", "clients", "note", "ref", "founding_price"})
+        self.assertEqual(rec["founding_price"], 29)
         self.assertEqual((rec["agency"], rec["email"], rec["clients"], rec["note"], rec["ref"]), ("North Star Marketing", "lead@example.com", 12, "hello", "ph"))
         self.assertNotIn("127.0.0.1", json.dumps(rec))
+
+    def test_founding_price_server_side(self):
+        for extra in ({}, {"founding_price": 1}):
+            st, j = self.post({**GOOD, **extra})
+            self.assertEqual(st, 200)
+            rec = json.load(open(os.path.join(server.LOCAL_ORDERS, "reservations", j["id"] + ".json")))
+            self.assertEqual(rec["founding_price"], 29)
+            self.assertIs(type(rec["founding_price"]), int)
+
+    def test_old_record_without_field_loads(self):
+        rid = "20261101-" + "c" * 32
+        d = os.path.join(server.LOCAL_ORDERS, "reservations")
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, rid + ".json"), "w") as f:
+            json.dump({"id": rid, "at": "2026-11-01T00:00:00+00:00", "agency": "Old Co", "email": "o@b.co", "clients": 2, "note": "", "ref": ""}, f)
+        rows = server.reservation_list(server.Store())
+        self.assertEqual([r["id"] for r in rows], [rid])
+        self.assertNotIn("founding_price", rows[0])
 
     def test_urlencoded_post(self):
         body = urllib.parse.urlencode({"agency": "Acme Agency", "email": "a@b.co", "clients": "3", "note": "", "website": ""}).encode()

@@ -225,7 +225,8 @@ def public_file(raw):
 RESERVE_PER_HOUR = 5
 RESERVE_ID = re.compile(r"\d{8}-[0-9a-f]{32}")
 RESERVE_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s.]+")
-RESERVE_OK = "Reserved. Nothing was charged. We'll email you before anything starts."
+RESERVE_FOUNDING_PRICE = 29     # USD per client per month; set here, never read from the request
+RESERVE_OK ="Reserved. Nothing was charged. We'll email you before anything starts."
 
 
 def reserve_check(d):
@@ -1370,7 +1371,7 @@ class H(http.server.BaseHTTPRequestHandler):
         agency.note("reserve", ip)
         now = datetime.datetime.now(datetime.timezone.utc)
         rid = now.strftime("%Y%m%d") + "-" + uuid.uuid4().hex
-        rec = {"id": rid, "at": now.isoformat(timespec="seconds"), **rec, "ref": refs.clean_ref(d.get("ref"))}
+        rec = {"id": rid, "at": now.isoformat(timespec="seconds"), **rec, "ref": refs.clean_ref(d.get("ref")), "founding_price": RESERVE_FOUNDING_PRICE}
         try:
             Store().put(f"reservations/{rid}.json", rec)
         except Exception as e:
