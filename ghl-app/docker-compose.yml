@@ -1,0 +1,22 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://ghl:${POSTGRES_PASSWORD:-ghl}@db:5432/ghl
+    ports:
+      - "${PORT:-8080}:8080"
+    depends_on:
+      - db
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ghl
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ghl}
+      POSTGRES_DB: ghl
+    volumes:
+      - ghl-db:/var/lib/postgresql/data
+volumes:
+  ghl-db:

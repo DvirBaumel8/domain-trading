@@ -41,6 +41,7 @@ def get():
         "GHL_MONTHLY_CAP_USD": _num("GHL_MONTHLY_CAP_USD", "20"),
         "GHL_PER_LOCATION_CAP_USD": _num("GHL_PER_LOCATION_CAP_USD", "2"),
         "GHL_TRIAL_MAX_LOCATIONS": _num("GHL_TRIAL_MAX_LOCATIONS", "3", int),
+        "PORT": _num("PORT", "8080", int),
         "GHL_APP_ENABLED": _str("GHL_APP_ENABLED", "0") in ("1", "true", "yes"),
     }
 

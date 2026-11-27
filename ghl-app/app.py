@@ -76,8 +76,8 @@ class H(http.server.BaseHTTPRequestHandler):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--port", type=int, default=int(os.environ.get("PORT") or 8080))
+    ap.add_argument("--host", default="0.0.0.0")  # noqa: S104 (container-friendly)
+    ap.add_argument("--port", type=int, default=config.get()["PORT"])
     a = ap.parse_args()
     http.server.ThreadingHTTPServer((a.host, a.port), H).serve_forever()
 
