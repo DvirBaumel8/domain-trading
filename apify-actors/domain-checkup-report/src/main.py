@@ -30,7 +30,6 @@ from .doh import DohResolver
 
 BOOTSTRAP_URL = 'https://data.iana.org/rdap/dns.json'
 UA = 'Mozilla/5.0 (compatible; ApifyDomainCheckupReport/0.1; +https://apify.com)'
-BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
 EXTRA_RDAP = {
     'io': 'https://rdap.identitydigital.services/rdap/',
     'me': 'https://rdap.identitydigital.services/rdap/',
@@ -96,7 +95,7 @@ async def fetch_landing(client: httpx.AsyncClient, domain: str) -> dict:
         'forSaleUrl': None,
         'askingPrice': None,
     }
-    headers = {'User-Agent': BROWSER_UA}
+    headers = {'User-Agent': UA}
     resp = None
     try:
         resp = await client.get(f'https://{domain}', headers=headers, timeout=10, follow_redirects=True)
