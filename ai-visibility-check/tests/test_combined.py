@@ -1,6 +1,6 @@
 """Tests for the combined discovery + refs + city pages change: product map, one FAQ, ref logging on every public
 page, sitemap/llms/links, names off by default, private store, add-on switch. No network."""
-import html as htmllib, http.client, json, os, re, shutil, sys, tempfile, threading, unittest
+import html as htmllib, http.client, json, os, re, shutil, sys, tempfile, unittest
 import xml.etree.ElementTree as ET
 HERE = os.path.dirname(os.path.abspath(__file__))
 SITE = os.path.join(HERE, "..", "site")
@@ -9,6 +9,7 @@ os.environ["ORDERS_LOCAL_DIR"] = os.path.join(tempfile.mkdtemp(), "orders")
 for k in ("ORDERS_REPO", "ORDERS_GITHUB_TOKEN", "ORDER_ALERT_WEBHOOK_URL", "AIVIS_PUBLIC_BASE_URL"):
     os.environ.pop(k, None)
 import server, discovery, cities, products, refs  # noqa: E402
+from server_base import ServerCase  # noqa: E402
 
 REAL_MARKETS = cities.MARKETS_DIR
 server.http_call = lambda req, timeout=15: (_ for _ in ()).throw(AssertionError("network call"))
@@ -47,16 +48,10 @@ def hit_lines(path):
         return [json.loads(x) for x in f if x.strip()]
 
 
-class Base(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.srv = server.http.server.ThreadingHTTPServer(("127.0.0.1", 0), server.H)
-        cls.port = cls.srv.server_address[1]
-        threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
-
+class Base(ServerCase):
     @classmethod
     def tearDownClass(cls):
-        cls.srv.shutdown(); cls.srv.server_close()
+        super().tearDownClass()
         cities.MARKETS_DIR = REAL_MARKETS
 
     def setUp(self):

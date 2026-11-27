@@ -11,7 +11,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "engine"))
 sys.path.insert(0, str(ROOT.parent / "docs" / "requests" / "avc-mock-run"))
 import fake_apis  # noqa: E402
-from aivis import config, order as order_mod  # noqa: E402
+from aivis import config  # noqa: E402
 from aivis.order import DEFAULT_CAP_USD, PAID_ENGINES, Order, OrderError, run_order  # noqa: E402
 from aivis.providers import REGISTRY, BudgetGuard, ProviderError  # noqa: E402
 from aivis.report_pro import render  # noqa: E402

@@ -9,7 +9,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { normalizeDomain } from '../src/domain-name.js';
 import { readFeed, type Feed } from '../src/prefilter/feed.js';
-import { createHistory } from '../src/prefilter/history.js';
+import { createHistory, reusable } from '../src/prefilter/history.js';
 import { metrics, runPrefilter, type CloseRow, type ShadowRow } from '../src/prefilter/run.js';
 import { createWebRisk } from '../src/sources/web-risk.js';
 import { loadState } from '../src/state.js';
@@ -34,6 +34,7 @@ const readAll = <T>(dir: string): T[] => {
   return existsSync(d) ? readdirSync(d).filter((f) => f.endsWith('.jsonl')).sort().flatMap((f) => readFileSync(join(d, f), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as T)) : [];
 };
 const logged = readAll<ShadowRow>('shadow');
+const shadowFiles = existsSync(join(out, 'shadow')) ? readdirSync(join(out, 'shadow')).filter((f) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(f)).map((f) => ({ date: f.slice(0, 10), rows: readFileSync(join(out, 'shadow', f), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as ShadowRow) })) : [];
 const closed = readAll<CloseRow>('closes');
 
 const tmp = mkdtempSync(join(tmpdir(), 'prefilter-'));
@@ -58,13 +59,13 @@ try {
   const closeouts = await feed('closeout_listings');
   const result = await runPrefilter({
     state, now: Date.now, kills, auctions, endingToday, closeouts, logged, closed: new Set(closed.map((c) => `${c.domain} ${c.logged_at}`)),
-    webRisk: createWebRisk(process.env.GOOGLE_WEB_RISK_API_KEY?.trim() || null, Date.now), history: createHistory(Date.now, (ms) => new Promise((r) => setTimeout(r, ms))),
+    webRisk: createWebRisk(process.env.GOOGLE_WEB_RISK_API_KEY?.trim() || null, Date.now), history: createHistory(Date.now, (ms) => new Promise((r) => setTimeout(r, ms)), fetch, reusable(shadowFiles, today)),
   });
   const write = (dir: string, name: string, text: string) => { mkdirSync(join(out, dir), { recursive: true }); writeFileSync(join(out, dir, name), text); };
   const lines = (rows: readonly unknown[]) => rows.map((r) => `${JSON.stringify(r)}\n`).join('');
   write('shadow', `${today}.jsonl`, lines(result.rows));
   write('closes', `${today}.jsonl`, lines(result.closes));
-  const summary = { date: today, kills: { read: kills.size, unreadable_lines: badKills }, files: result.summary, killed: result.killed, closes: result.closes.length, totals: metrics([...logged, ...result.rows], [...closed, ...result.closes], state) };
+  const summary = { date: today, kills: { read: kills.size, unreadable_lines: badKills }, files: result.summary, killed: result.killed, history_coverage: result.history_coverage, closes: result.closes.length, totals: metrics([...logged, ...result.rows], [...closed, ...result.closes], state) };
   write('runs', `${today}.json`, `${JSON.stringify(summary, null, 2)}\n`); // last: its presence says the day is complete
   const count = (f: (r: ShadowRow) => string) => result.rows.reduce<Record<string, number>>((n, r) => ({ ...n, [f(r)]: (n[f(r)] ?? 0) + 1 }), {});
   console.log(JSON.stringify({ ...summary, killed: result.killed.length, web_risk: count((r) => r.checks.web_risk.status), history: count((r) => r.checks.history.status) }, null, 2));

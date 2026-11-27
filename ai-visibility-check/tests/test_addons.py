@@ -1,11 +1,12 @@
 """Polar add-on products: routing, manual delivery, idempotency, buy buttons. No network, fake vendor APIs."""
-import datetime, http.client, json, os, re, sys, tempfile, threading, unittest, urllib.error
+import datetime, http.client, json, os, re, sys, tempfile, unittest, urllib.error
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import test_delivery as td  # noqa: E402  (fake_apis, sign, KEYS; sets sys.path and env)
 import server, delivery, products  # noqa: E402
+from server_base import ServerCase  # noqa: E402
 
 fake_apis, sign, KEYS = td.fake_apis, td.sign, td.KEYS
 PID = {t: next(k for k, v in products.PRODUCTS.items() if v["type"] == t)
@@ -47,16 +48,10 @@ def event(ptype, ref, email=EMAIL, shape="product_id", meta=None, pid=None, amou
     return json.dumps({"type": "order.paid", "data": d}).encode()
 
 
-class Base(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.httpd = server.http.server.ThreadingHTTPServer(("127.0.0.1", 0), server.H)
-        cls.port = cls.httpd.server_address[1]
-        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
-
+class Base(ServerCase):
     @classmethod
     def tearDownClass(cls):
-        cls.httpd.shutdown(); cls.httpd.server_close()
+        super().tearDownClass()
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -324,7 +319,6 @@ class IdempotencyTests(Base):
     def test_crash_after_purchase_write_resumes_without_duplicates(self):
         self.intake()
         ev = event("maps", "pol_crash")
-        real = server.alert
         calls = {"n": 0}
         def boom(text):
             calls["n"] += 1

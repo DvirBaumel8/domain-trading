@@ -1,4 +1,4 @@
-import contextlib, datetime, hmac, io, json, os, shutil, sys, unittest
+import contextlib, datetime, io, json, os, shutil, sys, unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import test_input_limits as til          # sets up the temp store and the no-network guard

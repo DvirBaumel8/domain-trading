@@ -290,7 +290,7 @@ def test_default_policy_still_retries_429_and_5xx_and_http_errors():
     for status in (429, 500, 503):
         calls = []
 
-        def h(req):
+        def h(req, calls=calls, status=status):
             calls.append(1)
             return httpx.Response(status)
 

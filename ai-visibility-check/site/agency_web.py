@@ -4,7 +4,6 @@ No log line here carries a token, an email or a request body."""
 import html as _html, json, re, sys, urllib.parse
 
 import agency
-import delivery
 import products
 
 E = _html.escape

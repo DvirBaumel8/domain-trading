@@ -1,6 +1,6 @@
 """Payment handling: one-time use of a payment, matching order, payment validation, event claim, run guard.
 No network, fake vendor APIs."""
-import concurrent.futures, datetime, json, os, sys, time, unittest
+import concurrent.futures, datetime, os, sys, time, unittest
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -13,10 +13,10 @@ event, fake_apis, PID = ta.event, ta.fake_apis, ta.PID
 
 class SlowStore(server.Store):
     def get(self, path):
-        time.sleep(0.2); return super().get(path)
+        time.sleep(0.05); return super().get(path)
 
     def put(self, path, obj, overwrite=False):
-        time.sleep(0.2); return super().put(path, obj, overwrite)
+        time.sleep(0.05); return super().put(path, obj, overwrite)
 
 
 class PaymentBase(ta.Base):

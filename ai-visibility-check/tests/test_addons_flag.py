@@ -37,7 +37,7 @@ class FlagTests(ta.Base):
             self.assertIn(CHECK_URL, pages["/assets/config.js"], flag)
             self.assertIn("payLinkCheck", pages["/assets/config.js"])
             html = pages["/"]
-            self.assertIn(f'data-pay="payLinkCheck"', html)
+            self.assertIn('data-pay="payLinkCheck"', html)
             for pk, name in NAMES.items():
                 self.assertNotIn(f'data-pay="{pk}"', html, (flag, pk))
                 m = re.search(r'<a [^>]*href="(mailto:[^"]+)"[^>]*>' + re.escape(name) + r": Coming soon - join waitlist</a>", html)

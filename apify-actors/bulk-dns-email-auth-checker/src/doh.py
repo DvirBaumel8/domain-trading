@@ -14,7 +14,6 @@ class DohResolver:
 
     async def query(self, name: str, rtype: str) -> tuple[int | None, list[dict]]:
         """Return (rcode, answers) where answers are dicts {name,type,TTL,data}. rcode None = lookup failed."""
-        last = None
         for attempt in range(self.retries):
             ep = DOH_ENDPOINTS[attempt % len(DOH_ENDPOINTS)]
             try:
@@ -23,9 +22,8 @@ class DohResolver:
                 if r.status_code == 200:
                     j = r.json()
                     return j.get('Status'), j.get('Answer') or []
-                last = r.status_code
-            except (httpx.HTTPError, ValueError) as e:
-                last = e
+            except (httpx.HTTPError, ValueError):
+                pass
             await asyncio.sleep(0.4 * (attempt + 1))
         return None, []
 

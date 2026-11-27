@@ -1,5 +1,5 @@
 """The manual smoke script, offline: a fake opener, no network, never reads a real key."""
-import io, os, sys, unittest
+import os, sys, unittest
 from unittest import mock
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))

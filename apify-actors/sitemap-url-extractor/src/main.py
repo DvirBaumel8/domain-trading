@@ -135,7 +135,7 @@ async def main() -> None:
                     if check and batch:
                         sem = asyncio.Semaphore(8)
 
-                        async def one(r):
+                        async def one(r, sem=sem):
                             async with sem:
                                 r['statusCode'], r['finalUrl'] = await check_status(client, r['url'])
                         await asyncio.gather(*(one(r) for r in batch))

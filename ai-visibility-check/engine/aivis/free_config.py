@@ -20,6 +20,7 @@ aistudio.google.com/docs/... and developers.openai.com/api/docs/...); re-verify 
 Conservative choice: every free-check Gemini search is counted at the paid $14 / 1,000 rate, even though the first
 5,000 a month may be free, because that pool is shared with the paid pipeline and is not ours to assume.
 """
+import math
 import os
 
 GEMINI_KEY_ENV = "GEMINI_API_KEY"
@@ -57,7 +58,7 @@ def daily_global_cap_usd():
         v = float(os.environ.get(DAILY_CAP_ENV, "").strip())
     except ValueError:
         return None
-    return v if v > 0 and v == v and v != float("inf") else None
+    return v if v > 0 and math.isfinite(v) else None
 
 
 def daily_max_checks() -> int:

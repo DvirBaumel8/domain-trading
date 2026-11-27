@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { feedObjects, readFeed, type Feed, type Listing } from '../src/prefilter/feed.js';
-import { createHistory, readHistory, type History } from '../src/prefilter/history.js';
+import { createHistory, readHistory, reusable, type History } from '../src/prefilter/history.js';
 import { gate, metrics, runPrefilter, type CloseRow, type RunInput, type ShadowRow } from '../src/prefilter/run.js';
 import type { WebRisk } from '../src/sources/web-risk.js';
 import { parseState, type State } from '../src/state.js';
@@ -176,6 +176,50 @@ describe('the name in the past (Wayback)', () => {
     const got = [];
     for (let i = 0; i < 7; i++) got.push((await down('a.com')).status);
     expect([got, calls]).toEqual([['error', 'error', 'error', 'error', 'error', 'not_checked', 'not_checked'], 5]);
+  });
+});
+
+describe('history coverage', () => {
+  const withHistory = (domain: string, status: History['status']) => ({ domain, checks: { history: { ...nothing, status } } });
+  const names = (n: number) => Array.from({ length: n }, (_, k) => listing({ domain: `n${String(k).padStart(3, '0')}.com`, auctionId: String(k), endsAt: NOW + (20 + (k % 7)) * 3_600_000 }));
+  it('500 names, every 10th call times out at 15 s: at least 450 get an answer, never two calls under 4 s apart', async () => {
+    let t = NOW;
+    const starts: number[] = [];
+    const fetchFn = async () => {
+      starts.push(t);
+      if (starts.length % 10 === 0) { t += 15_000; throw new DOMException('timeout', 'TimeoutError'); }
+      return new Response('20150101000000 http://a.com/');
+    };
+    const h = createHistory(() => t, async (ms) => { t += ms; }, fetchFn as never);
+    const r = await runPrefilter({ ...no, now: () => NOW, auctions: feed(names(500)), endingToday: feed([]), closeouts: feed([]), closed: new Set(), webRisk: async () => risk('clean'), history: h });
+    expect(r.rows.filter((x) => x.checks.history.status !== 'not_checked').length).toBeGreaterThanOrEqual(450);
+    expect(Math.min(...starts.slice(1).map((x, i) => x - starts[i]!))).toBeGreaterThanOrEqual(4000);
+    const c = r.history_coverage;
+    expect(c.checked + c.reused + c.not_checked + c.error).toBe(500);
+    expect(t - NOW).toBeLessThan(41 * 60_000);
+  });
+  it('a no_hits answer from 5 days ago is reused, not fetched, and marked', async () => {
+    const old = reusable([{ date: '2026-11-22', rows: [withHistory('goodname.com', 'no_hits')] }, { date: '2026-09-01', rows: [withHistory('closeout.com', 'no_hits')] }], '2026-11-27');
+    expect([...old.keys()]).toEqual(['goodname.com']);
+    let calls = 0;
+    const h = createHistory(() => NOW, async () => {}, (async () => { calls++; return new Response('20150101000000 http://a.com/'); }) as never, old);
+    const r = await run({ history: h, closeouts: feed([]) });
+    expect(calls).toBe(0);
+    expect(r.rows[0]!.checks.history).toMatchObject({ status: 'no_hits', reused_from: '2026-11-22' });
+    expect(r.history_coverage).toEqual({ checked: 0, reused: 1, not_checked: 0, error: 0 });
+  });
+  it('errors and unread answers are never reused', () => {
+    const bad = (status: History['status']) => withHistory('a.com', status);
+    expect(reusable([{ date: '2026-11-22', rows: [bad('error'), bad('not_checked')] }], '2026-11-27').size).toBe(0);
+  });
+  it('auctions ending sooner are read first, then the closeouts; an error is tried once more at the end', async () => {
+    const asked: string[] = [];
+    const errors = new Set(['b.com']);
+    const history = async (d: string): Promise<History> => { asked.push(d); return errors.delete(d) ? { ...nothing, status: 'error' } : nothing; };
+    const r = await run({ history, auctions: feed([listing({ domain: 'late.com', endsAt: NOW + 30 * 3_600_000 }), listing({ domain: 'b.com', endsAt: NOW + 20 * 3_600_000, bids: 1 }), listing({ domain: 'soon.com', endsAt: NOW + 18 * 3_600_000, bids: 1 })]), closeouts: feed([closeout({ domain: 'c.com' })]) });
+    expect(asked).toEqual(['soon.com', 'b.com', 'late.com', 'c.com', 'b.com']);
+    expect(r.rows.find((x) => x.domain === 'b.com')!.checks.history.status).toBe('no_hits');
+    expect(r.history_coverage).toEqual({ checked: 4, reused: 0, not_checked: 0, error: 0 });
   });
 });
 

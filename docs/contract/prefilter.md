@@ -8,7 +8,7 @@ Branch `shadow-log` of this repo, one file a day (UTC date), read by raw URL, so
 
 | File | Inside |
 |---|---|
-| `runs/DATE.json` | The day's counts: read, dropped by reason, killed with the evidence, logged, totals. Written last: **no file = no complete run that day, never "no names"** |
+| `runs/DATE.json` | The day's counts: read, dropped by reason, killed with the evidence, logged, totals, `history_coverage` (`checked`, `reused`, `not_checked`, `error`: names that reached the history check, they add up). Written last: **no file = no complete run that day, never "no names"** |
 | `shadow/DATE.jsonl` | One line a name: `domain, source, auction_id, logged_at, file_built_at, ends_at, price_cents, bids, age, exact_match_tlds, developed_tlds, budget, checks, open_checks` |
 | `closes/DATE.jsonl` | The day after: `domain, source, logged_at, last_price_cents, last_bids, seen_at, final, reason` |
 
@@ -21,7 +21,7 @@ Branch `shadow-log` of this repo, one file a day (UTC date), read by raw URL, so
 3. Not adult by GoDaddy's mark, not a name of ours, not in `docs/requests/kills.txt` (bots add lines there), not logged in the last 14 days.
 4. Not over a cap on the price alone. The files have no renewal price, so a logged name is always `budget: unknown`: ask `/budget` for a finalist.
 5. Web Risk: `flagged` is killed. `missing_key` and `error` stay open, never clean.
-6. Wayback addresses (not page text): two different ones with an adult, pharma, gambling or spam word kill, one is `suspect`. `no_hits` is not "clean". `partial` = more than 300 pages. The archive is slow: after 40 minutes the rest is `not_checked`, auctions with most bids go first.
+6. Wayback addresses (not page text): two different ones with an adult, pharma, gambling or spam word kill, one is `suspect`. `no_hits` is not "clean". `partial` = more than 300 pages. The archive is slow (one request per 4 s, 15 s timeout): auctions are read by `ends_at`, soonest first, then closeouts. A name with a usable answer (not `error`, not `not_checked`) in the last 30 days of `shadow/*.jsonl` is not asked again: `checks.history.reused_from` is the date of that file. A name that errored is tried once more at the end if time remains. After 40 minutes, or 5 failures in a row, the rest is `not_checked`.
 
 `open_checks` lists what a bot still has to do; it always has `budget`, `trademark` (USPTO has no word search by API) and `spamhaus` (its free lists are for non-commercial use only, so it is not called). The previous owner's brand is Buyer's check.
 

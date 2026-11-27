@@ -75,7 +75,7 @@ class Auditor:
             try:
                 # One attempt here; the retry decision below is ours (polite.request would retry any ConnectError).
                 r = await request(self.client, method, url, limiter=self.limiter, sleep=self.sleep, retries=0,
-                                  retry_on=(), retry_status=(), on_error=lambda _a, exc: on_error(attempt, exc), **kw)
+                                  retry_on=(), retry_status=(), on_error=lambda _a, exc, attempt=attempt: on_error(attempt, exc), **kw)
             except FetchError as e:
                 if attempt >= retries or not self._worth_retry(e.__cause__):
                     raise
@@ -272,7 +272,7 @@ async def run(inp: dict, *, client, push, set_status, sleep=asyncio.sleep, limit
             while frontier and not state["stop"]:
                 cur = []
 
-                async def one(u, want_body):
+                async def one(u, want_body, cur=cur):
                     row, html = await guarded(u, want_body)
                     cur.append((u, row, html))  # kept as soon as it is ready, even if the level is cut short
 

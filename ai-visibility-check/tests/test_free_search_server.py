@@ -232,7 +232,7 @@ class Daily(Base):
         self.assertAlmostEqual(led.daily_cap("gemini"), 10.0 / 30, places=6)
 
     def test_max_checks_per_day_and_instant_results_do_not_count(self):
-        led = self.chain(now=lambda: self.now[0], daily_max=2)
+        self.chain(now=lambda: self.now[0], daily_max=2)
         instant = dict(OK, niche="dentist", city="Austin, TX")
         for _ in range(2):
             st, data = self.post("/api/check", instant)
@@ -272,7 +272,7 @@ class Daily(Base):
 
 class Storage(Base):
     def test_nothing_grounded_is_persisted_gemini_and_openai(self):
-        led = self.chain([tfs.http_err(500)] * 20,
+        self.chain([tfs.http_err(500)] * 20,
                          [tfs.openai_body(text=GROUNDED_ALL, urls=(("https://example.org/secret-cite", "Cite Title"),))] * 8)
         r, err = self.run_free()
         self.assertEqual(r["status"], "done")

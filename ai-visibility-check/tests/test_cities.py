@@ -1,4 +1,4 @@
-import datetime, http.client, json, os, subprocess, sys, tempfile, threading, unittest
+import http.client, json, os, subprocess, sys, tempfile, unittest
 import xml.etree.ElementTree as ET
 HERE = os.path.dirname(os.path.abspath(__file__))
 SITE = os.path.join(HERE, "..", "site")
@@ -8,6 +8,7 @@ os.environ["ORDERS_LOCAL_DIR"] = os.path.join(TMP, "private-orders")
 for k in ("ORDERS_REPO", "ORDERS_GITHUB_TOKEN", "ORDER_ALERT_WEBHOOK_URL", "AIVIS_PUBLIC_BASE_URL"):
     os.environ.pop(k, None)
 import server, cities  # noqa: E402
+from server_base import ServerCase  # noqa: E402
 
 REAL_DIR = cities.MARKETS_DIR
 server.http_call = lambda req, timeout=15: (_ for _ in ()).throw(AssertionError("network call"))
@@ -32,18 +33,12 @@ def write(directory, name, obj, raw=None):
         f.write(raw if raw is not None else json.dumps(obj))
 
 
-class Base(unittest.TestCase):
+class Base(ServerCase):
     MARKETS = None
 
     @classmethod
-    def setUpClass(cls):
-        cls.srv = server.http.server.ThreadingHTTPServer(("127.0.0.1", 0), server.H)
-        cls.port = cls.srv.server_address[1]
-        threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
-
-    @classmethod
     def tearDownClass(cls):
-        cls.srv.shutdown()
+        super().tearDownClass()
         cities.MARKETS_DIR = REAL_DIR
 
     def req(self, path, headers=None):

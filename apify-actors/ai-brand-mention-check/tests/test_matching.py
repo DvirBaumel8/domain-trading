@@ -1,6 +1,5 @@
 """A1-A7: matching, snippet, and the parsers for the three vendors' shapes."""
 import json
-import re
 
 import pytest
 
@@ -67,7 +66,7 @@ def test_a6_alias_matches_either_spelling(text):
 
 
 def test_normalisation_and_word_boundaries():
-    assert mention("As​ana is a tool", "Asana").mentioned is True          # zero-width character removed
+    assert mention("As\u200bana is a tool", "Asana").mentioned is True          # zero-width character removed
     assert mention("Ａsana is a tool", "Asana").mentioned is True          # NFKC folds the full-width A
     assert mention("Asanas are yoga poses", "Asana").mentioned is False        # whole words only
 
