@@ -1,0 +1,16 @@
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.45 system-ui,sans-serif;color:#111827;background:#fff}
+main{padding:12px;max-width:960px;margin:0 auto}
+h1{font-size:20px;margin:0 0 12px}h2{font-size:17px;margin:20px 0 8px}h3{font-size:15px;margin:0 0 6px}
+.cards{display:flex;flex-wrap:wrap;gap:8px}.card{flex:1 1 150px;border:1px solid #d1d5db;border-radius:6px;padding:8px}
+.card p{margin:2px 0}
+.banner{background:#fef3c7;border:1px solid #f59e0b;padding:8px;border-radius:6px;margin-bottom:8px}
+.notice{padding:12px;border:1px solid #d1d5db;border-radius:6px;background:#f3f4f6}
+.muted{color:#4b5563}.small{font-size:12px}
+.chart{width:100%;max-width:480px;height:auto}
+.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:480px}
+th,td{border:1px solid #e5e7eb;padding:4px 6px;text-align:left;vertical-align:top;font-size:13px}
+textarea{width:100%;font:inherit;padding:6px}
+button{font:inherit;padding:8px 12px;border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:6px}
+button:disabled{opacity:.5}
+@media(max-width:400px){main{padding:8px}h1{font-size:18px}}
