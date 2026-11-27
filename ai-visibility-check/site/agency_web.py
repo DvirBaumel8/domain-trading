@@ -54,10 +54,18 @@ def _claim(ip, read, store):
         d = _obj(read(agency.MAX_JSON_BODY))
     except ValueError:
         return _err("Please check the details and try again.")
-    tok = agency.claim(store, str(d.get("order_id", "")), str(d.get("email", "")))
-    if tok is None:
+    email = str(d.get("email", ""))
+    ek = agency.email_key(email)
+    if agency.limited("claim_email", ek, agency.CLAIM_PER_HOUR_EMAIL, 3600):   # same answer for known and unknown emails
+        return _err("Too many attempts, try again later.", 429)
+    agency.note("claim_email", ek)
+    found = agency.claim(store, email, str(d.get("order_id", "")))
+    if not found:
         return _json(404, {"error": "We could not match those details."})
-    return _json(200, {"portal": "/agency/p/" + tok})
+    if len(found) == 1:
+        return _json(200, {"portal": "/agency/p/" + found[0]["token"]})
+    return _json(200, {"portals": [{"reports": e["reports"], "left": e["left"], "portal": "/agency/p/" + e["token"]}
+                                   for e in found]})
 
 
 def _pdf(token, store):
@@ -138,7 +146,7 @@ def page(token, st):
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Your reports</title>
 <link rel="stylesheet" href="/assets/style.css"></head><body><section><div class="wrap" style="max-width:860px">
-<h1>Your client reports</h1><p><b>{st['left']}</b> of {st['total']} reports left. {E(note)}</p>
+<h1>Your client reports</h1><p class="small">{BASE_TEXT.format(n=st['total'])}</p><p><b>{st['left']}</b> of {st['total']} reports left. {E(note)}</p>
 <h2>Brand</h2><form id="brand">
 <label>Name <input name="name" maxlength="80" value="{E(br.get('name', ''))}"></label>
 <label>Colour <input name="accent" maxlength="7" placeholder="#1D4ED8" value="{E(br.get('accent', ''))}"></label>
@@ -176,6 +184,9 @@ def agency_label(key):
     return niche_label(NICHES[key].label)
 
 
+BASE_TEXT = ("{n} automated AI Visibility reports for your agency's own client work. Each report is generated from one "
+             "business's details (name, trade, city). Delivered as a PDF you can put under your own logo. No cash value; "
+             "unused reports do not expire into money. We never contact your clients.")
 BANNED_WORDS = ("lead generation", "prospect", "pitch", "outreach", "cold email", "credits", "wallet", "balance")
 
 
@@ -189,12 +200,11 @@ def bundle_page(raw):
         price = products.AGENCY_BUNDLE_PRICES_USD[n]
         buy = f'<a class="btn" data-pay="{key}" href="{E(links[key])}">Buy</a>' if key in links else ""
         rows.append(f'<tr><td>{n} report{"s" if n != 1 else ""}</td><td class="amt">${price}</td><td>{buy}</td></tr>')
-    closed = "" if any(products.AGENCY_PRODUCT_IDS.values()) else " Checkout is not connected yet."
+    closed = "" if products.agency_product_ids() else " Checkout is not connected yet."
     section = ('<section id="pricing"><div class="wrap"><h2>Report bundles</h2>'
-               '<p class="sub">Buy a bundle, then run each report for one of your clients, under your brand or unbranded. US clients only.</p>'
+               f'<p class="sub">{BASE_TEXT.format(n="1, 5, 10 or 25")} US clients only.</p>'
                '<table class="sheet"><tr><th>Bundle</th><th>You pay</th><th></th></tr>' + "".join(rows) + "</table>"
                f'<p class="small" style="margin-top:12px">Each report is used when it starts and is returned if the run fails.{closed}'
                ' See the <a href="agency-terms.html">bundle terms</a>.</p></div></section>')
     text = re.sub(r'<section id="pricing">.*?</section>', lambda m: section, text, count=1, flags=re.S)
-    text = text.replace(" — great for pitches too.", " — useful in client reviews.").replace(" Suggested ranges are in the table below.", "")
     return text.encode("utf-8")

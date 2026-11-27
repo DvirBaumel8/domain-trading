@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Your order — agency reports</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="stylesheet" href="assets/style.css"></head>
+<body>
+<nav><div class="wrap"><a class="logo" href="index.html"><i></i>AI Visibility Check</a></div></nav>
+<section><div class="wrap" style="max-width:640px">
+<h1>Thank you for your order</h1>
+<p>Automated AI Visibility reports for your agency's own client work. Each report is generated from one business's details (name, trade, city). Delivered as a PDF you can put under your own logo. No cash value; unused reports do not expire into money. We never contact your clients.</p>
+<p class="small">Reports have no cash value and are not transferable. The report comes from AI assistants' answers, which vary from run to run; no ranking is promised.</p>
+<h2>Open your reports</h2>
+<p>Enter the email you purchased with.</p>
+<form id="claim">
+<label>Purchase email <input name="email" type="email" maxlength="200" required autocomplete="email"></label>
+<label>Order id from the receipt (optional) <input name="order_id" maxlength="120" autocomplete="off"></label>
+<button>Open my reports</button></form>
+<p id="msg" role="status"></p>
+<ul id="portals"></ul>
+</div></section>
+<footer><div class="wrap">
+ <p>© 2026 Dvir Baumel · <span class="addr">{{BUSINESS_ADDRESS}}</span></p>
+ <p><a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="refunds.html">Refunds</a></p>
+</div></footer>
+<script>
+document.getElementById('claim').onsubmit=async e=>{e.preventDefault();const m=document.getElementById('msg'),ul=document.getElementById('portals');
+const o={};new FormData(e.target).forEach((v,k)=>{if(v.trim())o[k]=v;});ul.textContent='';m.textContent='';
+const fail='We could not match those details.';
+try{const r=await fetch('/agency/claim',{method:'POST',body:JSON.stringify(o)});const j=await r.json();
+if(r.ok&&j.portal){location.href=j.portal;}
+else if(r.ok&&Array.isArray(j.portals)){m.textContent='Choose a bundle:';
+for(const p of j.portals){const li=document.createElement('li'),a=document.createElement('a');
+a.href=p.portal;a.textContent=p.reports+' reports, '+p.left+' left';li.appendChild(a);ul.appendChild(li);}}
+else{m.textContent=j.error||fail;}}
+catch(err){m.textContent=fail;}};
+</script>
+</body></html>

@@ -32,6 +32,7 @@ MAX_CSV_BODY = 32 * 1024
 MAX_JSON_BODY = 8 * 1024
 MAX_LOGO_BODY = MAX_LOGO_BYTES + 1024
 CLAIM_PER_MINUTE = 5                  # the 6th claim attempt from one address inside a minute gets 429
+CLAIM_PER_HOUR_EMAIL = 10             # the 11th attempt for one purchase email inside an hour gets 429
 BAD_TOKEN_PER_MINUTE = 30
 RUN_PER_MINUTE = 20
 DEFAULT_DAILY_CAP_USD = 60.0
@@ -70,12 +71,12 @@ _HITS = {}
 _HLOCK = threading.Lock()
 
 
-def limited(bucket, key, limit):
+def limited(bucket, key, limit, window=60):
     t = mono()
     with _HLOCK:
-        ts = [x for x in _HITS.get((bucket, key), []) if t - x < 60]
+        ts = [x for x in _HITS.get((bucket, key), []) if t - x < max(window, 60)]    # keep the longest window in use
         _HITS[(bucket, key)] = ts
-        return len(ts) >= limit
+        return len([x for x in ts if t - x < window]) >= limit
 
 
 def note(bucket, key):
@@ -95,7 +96,7 @@ def handle_paid(store, ev, info, ref, alert, notify):
     ok = (ev["one_time"] and ev["paid_cents"] is not None and ev["paid_cents"] >= info["price_usd"] * 100
           and bool(ev["email"]))
     if not ok:
-        alert(f"Payment {ref} for an agency bundle needs manual review (not a one-time purchase at list price, "
+        alert(f"Payment {ref} for an agency bundle of {info['reports']} reports needs manual review (not a one-time purchase at list price, "
               "or no purchase email); no bundle was created.")
         notify("held", ref=ref, ptype="agency_bundle")
         return {"status": "held"}
@@ -104,7 +105,10 @@ def handle_paid(store, ev, info, ref, alert, notify):
            "frozen": False, "token": "", "brand": {"name": "", "accent": "", "contact_line": ""}, "logo": False,
            "created_at": now().isoformat(timespec="seconds")}
     if not store.put(f"bundles/{bid}.json", rec):
+        if _own_email(store, bid, rec["email_key"]):
+            index_add(store, rec["email_key"], bid)          # a crash between the two writes may have lost it
         return {"status": "duplicate"}
+    index_add(store, rec["email_key"], bid)
     alert(f"Agency bundle {bid} created for payment {ref}: {rec['reports_total']} reports.")
     return {"status": "bundle", "bundle_id": bid, "reports": rec["reports_total"]}
 
@@ -182,21 +186,72 @@ def get_bundle(store, bid):
     return store.get(f"bundles/{bid}.json")[0] if re.fullmatch(r"BND-[a-f0-9]{12}", bid or "") else None
 
 
-def claim(store, order_id, email):
-    """-> portal token or None. Wrong order id and wrong email look the same (one comparison, one code path)."""
-    b = get_bundle(store, bundle_id(order_id)) if clean_ref(order_id) else None
-    want = (b or {}).get("email_key") or "0" * 32
-    good = hmac.compare_digest(want.encode(), email_key(email or "").encode()) and b is not None
-    if not good:
-        return None
+def _index_path(ek):
+    return f"bundle_emails/{ek}.json"
+
+
+def index_add(store, ek, bid):
+    """bundle_emails/<email_key>.json lists the bundle ids bought with that email. Create or update under LOCK."""
     with LOCK:
-        b = get_bundle(store, b["bundle_id"])
-        if not b.get("token"):
-            tok = delivery.new_token()
-            store.put(f"agency_tokens/{_tkey(tok)}.json", {"bundle_id": b["bundle_id"]})
-            b["token"] = tok
-            store.put(f"bundles/{b['bundle_id']}.json", b, overwrite=True)
-        return b["token"]
+        cur = store.get(_index_path(ek))[0] or {}
+        ids = list(cur.get("bundles", []))
+        if bid not in ids:
+            ids.append(bid)
+            store.put(_index_path(ek), {"bundles": ids}, overwrite=True)
+
+
+def _own_email(store, bid, ek):
+    b = get_bundle(store, bid)
+    return bool(b) and b.get("email_key") == ek
+
+
+_BACKFILL = "bundle_emails/_backfilled.json"
+_backfilled = False
+
+
+def backfill_index(store):
+    """Bundles created before the index existed: scan bundles/ once, fill the index, leave a marker."""
+    global _backfilled
+    if _backfilled:
+        return
+    with LOCK:
+        if store.get(_BACKFILL)[0] is None:
+            for path in store.list_prefix("bundles/"):
+                b = store.get(path)[0] or {}
+                if b.get("bundle_id") and b.get("email_key"):
+                    index_add(store, b["email_key"], b["bundle_id"])
+            store.put(_BACKFILL, {"done": True}, overwrite=True)
+        _backfilled = True
+
+
+def claim(store, email, order_id=""):
+    """The purchase email is the key; an order id is optional and only narrows. -> list of portal entries,
+    newest first ({"token", "reports", "left"}), empty when nothing matches. Unknown email, wrong email and wrong
+    order id look the same and do the same work."""
+    ek = email_key(email or "")
+    backfill_index(store)
+    ids = list((store.get(_index_path(ek))[0] or {}).get("bundles", []))
+    given = str(order_id or "").strip()
+    want = bundle_id(given) if clean_ref(given) else None
+    found = []
+    for bid in ids or [""]:                                    # an unknown email still does one lookup and compare
+        b = get_bundle(store, bid)
+        same = hmac.compare_digest(str((b or {}).get("email_key") or "0" * 32).encode(), ek.encode()) and b is not None
+        if same and (not given or (want is not None and bid == want)):
+            found.append(b)
+    out = []
+    with LOCK:
+        for b in found:
+            b = get_bundle(store, b["bundle_id"])
+            if not b.get("token"):
+                tok = delivery.new_token()
+                store.put(f"agency_tokens/{_tkey(tok)}.json", {"bundle_id": b["bundle_id"]})
+                b["token"] = tok
+                store.put(f"bundles/{b['bundle_id']}.json", b, overwrite=True)
+            c = counts(store, b)
+            out.append({"token": b["token"], "reports": c["total"], "left": c["left"], "at": b.get("created_at", "")})
+    out.sort(key=lambda e: e["at"], reverse=True)
+    return out
 
 
 def bundle_for_token(store, token):

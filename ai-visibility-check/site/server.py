@@ -62,9 +62,9 @@ ROSTER_OPENER = None        # tests inject a fake
 JOB_KEEP_SECONDS = 3600     # finished JOBS entries are dropped after this
 JOB_META = {}               # job id -> {"ip", "started", "finished"}; never sent to the browser
 CHECK_LOG = {}              # client address -> start times of recent checks
-PUBLIC_FILES = {"index.html", "agency.html", "agency-terms.html", "privacy.html", "refunds.html", "sample-report.html",
+PUBLIC_FILES = {"index.html", "agency.html", "agency-terms.html", "agency-thanks.html", "privacy.html", "refunds.html", "sample-report.html",
                 "sample-report.pdf", "terms.html", "thanks.html", "favicon.ico"}
-AGENCY_ONLY_FILES = {"agency-terms.html"}    # served only while AIVIS_AGENCY=1
+AGENCY_ONLY_FILES = {"agency-terms.html", "agency-thanks.html"}    # served only while AIVIS_AGENCY=1
 PUBLIC_DIRS = {"assets": {".css", ".js", ".png"}}   # direct children only, these extensions only
 LOCAL_ORDERS = os.environ.get("ORDERS_LOCAL_DIR") or os.path.join(HERE, "..", "private-orders")
 
@@ -206,6 +206,8 @@ def public_file(raw):
         return None
     if p == "":
         p = "index.html"
+    if p == "agency-thanks":            # the checkout success URL has no extension; this one page only
+        p = "agency-thanks.html"
     if p in PUBLIC_FILES:
         return os.path.join(HERE, p)
     d, _, name = p.rpartition("/")
@@ -1321,7 +1323,8 @@ class H(http.server.BaseHTTPRequestHandler):
             if os.path.basename(f) == "agency.html" and products.agency_on():
                 body = agency_web.bundle_page(body)
             body = render_page(body, self._origin())
-            refs.record_hit(self.path, f, HERE, DATA, save_line)
+            if os.path.basename(f) != "agency-thanks.html":      # private page: no hit log, no query is read
+                refs.record_hit(self.path, f, HERE, DATA, save_line)
         return self._send(200, ctype, body)
 
     def do_POST(self):
