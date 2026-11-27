@@ -42,7 +42,28 @@ EST_OUTPUT_TOKENS = 3000        # Gemini output includes thinking tokens
 EST_SEARCHES = {"gemini": 3, "openai": 3}
 MIN_BILLED_SEARCHES = {"gemini": 2, "openai": 1}    # a grounded Gemini answer is billed at least this many
 
-QUESTIONS_PER_CHECK = 8
+# One provider call per free check (one structured list of names), so a check costs one call.
+QUESTIONS_PER_CHECK = 1
+
+# Daily limits, UTC calendar day, on top of the monthly caps. Per-provider USD slice = monthly cap / days in the month.
+DEFAULT_DAILY_MAX_CHECKS = 8
+DAILY_CAP_ENV = "AVC_FREE_DAILY_CAP_USD"            # optional global USD ceiling over both providers
+DAILY_MAX_ENV = "AVC_FREE_DAILY_MAX_CHECKS"
+
+
+def daily_global_cap_usd():
+    """Positive number from AVC_FREE_DAILY_CAP_USD, else None (use the per-provider slices only)."""
+    try:
+        v = float(os.environ.get(DAILY_CAP_ENV, "").strip())
+    except ValueError:
+        return None
+    return v if v > 0 and v == v and v != float("inf") else None
+
+
+def daily_max_checks() -> int:
+    """Positive integer from AVC_FREE_DAILY_MAX_CHECKS, else the default (8)."""
+    raw = os.environ.get(DAILY_MAX_ENV, "").strip()
+    return int(raw) if raw.isdigit() and int(raw) > 0 else DEFAULT_DAILY_MAX_CHECKS
 
 
 def gemini_model() -> str:
@@ -65,5 +86,5 @@ def reserve_usd(provider: str) -> float:
 
 
 def check_usd(provider: str) -> float:
-    """Conservative cost of one whole free check on this provider."""
+    """Conservative cost of one whole free check on this provider (one call)."""
     return round(reserve_usd(provider) * QUESTIONS_PER_CHECK, 6)

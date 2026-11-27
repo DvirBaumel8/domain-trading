@@ -55,72 +55,33 @@ class Base(til.Reset):
 
 
 class Degraded(Base):
-    def test_8_of_8_done(self):
-        r, err = self.free([NAMES] * 8)
-        self.assertEqual((r["status"], r["answers"], r["named_in"]), ("done", 8, 0))
-        self.assertIn("free_job answers=8/8", err)
+    def test_one_good_answer_is_a_complete_check(self):
+        r, err = self.free([NAMES])
+        self.assertEqual((r["status"], r["answers"], r["expected"], r["named_in"]), ("done", 1, 1, 0))
+        self.assertIn("free_job answers=1/1", err)
         self.assertEqual(alerts(), [])
         self.assertEqual(r["names"]["heading"], HEADING)
+        self.assertEqual(r["names"]["based_on"], "")
 
-    def test_6_of_8_is_still_ok(self):
-        r, err = self.free([NAMES] * 6 + ["!rate_limited"] * 2)
-        self.assertEqual(r["status"], "done")
-        self.assertIn("free_job answers=6/8 rate_limited=2", err)
-
-    def test_5_of_8_is_partial(self):
-        r, err = self.free([NAMES] * 5 + ["!timeout"] * 3)
-        self.assertEqual((r["status"], r["message"]), ("partial", "Partial result: 5 of 8 questions answered"))
-        self.assertNotIn("named_in", r)
-        self.assertIn("free_job answers=5/8 timeout=3", err)
-        self.assertEqual(len(alerts()), 1)
-        page = self.req("GET", r["report"])[1].decode()
-        self.assertIn("Partial result: 5 of 8 questions answered", page)
-        for phrase in ("complete check", "complete result", "full check"):
-            self.assertNotIn(phrase, page.lower())
-        self.assertIn("Do not rely on these numbers.", page)
-
-    def test_1_of_8_is_partial_with_reason_counts(self):
-        r, err = self.free([NAMES] + ["!rate_limited"] * 7)
-        self.assertEqual((r["status"], r["answers"], r["reasons"]), ("partial", 1, {"rate_limited": 7}))
-        self.assertIn("free_job answers=1/8 rate_limited=7", err)
-
-    def test_1_of_8_names_state_the_real_denominator(self):
-        r, err = self.free([NAMES] + ["!rate_limited"] * 7)
-        n = r["names"]
-        self.assertEqual((n["heading"], n["based_on"], n["answers"]), (HEADING, "based on 1 of 8 answers", 8))
-        self.assertTrue(all(x["answers"] <= 8 for x in n["names"]))
+    def test_names_page_has_no_names_and_app_keeps_based_on(self):
+        r, _ = self.free([NAMES])
         page = self.req("GET", r["report"])[1].decode()     # the stored page holds derived numbers only
-        self.assertIn("Partial result: 1 of 8 questions answered", page)
         self.assertNotIn("Alpha Dental", page)
+        self.assertNotIn("Partial result", page)
         self.assertIn("based_on", open(os.path.join(os.path.dirname(HERE), "site", "assets", "app.js")).read())
 
-    def test_complete_run_has_no_based_on(self):
-        r, _ = self.free([NAMES] * 6 + ["!timeout"] * 2)
-        self.assertEqual(r["names"]["based_on"], "")
-        self.assertNotIn("based on", self.req("GET", r["report"])[1].decode())
+    def test_failed_call_is_failed_with_reason_and_alert(self):
+        r, err = self.free(["!rate_limited"])
+        self.assertEqual((r["status"], r["answers"], r["reasons"]), ("failed", 0, {"rate_limited": 1}))
+        self.assertIn("free_job answers=0/1 rate_limited=1", err)
+        self.assertEqual(len(alerts()), 1)
 
-    def test_summary_line_counts_exact_codes(self):
-        r, err = self.free([NAMES] + ["!http_403"] * 2 + [NAMES] * 5)
-        self.assertIn("free_job answers=6/8 http_403=2", err)
+    def test_permanent_and_transient_codes_are_counted_once(self):
+        for code in ("http_403", "http_502", "timeout"):
+            r, err = self.free(["!" + code], jid="abcdef1" + str(len(code)) + "-0000")
+            self.assertEqual((r["status"], r["reasons"]), ("failed", {code: 1}), code)
 
-    def test_fail_fast_after_three_permanent_errors(self):
-        r, err = self.free([NAMES, "!http_403", "!http_403", "!http_403", NAMES, NAMES, NAMES, NAMES])
-        self.assertEqual((r["status"], r["answers"]), ("partial", 1))
-        self.assertEqual(r["reasons"], {"http_403": 3, "skipped_after_permanent_errors": 4})
-        self.assertIn("free_job answers=1/8 http_403=3 skipped_after_permanent_errors=4", err)
-
-    def test_fail_fast_all_failed(self):
-        order.build_free_provider = lambda: ScriptedProvider(["!http_403"])
-        r, err = self.free(["!http_403"], jid="abcdef12-0001")
-        self.assertEqual((r["status"], r["answers"]), ("failed", 0))
-        self.assertEqual(r["reasons"], {"http_403": 3, "skipped_after_permanent_errors": 5})
-        self.assertIn("free_job answers=0/8 http_403=3 skipped_after_permanent_errors=5", err)
-
-    def test_5xx_and_429_are_not_permanent(self):
-        r, err = self.free(["!rate_limited"] * 3 + ["!http_502"] * 3 + [NAMES] * 2)
-        self.assertEqual(r["reasons"], {"rate_limited": 3, "http_502": 3})
-
-    def test_0_of_8_fails_clearly_and_request_is_saved(self):
+    def test_failed_check_says_so_clearly_and_request_is_saved(self):
         server.FREE_RUN = True
         order.build_free_provider = lambda: ScriptedProvider(["!rate_limited"])
         import threading
@@ -141,7 +102,7 @@ class Degraded(Base):
         j = json.loads(data)
         self.assertEqual(j["status"], "failed")
         self.assertEqual(j["message"], "We could not get answers from the AI model right now. Please try again in a few minutes.")
-        self.assertEqual(j["reasons"], {"rate_limited": 8})
+        self.assertEqual(j["reasons"], {"rate_limited": 1})
         self.assertEqual(len(alerts()), 1)
         leads = server.Store().list_prefix("leads/")
         self.assertEqual(server.Store().get(leads[0])[0]["result"], "free-run")
@@ -191,7 +152,7 @@ class NamesShown(Base):
         r, _ = self.free([NAMES + "\n3. Zed Co"] * 8, niche="dentist")
         rows = {x["name"]: x["match"] for x in r["names"]["names"]}
         self.assertEqual(rows, {"Alpha Dental": "matches a real listing", "Beta Smiles": "not found in the official register"})
-        self.assertEqual(r["names"]["named_in"], 8)
+        self.assertEqual(r["names"]["named_in"], 1)
         self.assertEqual(r["names"]["heading"], HEADING)
         self.assertNotIn("Alpha Dental", self.req("GET", r["report"])[1].decode())   # names are live only
 

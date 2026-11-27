@@ -2,7 +2,7 @@
 
 Modes
 - 'free'  : the free self-check: Gemini with Google Search grounding, then OpenAI web_search as the fallback,
-            each with its own hard monthly spend cap (providers/free_search.py, free_caps.py, free_config.py).
+            one call per check, each with its own hard monthly spend cap (providers/free_search.py, free_caps.py, free_config.py).
             It reads GEMINI_API_KEY / OPENAI_API_KEY but never unlocks paid mode. Pollinations (model memory,
             no key) is an explicit option of the CLI only and is never run or used as a fallback here.
 - 'paid'  : OpenAI / Gemini / Claude with live web search.
@@ -28,6 +28,7 @@ from . import signals as _signals
 from .niches import NICHES, get_niche
 from .parse import match_name
 from . import config
+from . import free_config as fc
 from .uscities import is_us_place
 from .providers import REGISTRY, BudgetGuard, Business, MockProvider, ProviderError
 from .providers.free_search import FreeSearchProvider
@@ -37,12 +38,12 @@ ENV_KEYS = config.ENV_KEYS
 DEFAULT_CAP_USD = config.order_cap_usd()    # 12.00; AIVIS_ORDER_CAP_USD overrides
 
 FREE_FAIL_FAST_AFTER = 3        # permanent HTTP errors in one free job before the remaining questions are skipped
-FREE_MIN_ANSWERS = 6            # the free check shows numbers only when at least this many of its 8 questions answered
+FREE_MIN_ANSWERS = 1            # the free check is one structured call; one good answer is a complete check
 MIN_ANSWER_SHARE = 0.8          # every engine must reach this share of its expected answers
 TIERS = {                        # prompts x repeats per engine
     "check": (30, 2),            # $149 report: 60 answers per engine
     "lean": (20, 1),             # cheapest useful run
-    "free": (8, 1),              # free self-check
+    "free": (fc.QUESTIONS_PER_CHECK, 1),   # free self-check: one call
 }
 
 
