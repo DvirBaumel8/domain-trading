@@ -77,7 +77,7 @@ Use **crawl** mode and schedule the run with Apify Schedules. The Actor follows 
 |---|---|
 | `startUrls` (required) | URLs, site address or sitemap, depending on the mode |
 | `mode` | `list`, `sitemap` or `crawl` (default `list`) |
-| `maxPages` | Cap on unique URLs, 1-100000 (default 1000) |
+| `maxPages` | Cap on unique URLs, 1-100000 (default 200) |
 | `maxDepth` | Crawl depth, 0-10 (default 3) |
 | `checkExternal` | Crawl mode: also check external links (default off) |
 | `maxConcurrency` | Parallel checks, 1-20 (default 5) |

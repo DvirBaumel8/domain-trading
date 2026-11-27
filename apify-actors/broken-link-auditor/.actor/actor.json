@@ -18,7 +18,8 @@
   "minMemoryMbytes": 256,
   "maxMemoryMbytes": 1024,
   "defaultRunOptions": {
-    "memoryMbytes": 256
+    "memoryMbytes": 256,
+    "timeoutSecs": 7200
   },
   "seoTitle": "Site Migration Link Checker: 301 Redirects and 404s",
   "seoDescription": "Site migration QA: check that every old URL redirects to a live page. See 301 chains, loops and 404s from a URL list, sitemap or crawl."

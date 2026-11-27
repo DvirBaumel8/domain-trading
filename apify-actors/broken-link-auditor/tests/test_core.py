@@ -190,7 +190,7 @@ def test_sitemap_mode_nested_gz_and_dedupe():
     assert ok and sorted(rows) == ["https://ex.com/a", "https://ex.com/b"] and len(pushed) == 2
 
 
-def test_empty_and_invalid_input_fails_without_charge():
+def test_empty_and_invalid_input_reports_not_ok_without_charge():
     for inp in ({}, {"startUrls": []}, {"startUrls": ["ftp://x", "mailto:a@b.c", ""]}):
         (ok, msg), _, pushed = drive(inp, lambda r: httpx.Response(200))
         assert not ok and "start URL" in msg and pushed == []

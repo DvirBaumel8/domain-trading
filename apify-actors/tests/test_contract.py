@@ -8,6 +8,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 ACTORS = sorted(p.parent.parent.name for p in ROOT.glob("*/.actor/actor.json"))
+CLEAN_EXIT = {"broken-link-auditor", "bulk-domain-availability-checker", "sitemap-url-extractor"}
 PRICE = re.compile(r"(?<!\\)\$\s?\d|eventTieredPricingUsd|pricePerUnit|pricingPerEvent")
 
 
@@ -16,7 +17,10 @@ def test_charge_once_per_row_and_empty_input_fails(name):
     src = (ROOT / name / "src" / "main.py").read_text()
     assert len(re.findall(r"charged_event_name=", src)) == 1, "one charged push_data call"
     assert re.search(r"charged_event_name='(result|report)'", src)
-    assert "Actor.fail(" in src and "status_message=" in src, "empty input fails with a message"
+    if name in CLEAN_EXIT:
+        assert "Actor.fail(" not in src and "'invalid_input'" in src, "bad input exits cleanly with a STATUS record"
+    else:
+        assert "Actor.fail(" in src and "status_message=" in src, "empty input fails with a message"
 
 
 @pytest.mark.parametrize("name", ACTORS)

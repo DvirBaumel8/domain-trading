@@ -16,6 +16,7 @@ REAL_CLIENT = httpx.AsyncClient
 class FakeActor:
     def __init__(self, inp):
         self.inp, self.pushed, self.values, self.failed, self.logs = inp, [], {}, None, []
+        self.status = None
         log = self.logs
         self.log = type('L', (), {'info': staticmethod(log.append), 'warning': staticmethod(log.append)})()
 
@@ -35,7 +36,7 @@ class FakeActor:
         self.values[k] = v
 
     async def set_status_message(self, msg):
-        pass
+        self.status = msg
 
     async def fail(self, status_message=None):
         self.failed = status_message
@@ -57,9 +58,27 @@ def run_main(monkeypatch, inp, handler):
     return fake, calls
 
 
-def test_modified_since_yesterday_fails_at_once(monkeypatch):
+def assert_clean_exit(fake, calls, msg):
+    assert calls == [] and fake.pushed == [] and fake.failed is None
+    assert fake.status == msg or (msg.endswith('*') and fake.status.startswith(msg[:-1]))
+    assert fake.values['STATUS'] == {'ok': False, 'reason': 'invalid_input', 'message': fake.status}
+
+
+def test_modified_since_yesterday_exits_cleanly_at_once(monkeypatch):
     fake, calls = run_main(monkeypatch, {'startUrls': ['https://ex.com'], 'modifiedSince': 'yesterday'}, lambda r: httpx.Response(404))
-    assert fake.failed == 'modifiedSince must look like 2026-01-31' and calls == [] and fake.pushed == []
+    assert_clean_exit(fake, calls, 'modifiedSince must look like 2026-01-31')
+
+
+def test_bad_regex_exits_cleanly(monkeypatch):
+    fake, calls = run_main(monkeypatch, {'startUrls': ['https://ex.com'], 'includeRegex': '(['}, lambda r: httpx.Response(404))
+    assert_clean_exit(fake, calls, 'Invalid regex:*')
+
+
+@pytest.mark.parametrize('inp', [{}, {'startUrls': []}, {'startUrls': ['', None]}])
+def test_missing_start_urls_exit_cleanly(monkeypatch, inp):
+    fake, calls = run_main(monkeypatch, inp, lambda r: httpx.Response(404))
+    assert_clean_exit(fake, calls, 'Add at least one website or sitemap URL.')
+    assert 'INVALID_INPUTS' not in fake.values
 
 
 def test_modified_since_accepts_dates():
@@ -72,7 +91,8 @@ def test_modified_since_accepts_dates():
 def test_bad_start_url_makes_no_http_call_and_is_listed(monkeypatch):
     fake, calls = run_main(monkeypatch, {'startUrls': ['not a url']}, lambda r: httpx.Response(404))
     assert calls == [] and fake.values['INVALID_INPUTS'] == ['not a url'] and fake.pushed == []
-    assert sum('invalid' in l for l in fake.logs) == 1 and fake.failed
+    assert sum('invalid' in l for l in fake.logs) == 1
+    assert_clean_exit(fake, calls, 'Add at least one website or sitemap URL.')
 
 
 def test_good_and_bad_mixed(monkeypatch):

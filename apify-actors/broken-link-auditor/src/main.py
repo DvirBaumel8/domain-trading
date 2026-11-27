@@ -17,6 +17,11 @@ async def main() -> None:
             await Actor.push_data(row)
             return False
 
+        async def invalid_input_exit(msg: str) -> None:
+            """Bad input is not a failed run: status message plus a STATUS record (never pushed, so never charged), exit 0."""
+            await Actor.set_status_message(msg)
+            await Actor.set_value('STATUS', {'ok': False, 'reason': 'invalid_input', 'message': msg})
+
         async with make_client() as client:
             async def save_invalid(items: list) -> None:
                 await Actor.set_value('INVALID_INPUTS', items)  # never pushed to the dataset, so never charged
@@ -24,6 +29,6 @@ async def main() -> None:
             ok, msg = await run(inp, client=client, push=push, set_status=Actor.set_status_message,
                                  debug_log=Actor.log.info, log=Actor.log.warning, save_invalid=save_invalid)
         if not ok:
-            await Actor.fail(status_message=msg)
+            await invalid_input_exit(msg)
             return
         await Actor.set_status_message(msg)

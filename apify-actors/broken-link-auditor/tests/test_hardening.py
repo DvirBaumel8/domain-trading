@@ -1,5 +1,6 @@
 """H2 hardening: retry policy, streaming crawl, input errors, sitemap message (offline, mock transports)."""
 import asyncio
+import json
 import pathlib
 import socket
 import ssl
@@ -155,9 +156,74 @@ def test_invalid_inputs_are_listed_not_charged_and_duplicates_logged():
     assert sum("invalid" in l for l in logs) == 1  # one warning line
 
 
-def test_all_invalid_still_fails_and_lists_them():
+def test_all_invalid_reports_message_and_lists_them():
     (ok, msg), pushed, _, saved = drive({"startUrls": ["not a url", "mailto:a@b.c"]}, lambda r: httpx.Response(200))
     assert not ok and pushed == [] and saved["INVALID_INPUTS"] == ["not a url", "mailto:a@b.c"]
+    assert msg == "Add at least one valid start URL (a site, a sitemap or a list of URLs)."
+
+
+def test_bad_mode_message():
+    (ok, msg), pushed, _, _ = drive({"startUrls": ["https://a.com"], "mode": "x"}, lambda r: httpx.Response(200))
+    assert not ok and pushed == [] and msg == "Mode must be list, sitemap or crawl."
+
+
+def test_default_max_pages_is_200_and_explicit_wins():
+    urls = [f"https://a.com/{i}" for i in range(250)]
+    ok_h = lambda r: httpx.Response(404) if r.url.path == "/robots.txt" else httpx.Response(200, text="x")
+    _, pushed, _, _ = drive({"startUrls": urls}, ok_h)
+    assert len(pushed) == 200
+    _, pushed, _, _ = drive({"startUrls": urls, "maxPages": 3}, ok_h)
+    assert len(pushed) == 3
+
+
+def test_new_defaults_in_actor_files():
+    d = pathlib.Path(__file__).resolve().parents[1] / ".actor"
+    schema = json.loads((d / "input_schema.json").read_text())
+    opts = json.loads((d / "actor.json").read_text())["defaultRunOptions"]
+    assert schema["properties"]["maxPages"]["default"] == 200 and schema["properties"]["maxPages"]["maximum"] == 100000
+    assert opts["timeoutSecs"] == 7200 and opts["memoryMbytes"] == 256
+
+
+class FakeActor:
+    def __init__(self, inp):
+        self.inp, self.pushed, self.values, self.failed, self.status = inp, [], {}, None, None
+        self.log = type("L", (), {"info": staticmethod(lambda *a: None), "warning": staticmethod(lambda *a: None)})()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def get_input(self):
+        return self.inp
+
+    async def push_data(self, row, charged_event_name=None):
+        self.pushed.append((row, charged_event_name))
+
+    async def set_value(self, k, v):
+        self.values[k] = v
+
+    async def set_status_message(self, msg):
+        self.status = msg
+
+    async def fail(self, status_message=None):
+        self.failed = status_message
+
+
+def test_main_invalid_input_exits_cleanly(monkeypatch):
+    from src import main as m
+    calls = []
+    real = httpx.AsyncClient
+    monkeypatch.setattr(m, "make_client", lambda: real(transport=httpx.MockTransport(lambda r: calls.append(1) or httpx.Response(200))))
+    for inp, msg in (({"startUrls": ["not a url", "mailto:a@b.c"]}, "Add at least one valid start URL (a site, a sitemap or a list of URLs)."),
+                     ({"startUrls": ["https://a.com"], "mode": "x"}, "Mode must be list, sitemap or crawl.")):
+        fake = FakeActor(inp)
+        monkeypatch.setattr(m, "Actor", fake)
+        asyncio.run(m.main())
+        assert calls == [] and fake.pushed == [] and fake.failed is None and fake.status == msg
+        assert fake.values["STATUS"] == {"ok": False, "reason": "invalid_input", "message": msg}
+    assert fake.values.get("INVALID_INPUTS") is None  # second input has no invalid lines
 
 
 def test_normalize_rejects_spaces_in_host_only():

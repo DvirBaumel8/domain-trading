@@ -217,7 +217,7 @@ async def run(inp: dict, *, client, push, set_status, sleep=asyncio.sleep, limit
     mode = inp.get("mode") or "list"
     if mode not in ("list", "sitemap", "crawl"):
         return False, "Mode must be list, sitemap or crawl."
-    max_pages = max(1, int(inp.get("maxPages") or 1000))
+    max_pages = max(1, int(inp.get("maxPages") or 200))
     max_depth = max(0, int(3 if inp.get("maxDepth") is None else inp["maxDepth"]))
     check_ext = bool(inp.get("checkExternal"))
     conc = max(1, min(20, int(inp.get("maxConcurrency") or 5)))
