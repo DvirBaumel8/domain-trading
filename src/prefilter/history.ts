@@ -10,6 +10,8 @@ export interface History {
   first_snapshot: string | null;
   evidence: { date: string; url: string }[];
   reason: string | null;
+  /** Set when the answer is an earlier day's (DATE of the shadow file), not a new call to the archive. */
+  reused_from?: string;
 }
 export type HistoryFn = (domain: string) => Promise<History>;
 
@@ -21,6 +23,24 @@ const KILL_AT = 2;
 const GAP_MS = 4000;
 const BUDGET_MS = 40 * 60_000;
 const MAX_FAILURES_IN_A_ROW = 5;
+const TIMEOUT_MS = 15_000;
+export const REUSE_DAYS = 30;
+
+export type Reuse = ReadonlyMap<string, { date: string; history: History }>;
+
+/** The newest usable answer a name already has in the last 30 days of the log. `files` are the shadow files, `date` = the file's UTC date. */
+export function reusable(files: readonly { date: string; rows: readonly { domain: string; checks: { history: History } }[] }[], today: string): Reuse {
+  const from = new Date(Date.parse(today) - REUSE_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const found = new Map<string, { date: string; history: History }>();
+  for (const f of [...files].sort((a, b) => a.date.localeCompare(b.date))) {
+    if (f.date < from || f.date >= today) continue;
+    for (const r of f.rows) {
+      const h = r.checks?.history;
+      if (h && h.status !== 'error' && h.status !== 'not_checked') found.set(r.domain, { date: h.reused_from ?? f.date, history: h });
+    }
+  }
+  return found;
+}
 
 const blank = (status: History['status'], reason: string | null = null): History => ({ status, pages: null, partial: false, first_snapshot: null, evidence: [], reason });
 
@@ -42,11 +62,13 @@ export function readHistory(domain: string, text: string): History {
   };
 }
 
-export function createHistory(now: () => number, sleep: (ms: number) => Promise<unknown>, fetchFn: Fetch = fetch): HistoryFn {
+export function createHistory(now: () => number, sleep: (ms: number) => Promise<unknown>, fetchFn: Fetch = fetch, reuse: Reuse = new Map()): HistoryFn {
   let until: number | null = null;
   let next = 0;
   let failures = 0;
   return async (domain) => {
+    const old = reuse.get(domain);
+    if (old) return { ...old.history, reused_from: old.date };
     until ??= now() + BUDGET_MS;
     if (failures >= MAX_FAILURES_IN_A_ROW) return blank('not_checked', 'the archive stopped answering');
     if (now() > until) return blank('not_checked', 'the time for this run is used');
@@ -54,7 +76,7 @@ export function createHistory(now: () => number, sleep: (ms: number) => Promise<
     next = now() + GAP_MS;
     const url = `https://web.archive.org/cdx/search/cdx?url=${domain}&matchType=domain&fl=timestamp,original&filter=statuscode:200&filter=mimetype:text/html&collapse=urlkey&limit=${LIMIT}`;
     try {
-      const answer = readHistory(domain, await readText(fetchFn, { source: 'wayback', url, timeoutMs: 45_000 }));
+      const answer = readHistory(domain, await readText(fetchFn, { source: 'wayback', url, timeoutMs: TIMEOUT_MS }));
       failures = 0;
       return answer;
     } catch (e) {
