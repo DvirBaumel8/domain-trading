@@ -17,8 +17,10 @@ jobs:
           python-version: '3.13'
       - name: Install
         run: |
-          pip install pytest
+          pip install pytest ruff
           for r in apify-actors/*/requirements.txt; do pip install -r "$r"; done
+      - name: Lint (ruff.toml)
+        run: ruff check ai-visibility-check apify-actors
       - name: Repo-wide contract (charging, schemas, no prices, bot guard, store sync)
         run: cd apify-actors && python -m pytest -q tests
       - name: Each actor

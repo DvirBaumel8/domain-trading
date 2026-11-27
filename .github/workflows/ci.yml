@@ -4,12 +4,15 @@ name: ci
 on:
   push:
     branches: [main]
-    paths-ignore: ['docs/requests/**', 'docs/releases/**', 'CLAUDE.md', 'ai-visibility-check/**']
+    paths-ignore: ['docs/**', 'CLAUDE.md', 'ai-visibility-check/**', 'apify-actors/**', '.github/workflows/apify-*.yml', '.github/workflows/avc-tests.yml', '.github/workflows/claude*.yml']
+  pull_request:
+    branches: [main]
+    paths-ignore: ['docs/**', 'CLAUDE.md', 'ai-visibility-check/**', 'apify-actors/**', '.github/workflows/apify-*.yml', '.github/workflows/avc-tests.yml', '.github/workflows/claude*.yml']
   workflow_call:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
