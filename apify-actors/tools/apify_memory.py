@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Post-push step: set defaultRunOptions.memoryMbytes = 256 on the 3 new actors.
+"""Post-push step: set defaultRunOptions.memoryMbytes = 256 on the 4 new actors.
 
 `apify push` does not apply actor.json defaultRunOptions, so Apify keeps 4096.
 Usage: apify_memory.py <actor-folder-name> ...   (token from APIFY_TOKEN, never printed)

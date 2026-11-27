@@ -1,0 +1,26 @@
+{
+  "actorSpecification": 1,
+  "name": "ai-brand-mention-check",
+  "title": "AI Brand Mention Check: ChatGPT, Gemini & Claude",
+  "description": "Is your brand named when people ask AI? Asks ChatGPT, Gemini and Claude buyer-style questions with web search on, and returns per question and engine: mentioned yes/no, rank, competitors, a quoted line and cited URLs. A fast sample on small models. Export CSV, Excel or JSON.",
+  "version": "0.1",
+  "buildTag": "latest",
+  "meta": {
+    "templateId": "python-empty"
+  },
+  "input": "./input_schema.json",
+  "output": "./output_schema.json",
+  "storages": {
+    "dataset": "./dataset_schema.json"
+  },
+  "dockerfile": "../Dockerfile",
+  "readme": "../README.md",
+  "minMemoryMbytes": 256,
+  "maxMemoryMbytes": 1024,
+  "defaultRunOptions": {
+    "memoryMbytes": 256,
+    "timeoutSecs": 600
+  },
+  "seoTitle": "AI Brand Mention Check: ChatGPT, Gemini, Claude",
+  "seoDescription": "See whether ChatGPT, Gemini and Claude name your brand in buyer-style questions, with rank, competitors and cited URLs, as CSV or JSON."
+}

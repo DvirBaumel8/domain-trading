@@ -17,7 +17,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 BASE = "https://api.apify.com"
-ALLOWED = ("wayback-domain-history", "broken-link-auditor", "bulk-pagespeed-checker")
+ALLOWED = ("wayback-domain-history", "broken-link-auditor", "bulk-pagespeed-checker", "ai-brand-mention-check")
 PRICE_KEY_HINTS = ("pric", "monetiz")
 TARGET_MEMORY_MB = 256
 

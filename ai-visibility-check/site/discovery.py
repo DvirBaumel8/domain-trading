@@ -72,7 +72,7 @@ FAQ = (
      "instead of one screenshot."),
     ("Which AI assistants do you check?",
      "The paid report checks ChatGPT, Gemini and Claude with their web-search features turned on. The free quick check "
-     "uses one AI model answering from memory only, so treat it as a first look."),
+     "is AI output from one AI model with web search on 8 questions, so treat it as a first look."),
     ("What do the fixes involve?",
      "Mostly the basics AI assistants read: complete and consistent profiles on the sites they cite for your trade "
      "(Google, Yelp, Healthgrades, Avvo and so on), clear service and city information on your website, and honest "

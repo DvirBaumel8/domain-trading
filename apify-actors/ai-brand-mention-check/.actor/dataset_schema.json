@@ -1,0 +1,229 @@
+{
+  "actorSpecification": 1,
+  "fields": {
+    "type": "object",
+    "properties": {
+      "brand": {
+        "type": "string",
+        "description": "The brand that was checked"
+      },
+      "domain": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "The brand's domain, normalised (no scheme, www or path); null when none was given"
+      },
+      "category": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "The category used for the questions; null when you gave your own questions without one"
+      },
+      "promptIndex": {
+        "type": "integer",
+        "description": "Position of the question in this run, starting at 1"
+      },
+      "prompt": {
+        "type": "string",
+        "description": "The question that was asked"
+      },
+      "engine": {
+        "type": "string",
+        "description": "chatgpt, gemini or claude"
+      },
+      "model": {
+        "type": "string",
+        "description": "The model id that answered (or would have answered, on an error row)"
+      },
+      "status": {
+        "type": "string",
+        "description": "ok = an answer came back (one charged result); error = it did not (see errorCode), not charged"
+      },
+      "errorCode": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "timeout, rate_limited, quota_exhausted, provider_error, engine_not_configured, budget_cap or charge_limit; null when status is ok"
+      },
+      "mentioned": {
+        "type": [
+          "boolean",
+          "null"
+        ],
+        "description": "true when the brand (or an alias) is named in the answer by the matching rules; decided by text matching, not by an AI; null on error"
+      },
+      "mentionType": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "listed = named in a list, bold text, heading or table; prose = named in running text; none = not named; null on error"
+      },
+      "rank": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "description": "Position of the brand in the list the answer gives (1 = first); null when not mentioned or not in a list"
+      },
+      "listLength": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "description": "How many brands the answer lists, the brand included; null when no list was found"
+      },
+      "snippet": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "A verbatim line from the answer that names the brand, at most 300 characters; null when not mentioned"
+      },
+      "competitors": {
+        "type": "array",
+        "description": "Other brands the answer names, in order, up to 15, each with name and rank. The brand itself is never included",
+        "items": {
+          "type": "object"
+        }
+      },
+      "brandCited": {
+        "type": [
+          "boolean",
+          "null"
+        ],
+        "description": "true when one of the cited URLs is on the brand's domain; null on error or without a domain"
+      },
+      "citedUrls": {
+        "type": "array",
+        "description": "URLs the engine cited, without duplicates, up to 20",
+        "items": {
+          "type": "string"
+        }
+      },
+      "searchUsed": {
+        "type": [
+          "boolean",
+          "null"
+        ],
+        "description": "true when the engine ran a web search for this answer; false means it answered from memory; null on error"
+      },
+      "sentiment": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "positive, neutral or negative: an AI judgement of the answer's tone toward the brand, not a measurement; null when not mentioned or when the simple list parser was used"
+      },
+      "extraction": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "llm = competitors and rank read by a small model; heuristic = by a simple list parser; null on error"
+      },
+      "answerText": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "The full answer text, when Include answer text is on; otherwise null"
+      },
+      "latencyMs": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "description": "Milliseconds the engine took to answer; null on error"
+      },
+      "checkedAt": {
+        "type": "string",
+        "description": "UTC time of the check (ISO 8601)"
+      }
+    },
+    "required": [
+      "brand",
+      "engine",
+      "prompt",
+      "status",
+      "checkedAt"
+    ]
+  },
+  "views": {
+    "overview": {
+      "title": "Brand mentions",
+      "transformation": {
+        "fields": [
+          "brand",
+          "engine",
+          "prompt",
+          "status",
+          "mentioned",
+          "mentionType",
+          "rank",
+          "listLength",
+          "snippet",
+          "competitors",
+          "brandCited",
+          "citedUrls",
+          "searchUsed",
+          "sentiment",
+          "errorCode"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "brand": {
+            "label": "Brand"
+          },
+          "engine": {
+            "label": "Engine"
+          },
+          "prompt": {
+            "label": "Question"
+          },
+          "status": {
+            "label": "Status"
+          },
+          "mentioned": {
+            "label": "Mentioned"
+          },
+          "mentionType": {
+            "label": "Mention type"
+          },
+          "rank": {
+            "label": "Rank"
+          },
+          "listLength": {
+            "label": "List length"
+          },
+          "snippet": {
+            "label": "Quoted line"
+          },
+          "competitors": {
+            "label": "Competitors"
+          },
+          "brandCited": {
+            "label": "Brand cited"
+          },
+          "citedUrls": {
+            "label": "Cited URLs"
+          },
+          "searchUsed": {
+            "label": "Web search used"
+          },
+          "sentiment": {
+            "label": "Sentiment (AI judgement)"
+          },
+          "errorCode": {
+            "label": "Error"
+          }
+        }
+      }
+    }
+  }
+}

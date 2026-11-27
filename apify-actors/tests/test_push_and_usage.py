@@ -16,7 +16,7 @@ import apify_memory as memory  # noqa: E402
 
 NOW = datetime(2026, 11, 27, 6, 0, tzinfo=timezone.utc)
 MEM = {"defaultRunOptions": {"memoryMbytes": 256}}
-NEW = {"wayback-domain-history", "broken-link-auditor", "bulk-pagespeed-checker"}
+NEW = {"wayback-domain-history", "broken-link-auditor", "bulk-pagespeed-checker", "ai-brand-mention-check"}  # CR-134 added the fourth
 
 
 # ---- post-push guard
@@ -79,7 +79,7 @@ def test_guard_rejects_old_actors(monkeypatch):
     assert guard.main(["sitemap-url-extractor"], fetch_fn=lambda n, t: {}) == 2
 
 
-def test_guard_allow_list_is_the_three_new():
+def test_guard_allow_list_is_the_new_actors():
     assert set(guard.ALLOWED) == NEW
 
 
@@ -102,9 +102,15 @@ def test_push_workflow_manual_only():
     assert "workflow_dispatch" in WF
 
 
+def _options(text):
+    return set(re.findall(r"^\s+- ([\w-]+)\s*$", text.split("options:")[1].split("permissions:")[0], re.M))
+
+
 def test_push_workflow_allow_list_exactly_new_actors():
-    opts = set(re.findall(r"^\s+- ([\w-]+)\s*$", WF.split("options:")[1].split("permissions:")[0], re.M))
-    assert opts == NEW | {"all-new"}
+    # CR-134: the bot cannot change .github/workflows, so the new allow-list line lives in the ci/ copy that Dvir installs.
+    # That copy must list exactly the new actors; the installed copy may lag behind (it must never list anything else).
+    assert _options((ROOT / "ci" / "apify-push.yml").read_text()) == NEW | {"all-new"}
+    assert _options(WF) <= NEW | {"all-new"}
 
 
 def test_push_workflow_never_publishes_or_prices():
