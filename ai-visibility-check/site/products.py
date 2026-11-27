@@ -8,7 +8,7 @@ Order types: base | maps | listings_check | listings | content | bundle.
 Only `base` and `bundle` may reach the paid-run path (delivery.on_paid, behind its own gate).
 maps / listings_check / listings / content are delivered by hand: no engine is ever called for them.
 """
-import datetime, os, re, sys
+import datetime, math, os, re, sys
 
 MANUAL_DELIVERY_BUSINESS_DAYS = 3        # Mon-Fri; inside the 5 business days promised in refunds.html
 
@@ -155,7 +155,7 @@ def paid_cents(data):
                 return None
             v = int(v)
         elif isinstance(v, float):
-            if v != v or v in (float("inf"), float("-inf")):
+            if math.isnan(v) or v in (float("inf"), float("-inf")):
                 return None
         elif not isinstance(v, int):
             return None

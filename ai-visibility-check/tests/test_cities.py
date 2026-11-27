@@ -1,4 +1,4 @@
-import datetime, http.client, json, os, subprocess, sys, tempfile, threading, unittest
+import http.client, json, os, subprocess, sys, tempfile, threading, unittest
 import xml.etree.ElementTree as ET
 HERE = os.path.dirname(os.path.abspath(__file__))
 SITE = os.path.join(HERE, "..", "site")

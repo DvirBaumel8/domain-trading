@@ -3,7 +3,6 @@ import asyncio
 import json
 import pathlib
 import sys
-from decimal import Decimal
 
 import httpx
 

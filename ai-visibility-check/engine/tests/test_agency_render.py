@@ -1,5 +1,5 @@
 """CR-133 engine side: agency render options, the fixed method footer, stored results, the PDF. Mock providers only."""
-import hashlib, io, json, os, re, sys, tempfile, unittest
+import io, json, os, re, sys, tempfile, unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 

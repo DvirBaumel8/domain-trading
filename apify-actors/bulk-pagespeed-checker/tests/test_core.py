@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from src import core, runner  # noqa: E402
+from src import runner  # noqa: E402
 from src.polite import HostLimiter  # noqa: E402
 
 SECRET = "AIzaSECRETKEY123"
@@ -130,7 +130,7 @@ def test_key_never_in_logs_rows_or_status(caplog):
     for code in (200, 500):
         caplog.clear()
         (ok, msg), pushed, statuses = drive({"urls": ["https://ex.com"], "strategies": ["mobile"], "apiKey": SECRET},
-                                            lambda r: httpx.Response(code, json=FULL))
+                                            lambda r, code=code: httpx.Response(code, json=FULL))
         blob = caplog.text + json.dumps(pushed) + msg + " ".join(statuses)
         assert SECRET not in blob
     # the key is really sent to Google
@@ -154,7 +154,7 @@ def test_api_key_is_optional_in_schema_and_missing_everywhere_fails():
     assert "keyless" not in text and "without a key" not in text and "without it" not in text
     for inp in ({"urls": ["https://ex.com"]}, {"urls": ["https://ex.com"], "apiKey": "  "}):
         calls = []
-        (ok, msg), pushed, _ = drive(inp, lambda r: (calls.append(1), httpx.Response(200, json=FULL))[1])
+        (ok, msg), pushed, _ = drive(inp, lambda r, calls=calls: (calls.append(1), httpx.Response(200, json=FULL))[1])
         assert not ok and "API key" in msg and pushed == [] and calls == []
 
 
@@ -248,7 +248,7 @@ def test_env_and_input_keys_never_leak(monkeypatch, caplog):
     for inp in (dict(URL_INP), {**URL_INP, "apiKey": SECRET}):
         for code in (200, 500):
             caplog.clear()
-            (ok, msg), pushed, statuses = drive(inp, lambda r: httpx.Response(code, json=FULL))
+            (ok, msg), pushed, statuses = drive(inp, lambda r, code=code: httpx.Response(code, json=FULL))
             blob = caplog.text + json.dumps(pushed) + msg + " ".join(statuses)
             assert ENV_KEY not in blob and SECRET not in blob
 

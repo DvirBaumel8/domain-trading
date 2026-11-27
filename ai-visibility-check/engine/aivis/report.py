@@ -1,6 +1,5 @@
 """One-page report (Markdown and a print-friendly HTML)."""
 import html
-import math
 
 from .niches import niche_label
 

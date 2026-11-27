@@ -7,10 +7,9 @@ the daily pack cap AIVIS_PACK_DAILY_CAP_USD (the gate below). A permanently fail
 
 Nothing here sends a message, calls Polar or spends money by itself. Alerts carry ids, counts and amounts only.
 """
-import base64, csv, datetime, hashlib, hmac, io, json, os, re, struct, sys, threading, time
+import base64, csv, datetime, hashlib, hmac, io, json, math, os, re, struct, sys, threading, time
 
 import delivery
-import products
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "engine"))
@@ -625,7 +624,7 @@ def daily_cap_usd():
         v = float(raw)
     except ValueError:
         return 0.0
-    return v if v == v and v >= 0 else 0.0
+    return v if not math.isnan(v) and v >= 0 else 0.0
 
 
 def estimate_usd(o):

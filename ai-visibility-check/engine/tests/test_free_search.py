@@ -204,7 +204,7 @@ class Fallback(Env):
     def test_openai_unconfigured_when_fallback_needed(self):
         with mock.patch.dict(os.environ, {"OPENAI_API_KEY": ""}):
             p, g, o, _ = providers([http_err(500)] * 3, [openai_body()])
-            with self.assertRaises(ProviderError) as cm:
+            with self.assertRaises(ProviderError):
                 p.ask("q")
             self.assertEqual(len(o.reqs), 0)
             self.assertEqual(p.failures["openai"], {"provider_not_configured": 1})

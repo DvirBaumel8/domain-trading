@@ -1,4 +1,4 @@
-import json,urllib.request,urllib.parse,sys,statistics,time
+import json,urllib.request,urllib.parse,sys,time
 res={}
 for kw in sys.argv[1:]:
     terms=kw.split('|'); q=terms[0]; must=[t.lower() for t in terms[1:]] or [q.lower()]

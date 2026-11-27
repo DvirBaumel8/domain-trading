@@ -1,0 +1,9 @@
+# Repo-level lint: pyflakes (F), loop-variable capture (B023), pylint errors (PLE).
+extend-exclude = ["ai-visibility-check/.venv"]
+
+[lint]
+select = ["F", "B023", "PLE"]
+
+[lint.per-file-ignores]
+# Off-limits for this cleanup batch (touched only by its owner).
+"apify-actors/tests/test_push_and_usage.py" = ["F401"]

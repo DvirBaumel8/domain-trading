@@ -1,4 +1,4 @@
-import http.client, json, os, sys, tempfile, threading, unittest
+import http.client, json, os, sys, unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import test_server as ts          # sets up the temp orders folder and the no-network guard
