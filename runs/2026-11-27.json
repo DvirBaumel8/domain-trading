@@ -1,0 +1,75 @@
+{
+  "date": "2026-11-27",
+  "kills": {
+    "read": 1660,
+    "unreadable_lines": 0
+  },
+  "files": {
+    "auction": {
+      "file_built_at": "2026-11-27T16:09:41+02:00",
+      "counts": {
+        "read": 67075,
+        "not_com": 28225,
+        "not_letters": 7695,
+        "too_long": 15400,
+        "unreadable": 0
+      },
+      "dropped": {
+        "no_bid": 15436,
+        "adult": 108,
+        "over_per_name": 5,
+        "over_total": 1
+      },
+      "checked": 205,
+      "logged": 204
+    },
+    "closeout": {
+      "file_built_at": "2026-11-27T16:12:36+02:00",
+      "counts": {
+        "read": 458052,
+        "not_com": 275233,
+        "not_letters": 38632,
+        "too_long": 69916,
+        "unreadable": 0
+      },
+      "dropped": {
+        "no_demand_sign": 28273,
+        "price": 44914,
+        "adult": 551,
+        "already_logged": 209
+      },
+      "checked": 324,
+      "logged": 323
+    }
+  },
+  "killed": [
+    {
+      "domain": "hairiamwigs.com",
+      "source": "auction",
+      "by": "web_risk",
+      "evidence": [
+        "SOCIAL_ENGINEERING"
+      ]
+    },
+    {
+      "domain": "rukub.com",
+      "source": "closeout",
+      "by": "web_risk",
+      "evidence": [
+        "SOCIAL_ENGINEERING"
+      ]
+    }
+  ],
+  "history_coverage": {
+    "checked": 1,
+    "reused": 0,
+    "not_checked": 521,
+    "error": 5
+  },
+  "closes": 423,
+  "totals": {
+    "auctions": 853,
+    "closeouts": 1229,
+    "with_last_price": 1249
+  }
+}
