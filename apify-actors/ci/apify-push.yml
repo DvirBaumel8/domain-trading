@@ -1,17 +1,29 @@
 name: apify-push
 
-# Manual only. Pushes the 4 NEW actors to Apify as PRIVATE, unpublished, unpriced. Never publishes, never sets prices or Store listing.
-# The 4 existing live actors are not allowed here. Each run needs Dvir's OK through Gavriel.
+# Two paths, one allow-list each (allow-lists live in apify-actors/tools). Never publishes or unpublishes, never sets prices or Store listing.
+# PRIVATE (manual): wayback-domain-history, bulk-pagespeed-checker, ai-brand-mention-check. Pushed private and unpriced; the guard fails if public or priced.
+# LIVE (manual, or on merge to main): bulk-domain-availability-checker, sitemap-url-extractor, broken-link-auditor. Already public and priced;
+#   the guard fails if visibility, listing fields or price changed. A merge rebuilds only the live actors whose folder changed.
+# Manual runs need Dvir's OK through Gavriel.
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'apify-actors/bulk-domain-availability-checker/**'
+      - 'apify-actors/sitemap-url-extractor/**'
+      - 'apify-actors/broken-link-auditor/**'
+      - '.github/workflows/apify-push.yml'
   workflow_dispatch:
     inputs:
       actor:
-        description: Which new actor to push (private)
+        description: Which actor to push (live ones stay public and priced; the others stay private)
         required: true
         type: choice
         options:
-          - wayback-domain-history
+          - bulk-domain-availability-checker
+          - sitemap-url-extractor
           - broken-link-auditor
+          - wayback-domain-history
           - bulk-pagespeed-checker
           - ai-brand-mention-check
           - all-new
@@ -19,27 +31,46 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: apify-push
+  cancel-in-progress: false
+
 jobs:
-  push-private:
+  push:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Resolve actor list (allow-list)
+      - name: Resolve mode and actor list (allow-list; empty on a merge that touches no live actor)
         env:
+          EVENT: ${{ github.event_name }}
           ACTOR: ${{ inputs.actor }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
         run: |
-          case "$ACTOR" in
-            wayback-domain-history|broken-link-auditor|bulk-pagespeed-checker|ai-brand-mention-check) echo "ACTORS=$ACTOR" >> "$GITHUB_ENV" ;;
-            all-new) echo "ACTORS=wayback-domain-history broken-link-auditor bulk-pagespeed-checker ai-brand-mention-check" >> "$GITHUB_ENV" ;;
-            *) echo "actor not allowed"; exit 1 ;;
-          esac
+          if [ "$EVENT" = "push" ]; then
+            echo "MODE=live" >> "$GITHUB_ENV"
+            echo "ACTORS=$(python apify-actors/tools/apify_changed.py "$BEFORE" "$AFTER")" >> "$GITHUB_ENV"
+          else
+            case "$ACTOR" in
+              bulk-domain-availability-checker|sitemap-url-extractor|broken-link-auditor) echo "MODE=live" >> "$GITHUB_ENV"; echo "ACTORS=$ACTOR" >> "$GITHUB_ENV" ;;
+              wayback-domain-history|bulk-pagespeed-checker|ai-brand-mention-check) echo "MODE=private" >> "$GITHUB_ENV"; echo "ACTORS=$ACTOR" >> "$GITHUB_ENV" ;;
+              all-new) echo "MODE=private" >> "$GITHUB_ENV"; echo "ACTORS=wayback-domain-history bulk-pagespeed-checker ai-brand-mention-check" >> "$GITHUB_ENV" ;;
+              *) echo "actor not allowed"; exit 1 ;;
+            esac
+          fi
+      - name: Nothing to push
+        if: env.ACTORS == ''
+        run: echo "No live actor changed in this commit; nothing pushed."
       - name: Pytest first (stop if red)
+        if: env.ACTORS != ''
         run: |
           pip install pytest
           for a in $ACTORS; do
@@ -48,8 +79,15 @@ jobs:
           done
           (cd apify-actors && python -m pytest -q tests)
       - name: Install Apify CLI
+        if: env.ACTORS != ''
         run: npm install -g apify-cli
-      - name: apify push (private; the token stays in the environment)
+      - name: Live only, record listing and price before the push (GET)
+        if: env.ACTORS != '' && env.MODE == 'live'
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: python apify-actors/tools/apify_baseline.py "$RUNNER_TEMP/baseline.json" $ACTORS
+      - name: apify push (the token stays in the environment)
+        if: env.ACTORS != ''
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
         run: |
@@ -63,16 +101,27 @@ jobs:
             printf '%s\n' "$out" | sed "s|$APIFY_TOKEN|***|g"
             echo "pushed $a"
           done
-      - name: Set run memory to 256 MB (apify push ignores actor.json defaultRunOptions)
+      - name: Set run memory to 256 MB (apify push ignores actor.json defaultRunOptions; live broken-link-auditor also 7200 s)
+        if: env.ACTORS != ''
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
-        run: python apify-actors/tools/apify_memory.py $ACTORS
-      - name: Post-push check (fails if public, priced or memory is not 256) and summary
+        run: |
+          flag=""; [ "$MODE" = "live" ] && flag="--live"
+          python apify-actors/tools/apify_memory.py $flag $ACTORS
+      - name: Post-push check and summary (private fails if public or priced; live fails if the listing or price changed; both fail if memory is not 256)
+        if: env.ACTORS != ''
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
-        run: python apify-actors/tools/apify_guard.py $ACTORS
+        run: |
+          if [ "$MODE" = "live" ]; then
+            python apify-actors/tools/apify_guard.py --live --baseline "$RUNNER_TEMP/baseline.json" $ACTORS
+          else
+            python apify-actors/tools/apify_guard.py $ACTORS
+          fi
       - name: Keep the DOM-TO-GAVRIEL line
+        if: env.ACTORS != ''
         uses: actions/upload-artifact@v4
         with:
           name: dom-to-gavriel-line
           path: dom-to-gavriel-line.md
+          if-no-files-found: ignore
