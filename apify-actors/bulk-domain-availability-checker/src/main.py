@@ -158,7 +158,15 @@ async def main() -> None:
             Actor.log.warning(f'{len(items)} domains given, checking the first {max_domains} (maxDomains).')
             items = items[:max_domains]
         if not items:
-            await Actor.fail(status_message='Please add at least one domain in Domains, or a keyword in Keywords.')
+            # Input error, not a failed run: status message + STATUS record (never pushed, so never charged), exit 0.
+            if inp.get('domains') or inp.get('keywords'):
+                msg = 'No valid domains or keywords in input.'
+            else:
+                msg = 'Please add at least one domain in Domains, or a keyword in Keywords.'
+            if invalid:
+                await Actor.set_value('INVALID_INPUTS', invalid[:5000])
+            await Actor.set_status_message(msg)
+            await Actor.set_value('STATUS', {'ok': False, 'reason': 'invalid_input', 'message': msg})
             return
         Actor.log.info(f'Checking {len(items)} domains ({len(invalid)} invalid inputs skipped).')
 

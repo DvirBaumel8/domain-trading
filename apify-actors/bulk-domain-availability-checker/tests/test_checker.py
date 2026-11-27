@@ -41,6 +41,7 @@ class FakeActor:
         self.pushed = []   # (row, charged_event_name)
         self.values = {}
         self.failed = None
+        self.status = None
         self.log = type('L', (), {'info': staticmethod(lambda *a, **k: None), 'warning': staticmethod(lambda *a, **k: None)})()
 
     async def __aenter__(self):
@@ -59,7 +60,7 @@ class FakeActor:
         self.values[k] = v
 
     async def set_status_message(self, msg):
-        pass
+        self.status = msg
 
     async def fail(self, status_message=None):
         self.failed = status_message
@@ -67,8 +68,14 @@ class FakeActor:
 
 def run_main(monkeypatch, inp, **hk):
     fake = FakeActor(inp)
+    fake.calls = calls = []
     monkeypatch.setattr(m, 'Actor', fake)
-    monkeypatch.setattr(m.httpx, 'AsyncClient', lambda **kw: REAL_CLIENT(transport=httpx.MockTransport(handler(**hk)), **kw))
+    inner = handler(**hk)
+
+    def h(req):
+        calls.append(str(req.url))
+        return inner(req)
+    monkeypatch.setattr(m.httpx, 'AsyncClient', lambda **kw: REAL_CLIENT(transport=httpx.MockTransport(h), **kw))
     monkeypatch.setattr(m, 'RDAP_MIN_INTERVAL', 0)
     asyncio.run(m.main())
     return fake
@@ -76,6 +83,32 @@ def run_main(monkeypatch, inp, **hk):
 
 def by_domain(fake):
     return {r['domain']: (r, ev) for r, ev in fake.pushed}
+
+
+NO_INPUT_MSG = 'Please add at least one domain in Domains, or a keyword in Keywords.'
+
+
+def assert_clean_exit(f, msg):
+    assert f.calls == [] and f.pushed == [] and f.failed is None and f.status == msg
+    assert f.values['STATUS'] == {'ok': False, 'reason': 'invalid_input', 'message': msg}
+
+
+def test_no_domains_no_keywords_exits_cleanly(monkeypatch):
+    for inp in ({}, {'tlds': ['com', 'net']}, {'domains': [], 'keywords': []}):
+        f = run_main(monkeypatch, inp)
+        assert_clean_exit(f, NO_INPUT_MSG)
+        assert 'INVALID_INPUTS' not in f.values
+
+
+def test_all_domains_invalid_exits_cleanly(monkeypatch):
+    f = run_main(monkeypatch, {'domains': ['not a domain', '???', '']})
+    assert_clean_exit(f, 'No valid domains or keywords in input.')
+    assert f.values['INVALID_INPUTS'] == ['not a domain', '???', '']
+
+
+def test_valid_domain_still_checked(monkeypatch):
+    f = run_main(monkeypatch, {'domains': ['free-name-xyz.com']})
+    assert f.failed is None and 'STATUS' not in f.values and by_domain(f)['free-name-xyz.com'][1] == 'result'
 
 
 def test_bundled_tld_list_is_sane():

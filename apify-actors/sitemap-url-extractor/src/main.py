@@ -56,12 +56,18 @@ async def check_status(client, url: str) -> tuple[int | None, str | None]:
         return None, None
 
 
+async def invalid_input_exit(msg: str) -> None:
+    """Bad input is not a failed run: status message plus a STATUS record (never pushed, so never charged), exit 0."""
+    await Actor.set_status_message(msg)
+    await Actor.set_value('STATUS', {'ok': False, 'reason': 'invalid_input', 'message': msg})
+
+
 async def main() -> None:
     async with Actor:
         inp = await Actor.get_input() or {}
         since_raw = inp.get('modifiedSince')
         if since_raw is not None and not valid_modified_since(str(since_raw)):
-            await Actor.fail(status_message='modifiedSince must look like 2026-01-31')
+            await invalid_input_exit('modifiedSince must look like 2026-01-31')
             return
         # accept the Apify requestListSources shape too
         raw = [s if isinstance(s, str) else (s.get('url') if isinstance(s, dict) else None) for s in inp.get('startUrls') or []]
@@ -76,7 +82,7 @@ async def main() -> None:
             await Actor.set_value('INVALID_INPUTS', invalid[:5000])  # never pushed to the dataset, so never charged
             Actor.log.warning(f'{len(invalid)} invalid start URL(s) skipped (saved to INVALID_INPUTS, not charged).')
         if not starts:
-            await Actor.fail(status_message='Add at least one website or sitemap URL.')
+            await invalid_input_exit('Add at least one website or sitemap URL.')
             return
         max_urls = int(inp.get('maxUrlsPerSite') or 1000)
         max_maps = int(inp.get('maxSitemaps') or 500)
@@ -84,7 +90,7 @@ async def main() -> None:
             include = re.compile(inp['includeRegex']) if inp.get('includeRegex') else None
             exclude = re.compile(inp['excludeRegex']) if inp.get('excludeRegex') else None
         except re.error as e:
-            await Actor.fail(status_message=f'Invalid regex: {e}')
+            await invalid_input_exit(f'Invalid regex: {e}')
             return
         since = (inp.get('modifiedSince') or '').strip()[:10] or None
         check = bool(inp.get('checkStatus'))
