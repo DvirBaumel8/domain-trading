@@ -43,7 +43,8 @@ class SmokeTests(unittest.TestCase):
 
     def test_not_wired_into_ci_or_discovery(self):
         root = os.path.join(HERE, "..")
-        self.assertNotIn("free_check_smoke", open(os.path.join(root, "ci", "avc-tests.yml")).read())
+        wf = os.path.join(root, "..", ".github", "workflows", "avc-tests.yml")
+        self.assertNotIn("free_check_smoke", open(wf).read())
         self.assertFalse(os.path.exists(os.path.join(root, "tests", "free_check_smoke.py")))
 
 
