@@ -1,10 +1,10 @@
 """CR-133 T-ABUSE and T-REG: hostile input, the flag off, wording. Offline."""
-import contextlib, hashlib, io, os, pathlib, re, sys, time, unittest
+import contextlib, hashlib, io, os, pathlib, re, time, unittest
 from unittest import mock
 
 import agency_base as ab
-from agency_base import BUYER, CLIENT_A, CLIENT_B, CLIENT_C, MORE
-import agency, agency_web, products, server
+from agency_base import BUYER, CLIENT_A, CLIENT_B, CLIENT_C
+import agency, products, server
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 AGENCY_HTML_SHA = "0eb233bc4f1bb94eee9f6bc1be7bf79a890a95532dc3373ecdc8a0eadb39f971"

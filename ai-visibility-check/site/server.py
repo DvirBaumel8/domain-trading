@@ -841,7 +841,6 @@ def new_order(d, req):
                 r, _ = store.get(f"purchases/{clean_ref(ref)}.json")
                 if r and r.get("status", "ok") == "ok" and r.get("type") in products.TYPES:
                     recs.append(r)
-        email_refs = {r["ref"] for r in recs}
         typed_rec = None
         if typed:
             typed_rec = next((r for r in recs if r["ref"] == typed), None) or store.get(f"purchases/{typed}.json")[0]

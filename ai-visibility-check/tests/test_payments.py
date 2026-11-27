@@ -1,6 +1,6 @@
 """Payment handling: one-time use of a payment, matching order, payment validation, event claim, run guard.
 No network, fake vendor APIs."""
-import concurrent.futures, datetime, json, os, sys, time, unittest
+import concurrent.futures, datetime, os, sys, time, unittest
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))

@@ -1,9 +1,8 @@
 """CR-133 T-BRAND at the service level: a real (fake-vendor) run, then branded / unbranded output, PDF, SAMPLE preview."""
-import hashlib, io, json, re, unittest
+import hashlib, io, re, unittest
 
 import agency_base as ab
 from agency_base import CLIENT_C
-import agency
 from site_config import SUPPORT_EMAIL
 
 HOST = "ai-visibility-check-nrtl.onrender.com"

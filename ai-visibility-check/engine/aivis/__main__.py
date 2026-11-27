@@ -136,7 +136,7 @@ def cmd_sample(a):
 
 
 def cmd_order(a):
-    from .order import Order, run_order, estimate_cost, DEFAULT_CAP_USD, OrderError
+    from .order import Order, run_order, DEFAULT_CAP_USD, OrderError
     from .report_pro import render
     o = Order.from_dict(json.load(open(a.intake)))
     if a.mode == "paid" and not a.dry_run and not o.paid:

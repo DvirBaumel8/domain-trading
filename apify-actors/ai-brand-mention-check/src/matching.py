@@ -23,7 +23,7 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlsplit
 
-ZERO_WIDTH = dict.fromkeys(map(ord, "​‌‍‎‏⁠⁡⁢⁣﻿­"))
+ZERO_WIDTH = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u200e\u200f\u2060\u2061\u2062\u2063\ufeff\u00ad"))
 WORDS_FILE = Path(__file__).parent / "data" / "common_words.txt"
 SNIPPET_MAX = 300
 LIST_LINE = re.compile(r"^\s*(?:[-*+•]\s+|\d{1,3}[.)]\s+|#{1,6}\s+|\|)")

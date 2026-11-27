@@ -1,6 +1,5 @@
 """A25: no key, header or provider text anywhere."""
 import logging
-import pathlib
 
 import httpx
 

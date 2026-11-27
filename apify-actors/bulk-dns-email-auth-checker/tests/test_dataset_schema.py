@@ -7,7 +7,7 @@ import sys
 import httpx
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from src import core, main  # noqa: E402
+from src import main  # noqa: E402
 from src.doh import DohResolver  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]

@@ -1,5 +1,5 @@
 """CR-133: T-PAY (one payment, one bundle, never more) and T-COUNT (counting). Offline; fake vendor APIs only."""
-import base64, csv, io, concurrent.futures, datetime, hashlib, hmac, json, os, time, unittest
+import base64, csv, io, concurrent.futures, datetime, hashlib, hmac, os, time, unittest
 from unittest import mock
 
 import agency_base as ab

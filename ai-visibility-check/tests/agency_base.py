@@ -1,11 +1,11 @@
 """Shared fixtures for the agency tests (CR-133). Not a test module. No network, no real AI call."""
-import datetime, http.client, json, os, sys
+import datetime, http.client, json, os, sys  # noqa: F401
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import test_addons as ta  # noqa: E402  (sets sys.path and env; Base starts the local server and fake vendor APIs)
-import server, delivery, products, agency  # noqa: E402
+import server, delivery, products, agency  # noqa: E402,F401  (re-exported to tests)
 from aivis.jobs import JobFailed  # noqa: E402
 
 fake_apis, sign = ta.fake_apis, ta.sign

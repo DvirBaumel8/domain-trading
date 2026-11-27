@@ -324,7 +324,6 @@ class IdempotencyTests(Base):
     def test_crash_after_purchase_write_resumes_without_duplicates(self):
         self.intake()
         ev = event("maps", "pol_crash")
-        real = server.alert
         calls = {"n": 0}
         def boom(text):
             calls["n"] += 1

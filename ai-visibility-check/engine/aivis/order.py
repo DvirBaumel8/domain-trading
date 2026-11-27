@@ -30,7 +30,7 @@ from .parse import match_name
 from . import config
 from . import free_config as fc
 from .uscities import is_us_place
-from .providers import REGISTRY, BudgetGuard, Business, MockProvider, ProviderError
+from .providers import REGISTRY, BudgetGuard, Business, MockProvider
 from .providers.free_search import FreeSearchProvider
 
 PAID_ENGINES = config.PAID_ENGINES

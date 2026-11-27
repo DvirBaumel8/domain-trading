@@ -1,5 +1,5 @@
 """Agency bundle settings come from the environment (CR-133). Offline; test-only ids and links."""
-import io, os, sys, unittest
+import io, os, unittest
 from contextlib import redirect_stderr
 from unittest import mock
 

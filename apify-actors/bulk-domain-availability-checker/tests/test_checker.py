@@ -1,11 +1,9 @@
 """Offline tests for the TLD check and likely_available (mock transport, fake Actor, no network)."""
 import asyncio
-import json
 import pathlib
 import sys
 
 import httpx
-import pytest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from src import main as m  # noqa: E402
