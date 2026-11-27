@@ -205,11 +205,13 @@ class FlagOn(ab.AgencyBase):
         st, body, _ = self.call("GET", "/agency.html")
         html = body.decode()
         for n, price in products.AGENCY_BUNDLE_PRICES_USD.items():
-            self.assertRegex(html, rf"<td>{n} reports?</td><td class=\"amt\">\${price}</td>")
+            self.assertRegex(html, rf"<td>{n} reports?</td><td class=\"amt\">\${price:,}</td>")
         self.assertEqual({1: 59, 5: 245, 10: 475, 25: 1075}, products.AGENCY_BUNDLE_PRICES_USD)
         for gone in ("Growth", "Dominate", "monitoring", "Google Maps", "first month"):
             self.assertNotIn(gone, html)
         self.assertEqual(html.count('class="amt"'), 4)
+        self.assertIn("$1,075", html)
+        self.assertNotIn("$1075", html)
         self.assertNotIn('data-pay="payLinkAgency', html)                 # no URL, no button
         with mock.patch.dict(os.environ, {"AIVIS_AGENCY_LINK_5": "https://buy.polar.sh/polar_cl_testlink"}):
             self.assertIn('data-pay="payLinkAgency5" href="https://buy.polar.sh/polar_cl_testlink"', self.call("GET", "/agency.html")[1].decode())

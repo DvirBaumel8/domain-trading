@@ -74,7 +74,7 @@ class Base(tfc.Base):
 
 class Order(Base):
     def test_gemini_ok_no_openai_and_live_suggestions_exact(self):
-        self.chain([tfs.gemini_body(text=GROUNDED_ALL)] * 8)
+        self.chain([tfs.gemini_body()] * 8)
         r, err = self.run_free()
         self.assertEqual((r["status"], r["answers"], len(self.g.reqs), len(self.o.reqs)), ("done", 1, 1, 0))     # one call, no hidden retry
         self.assertEqual(r["suggestions"], [SUGG])              # exact string, one copy
@@ -99,9 +99,25 @@ class Order(Base):
         self.assertEqual(r["suggestions"], [])
         js = open(os.path.join(os.path.dirname(HERE), "site", "assets", "app.js")).read()
         self.assertIn('<a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">', js)
+        self.assertIn("Sources the AI searched (AI output, not verified)", js)
+        self.assertNotIn("Sources the AI cited", js)
+
+    def test_live_suggestions_and_citations_once_and_never_stored(self):
+        self.chain([tfs.gemini_body()] * 3, [tfs.openai_body(text=GROUNDED_ALL, urls=(("https://example.org/zz-live", "Live Title"),))] * 3)
+        jid = "abcdef12-2222-2222-2222-222222222222"
+        r, err = self.run_free(jid)
+        self.assertEqual(r["suggestions"], [SUGG])
+        first = json.loads(self.req("GET", "/api/check/" + jid)[1])
+        second = json.loads(self.req("GET", "/api/check/" + jid)[1])
+        self.assertEqual(first["suggestions"], [SUGG])
+        for k in ("suggestions", "citations"):
+            self.assertNotIn(k, second)
+        blob = "\n".join(self.files().values()) + err + self.req("GET", first["report"])[1].decode()
+        for bad in (SUGG, "chip", "zz-live", "Live Title"):
+            self.assertNotIn(bad, blob)
 
     def test_live_fields_delivered_once_then_dropped(self):
-        self.chain([tfs.gemini_body(text=GROUNDED_ALL)] * 8)
+        self.chain([tfs.gemini_body()] * 8)
         r, _ = self.run_free("abcdef12-1111-1111-1111-111111111111")
         jid = "abcdef12-1111-1111-1111-111111111111"
         first = json.loads(self.req("GET", "/api/check/" + jid)[1])
@@ -115,7 +131,7 @@ class Order(Base):
 class OneCall(Base):
     """Acceptance 1-3 and 6: one vendor call per check; a second loop or hidden retry fails these."""
     def test_happy_path_exactly_one_gemini_call_zero_openai(self):
-        self.chain([tfs.gemini_body(text=GROUNDED_ALL)] * 5, [tfs.openai_body(text=GROUNDED_ALL)] * 5)
+        self.chain([tfs.gemini_body()] * 5, [tfs.openai_body(text=GROUNDED_ALL)] * 5)
         r, _ = self.run_free()
         self.assertEqual((r["status"], len(self.g.reqs), len(self.o.reqs)), ("done", 1, 0))
         self.assertEqual(r["suggestions"], [SUGG])
@@ -139,13 +155,13 @@ class OneCall(Base):
         self.assertEqual((r["status"], len(self.g.reqs), len(self.o.reqs)), ("done", 0, 1))
 
     def test_unstructured_reply_is_not_a_complete_check(self):
-        self.chain([tfs.gemini_body(text="1. Alpha Plumbing\n2. Beta Pipes")] * 3, [tfs.openai_body(text="not json")] * 3)
+        self.chain([tfs.gemini_body(text="Sorry, I cannot help.")] * 3, [tfs.openai_body(text="not json")] * 3)
         r, err = self.run_free()
         self.assertEqual(r["status"], "failed")
         self.assertIn("parse_error", err)
 
     def test_persisted_files_hold_no_names_text_or_links(self):
-        self.chain([tfs.gemini_body(text=GROUNDED_ALL)])
+        self.chain([tfs.gemini_body()])
         self.run_free()
         blob = "\n".join(self.files().values())
         for bad in ("Alpha Plumbing", "Beta Pipes", SUGG, "example.org", "chip"):
@@ -174,7 +190,7 @@ class Daily(Base):
         super().tearDown()
 
     def test_usd_cap_refuses_without_a_vendor_call_and_resets_next_day(self):
-        self.chain([tfs.gemini_body(text=GROUNDED_ALL)] * 6, [tfs.openai_body(text=GROUNDED_ALL)] * 6,
+        self.chain([tfs.gemini_body()] * 6, [tfs.openai_body(text=GROUNDED_ALL)] * 6,
                    now=lambda: self.now[0], daily_caps={"gemini": 0.06, "openai": 0.01}, daily_max=100)
         server.free_job = self.saved_free_job
         r, _ = self.run_free()
@@ -346,7 +362,7 @@ class PaidStaysLocked(Base):
     def test_keys_do_not_unlock_paid(self):
         os.environ.pop("AIVIS_ALLOW_PAID", None)
         self.assertFalse(server.health()["allow_paid"])
-        self.chain([tfs.gemini_body(text=GROUNDED_ALL)] * 8)
+        self.chain([tfs.gemini_body()] * 8)
         self.run_free()
         self.assertFalse(server.health()["allow_paid"])
         self.assertEqual(os.environ.get("AIVIS_ALLOW_PAID"), None)

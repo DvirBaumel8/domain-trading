@@ -13,8 +13,10 @@ Failures carry a short reason code (never a URL, prompt, body or key):
   model_unavailable        404 / 403 naming the model; permanent for that provider
   grounding_missing        Gemini 200 without grounding metadata or without Search Suggestions HTML
 
-One call per check: the prompt asks for the whole list of businesses as JSON ({"businesses": [...], "note": ""}) and
-the provider turns that list into a numbered text answer for the audit pipeline. A reply that is empty, not that JSON
+One call per check. OpenAI is asked for the whole list as JSON ({"businesses": [...], "note": ""}); Gemini is asked
+for a plain numbered list, because JSON-only prompts suppress Google Search (the model then answers ungrounded). OpenAI
+citations come from `web_search_call.action.sources` (it writes no url_citation annotations for a JSON answer). The
+provider turns the list into a numbered text answer for the audit pipeline. A reply that is empty, not that JSON
 or has no names is empty_answer / parse_error (then the fallback, or a clean failure). Gemini has no documented
 per-request cap on search queries, so the prompt asks for a single search and cost is bounded by the reservation
 (3 searches) and the caps.
@@ -26,6 +28,7 @@ never written anywhere by this module.
 """
 import json
 import os
+import re
 import socket
 import time
 import urllib.error
@@ -45,6 +48,28 @@ FORMAT = (' Give the full list of specific business names a customer would be gi
           ' Reply with only JSON like {"businesses": ["Name One", "Name Two"], "note": ""}.'
           ' If you are not sure a business exists, say so in "note" instead of guessing;'
           ' if you find no specific business, return an empty list.')
+GEMINI_FORMAT = (' You must run one Google Search for the question above, then answer only from what the search returns.'
+                 ' Do not answer from memory. Give the full list of specific business names a customer would be given.'
+                 ' Reply with only a numbered list, one business name per line, with no other text.'
+                 ' Leave out any business you cannot confirm exists; if you find none, reply with the single word NONE.')
+_LIST_LINE = re.compile(r"^\s*(?:\d+\s*[.)]|[-*\u2022])\s*(.+?)\s*$")
+
+
+def _names_from_list(text):
+    """Names in a numbered / bulleted list, [] for NONE, None when there is no list at all."""
+    t = (text or "").strip()
+    if t.strip("`*. ").upper() == "NONE":
+        return []
+    out, found = [], False
+    for line in t.splitlines():
+        m = _LIST_LINE.match(line)
+        if not m:
+            continue
+        found = True
+        n = " ".join(m.group(1).replace("**", "").split())[:120]
+        if n and n.lower() not in (o.lower() for o in out):
+            out.append(n)
+    return out[:MAX_NAMES] if found else None
 
 
 def _names_from_text(text):
@@ -227,7 +252,7 @@ class GeminiSearchProvider(_SearchProvider):
         return fc.gemini_model()
 
     def _request(self, key, prompt, city):
-        body = {"contents": [{"parts": [{"text": prompt + FORMAT}]}], "tools": [{"google_search": {}}],
+        body = {"contents": [{"parts": [{"text": prompt + GEMINI_FORMAT}]}], "tools": [{"google_search": {}}],
                 "generationConfig": {"maxOutputTokens": fc.EST_OUTPUT_TOKENS}}
         return urllib.request.Request(GEMINI_URL.format(model=self.model), data=json.dumps(body).encode(), method="POST",
                                       headers={"x-goog-api-key": key, "Content-Type": "application/json"})
@@ -257,7 +282,7 @@ class GeminiSearchProvider(_SearchProvider):
             return e
         if not text:
             raise fail("empty_answer")
-        names = _names_from_text(text)
+        names = _names_from_list(text)
         if names is None:
             raise fail("parse_error")
         if not names:
@@ -279,7 +304,8 @@ class OpenAISearchProvider(_SearchProvider):
     def _request(self, key, prompt, city):
         tool = {"type": "web_search", "user_location": {"type": "approximate", "country": "US", "city": city}} if city \
             else {"type": "web_search"}
-        body = {"model": self.model, "input": prompt + FORMAT, "tools": [tool], "max_output_tokens": 1500}
+        body = {"model": self.model, "input": prompt + FORMAT, "tools": [tool], "max_output_tokens": 1500,
+                "tool_choice": "required", "include": ["web_search_call.action.sources"]}
         return urllib.request.Request(OPENAI_URL, data=json.dumps(body).encode(), method="POST",
                                       headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"})
 
@@ -290,6 +316,12 @@ class OpenAISearchProvider(_SearchProvider):
                 continue
             if item.get("type") == "web_search_call":
                 calls += 1
+                act = item.get("action") if isinstance(item.get("action"), dict) else {}
+                for src in act.get("sources") or []:
+                    url = src.get("url") if isinstance(src, dict) else None
+                    if isinstance(url, str) and url.startswith(("https://", "http://")) \
+                            and all(l["url"] != url for l in links):
+                        links.append({"url": url, "title": str(src.get("title") or "")[:200]})
             for c in item.get("content") or []:
                 if isinstance(c, dict) and c.get("type") == "output_text":
                     text += c.get("text", "") if isinstance(c.get("text"), str) else ""
@@ -316,7 +348,7 @@ class OpenAISearchProvider(_SearchProvider):
         if not calls and not links:
             raise fail("grounding_missing")     # an answer from model memory is not web-search output
         text = _as_list_text(names)
-        return Answer(self.name, self.model, prompt, text.strip(), [l["url"] for l in links], self.mode, 0.0, 0, {},
+        return Answer(self.name, self.model, prompt, text.strip(), [l["url"] for l in links[:MAX_LINKS]], self.mode, 0.0, 0, {},
                       {"citations": links[:MAX_LINKS]}), usage
 
 

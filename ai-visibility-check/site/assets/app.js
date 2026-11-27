@@ -56,7 +56,7 @@
   function liveHtml(j){
     let h = "";
     if (j.citations && j.citations.length) {
-      h += "<h4 style='margin:14px 0 4px'>Sources the AI cited (AI output, not verified)</h4><ul class='small' style='margin:4px 0 4px 18px'>" +
+      h += "<h4 style='margin:14px 0 4px'>Sources the AI searched (AI output, not verified)</h4><ul class='small' style='margin:4px 0 4px 18px'>" +
         j.citations.filter(c => /^https?:\/\//i.test(c.url || "")).map(c =>
           `<li><a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">${esc(c.title || c.url)}</a></li>`).join("") + "</ul>";
     }
