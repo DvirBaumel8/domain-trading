@@ -18,3 +18,5 @@ services:
         value: "1"
       - key: AVC_TEST_BYPASS_TOKEN   # internal testing only; set in the Render dashboard, never here
         sync: false
+      - key: RESERVE_ADMIN_TOKEN   # operator token for /api/reservations (24+ chars); set in the Render dashboard, never here
+        sync: false
