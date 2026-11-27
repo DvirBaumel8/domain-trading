@@ -205,6 +205,8 @@ def public_file(raw):
         return None
     if p == "":
         p = "index.html"
+    if p == "agency-thanks":            # the checkout success URL has no extension; this one page only
+        p = "agency-thanks.html"
     if p in PUBLIC_FILES:
         return os.path.join(HERE, p)
     d, _, name = p.rpartition("/")
@@ -1305,7 +1307,8 @@ class H(http.server.BaseHTTPRequestHandler):
             if os.path.basename(f) == "agency.html" and products.agency_on():
                 body = agency_web.bundle_page(body)
             body = render_page(body, self._origin())
-            refs.record_hit(self.path, f, HERE, DATA, save_line)
+            if os.path.basename(f) != "agency-thanks.html":      # private page: no hit log, no query is read
+                refs.record_hit(self.path, f, HERE, DATA, save_line)
         return self._send(200, ctype, body)
 
     def do_POST(self):

@@ -7,7 +7,7 @@ from agency_base import BUYER, CLIENT_A, CLIENT_B, CLIENT_C, MORE
 import agency, agency_web, products, server
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-AGENCY_HTML_SHA = "7f7e4d202d6b61d6a81589ee29b28b04e8a079948f1ed4210eacb91e4b36821a"
+AGENCY_HTML_SHA = "0eb233bc4f1bb94eee9f6bc1be7bf79a890a95532dc3373ecdc8a0eadb39f971"
 BANNED = ("lead generation", "prospect", "pitch", "outreach", "cold email", "credits", "wallet", "balance")
 
 

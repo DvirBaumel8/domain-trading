@@ -54,10 +54,18 @@ def _claim(ip, read, store):
         d = _obj(read(agency.MAX_JSON_BODY))
     except ValueError:
         return _err("Please check the details and try again.")
-    tok = agency.claim(store, str(d.get("order_id", "")), str(d.get("email", "")))
-    if tok is None:
+    email = str(d.get("email", ""))
+    ek = agency.email_key(email)
+    if agency.limited("claim_email", ek, agency.CLAIM_PER_HOUR_EMAIL, 3600):   # same answer for known and unknown emails
+        return _err("Too many attempts, try again later.", 429)
+    agency.note("claim_email", ek)
+    found = agency.claim(store, email, str(d.get("order_id", "")))
+    if not found:
         return _json(404, {"error": "We could not match those details."})
-    return _json(200, {"portal": "/agency/p/" + tok})
+    if len(found) == 1:
+        return _json(200, {"portal": "/agency/p/" + found[0]["token"]})
+    return _json(200, {"portals": [{"reports": e["reports"], "left": e["left"], "portal": "/agency/p/" + e["token"]}
+                                   for e in found]})
 
 
 def _pdf(token, store):

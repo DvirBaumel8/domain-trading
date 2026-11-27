@@ -16,7 +16,7 @@ A run takes the next free slot (`bundle_runs/<bundle>/<n>`, create-only, server-
 ## Routes (all 404 with the flag off; every response is private, `noindex`, `no-store`)
 | Route | What |
 |---|---|
-| `POST /agency/claim` `{order_id, email}` | The portal link. Wrong order id and wrong email give the same 404. 5 attempts a minute per address, then 429. Same details give the same link |
+| `POST /agency/claim` `{email}` or `{email, order_id}` | Only the purchase email is required; an order id is optional and only narrows (a given id must match). One bundle: `{"portal": "/agency/p/<token>"}`. Several: `{"portals": [{reports, left, portal}]}`, newest first. A refunded bundle is still listed. Unknown email, wrong email and wrong order id give the same 404. 5 attempts a minute per address and 10 an hour per purchase email, then 429 (same body for known and unknown emails; nothing changes on a 429). Lookup uses `bundle_emails/<email_key>.json` (bundle ids, written when the bundle is created; bundles from before it are found by one scan of `bundles/`, which fills it). **Claiming by email alone is weaker: anyone who knows a purchase email can open that bundle's portal, which shows client business names and reports; the rate limits slow guessing but do not remove this.** |
 | `GET /agency/p/<token>` | Portal page. `GET .../state` JSON, `GET .../preview?mode=branded|unbranded` labelled SAMPLE |
 | `POST /agency/p/<token>/run` `{business, city, niche, website, competitors, prepared_for, mode, confirm_rerun}` | One report. 409 "No reports left in this bundle." when none |
 | `POST .../bulk` `{csv, confirm_rerun, mode}` | Up to 25 rows |
@@ -25,7 +25,7 @@ A run takes the next free slot (`bundle_runs/<bundle>/<n>`, create-only, server-
 | `POST .../rebrand` `{order_id, mode, name, accent, contact_line}` | Regenerates from the stored result: no engine call, no slot, at most 5 per report |
 | `GET /r/<report-token>` and `/r/<report-token>.pdf` | The report (HTML or PDF) in the chosen brand |
 | `GET /agency-terms.html` | Neutral terms page |
-| `GET /agency-thanks.html` | Order confirmation page (`noindex`): the bundle wording and a form (order id, purchase email) that posts to `/agency/claim` and then opens the returned portal link. 404 while the flag is off |
+| `GET /agency-thanks` and `/agency-thanks.html` | Order confirmation page (`noindex`), the checkout success URL: the bundle wording and a form (purchase email required, order id optional) that posts to `/agency/claim` and then opens the returned portal link, or lists several as plain links ("5 reports, 3 left"). A query string (for example `checkout_id`) is ignored, never echoed or logged. 404 while the flag is off. The extensionless alias exists for this page only |
 
 Limits: 30 bad portal tokens a minute per address, 20 run submissions a minute per token (429, nothing consumed). The existing `MAX_BODY` (4,096) holds for every other route.
 
