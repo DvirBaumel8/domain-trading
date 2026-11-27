@@ -56,6 +56,14 @@ class TestConfig(Base):
         self.assertEqual(config.get()["GHL_MONTHLY_CAP_USD"], 20)
 
 
+class TestDatabaseUrl(Base):
+    def test_postgres_url_read_as_is(self):
+        import config
+        for url in ("postgres://u:p@host:5432/db", "postgresql://u:p@host/db"):
+            os.environ["DATABASE_URL"] = url
+            self.assertEqual(config.get()["DATABASE_URL"], url)
+
+
 class TestModules(Base):
     def test_each_stub_registers(self):
         for name in ("oauth", "store", "runs", "page"):

@@ -16,3 +16,5 @@ Run: `python3 app.py --port 8080`. Test: `python -m unittest discover -s tests`.
 | `ci/ghl-app-tests.yml` | CI job, to be installed under `.github/workflows/` |
 
 New tests go in new files under `tests/`. Deploy: second service in the root `render.yaml` (`ghl-app`, free plan).
+
+Database: the free Render Postgres `ghl-app-db` is for build and review only and must move to a paid plan before go-live.

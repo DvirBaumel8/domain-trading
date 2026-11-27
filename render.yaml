@@ -68,10 +68,17 @@ services:
       - key: GHL_WEBHOOK_PUBLIC_KEY
         sync: false
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: ghl-app-db
+          property: connectionString
       - key: OPENAI_API_KEY
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: PERPLEXITY_API_KEY
         sync: false
+
+databases:
+  - name: ghl-app-db
+    plan: free
+    region: frankfurt
