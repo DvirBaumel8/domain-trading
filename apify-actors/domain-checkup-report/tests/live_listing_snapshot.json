@@ -1,0 +1,8 @@
+{
+  "title": "Domain Due Diligence Report: Check a Domain Before You Buy",
+  "description": "Due diligence before you buy a domain: a one-row report with registration age, registrar and expiry (RDAP), DNS and provider, for-sale signals with asking price, SPF/DMARC, a Cloudflare Security DNS check, a trademark-risk hint and a 0-100 score. No API keys. Export JSON, CSV or Excel.",
+  "seoTitle": "Domain Due Diligence Report Before You Buy",
+  "seoDescription": "Due diligence before you buy a domain: age, registrar, expiry, DNS, for-sale signals, email auth, safety check and a 0-100 score. No API keys.",
+  "categories": ["DEVELOPER_TOOLS", "SEO_TOOLS", "OTHER"],
+  "readme_sha256": "090dd2c934dedc619d396003ae909fb83275b8625cdbd46a482001d9b55f86c2"
+}
