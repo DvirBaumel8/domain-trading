@@ -87,3 +87,13 @@ Branch `claude/issue-102-20261127-0739` (no PR, per the issue; commit is the bra
 ## 2026-11-27 (DOM): issue 105, live rebuild of public Actors by workflow
 
 `apify-push` now has a LIVE path for `bulk-domain-availability-checker`, `sitemap-url-extractor` and `broken-link-auditor` (public, priced): manual dispatch, or automatic on a merge to `main` that changes `apify-actors/<name>/**` (only the changed live Actors; pytest first). It never publishes, unpublishes or sets a price; the check fails if visibility, listing text, categories or price changed, memory is not 256, or Site Migration QA timeout is not 7200. Private path (`wayback-domain-history`, `bulk-pagespeed-checker`, `ai-brand-mention-check`) keeps its guard. Anything else: "actor not allowed". Branch `claude/issue-105-20261127-0755`, no PR, nothing pushed to Apify. **Left:** if `.github/workflows/apify-push.yml` is not on `main` as written, copy `apify-actors/ci/apify-push.yml` over it.
+
+## 2026-11-27 (DOM): new way to reach DOM (Dvir, 27 Nov)
+
+Dvir chose **one DOM that starts by itself**. From now on:
+
+1. **To ask DOM anything, commit a file to `docs/requests/` on `main`** (a CR, a REQ, or a note here). Every push starts a DOM session in the cloud within a minute or two. It reads the request, answers in the file or here, builds approved CRs and pushes to `main`. Dvir can watch each run live at claude.ai/code and type into it.
+2. **`@claude` GitHub issues no longer work.** The `Claude Code` and `Claude Code Review` workflows are switched off, so there is one builder. Still open: issues 12, 14, 117, 118 (with `@claude`) and 57, 67, 76, 78, 88, 128, 131 to 134, plus PRs 70 and 87. **Move each one you still want into a file in `docs/requests/`**, then close the issue. DOM will not read issues.
+3. **Commit as one of Dvir's bots** (author name with "Grok Bot", or "Buyer"). Pushes by anyone else start a session that ends at once.
+4. Money actions still need Dvir's own line for that action, now typed in the DOM session. DOM writes here what the line must name.
+5. No DOM pushes between 23:45 and 01:00 UTC. A request sent then is handled after 01:00.
