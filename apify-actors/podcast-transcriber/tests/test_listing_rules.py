@@ -18,13 +18,18 @@ def test_u28_listing_text_lengths_and_first_screen():
     first = text.split("\n## ", 1)[0]
     assert len(first.strip().splitlines()) == 11
     assert "**Returns**" in first and "**Cost:**" in first and "Pricing tab" in first
-    assert text.strip().split("\n## ")[-1].startswith("Permissions")
+    sections = text.strip().split("\n## ")
+    assert sections[-1].startswith("Permissions") or sections[-1].startswith("Deploying from the repo")
 
 
 def test_u28_bot_drafts_copied_unchanged():
     if not DRAFT.exists():
         return
-    assert (ROOT / "README.md").read_text() == (DRAFT / "README.draft.md").read_text()
+    draft = (DRAFT / "README.draft.md").read_text()
+    readme = (ROOT / "README.md").read_text()
+    assert readme.startswith(draft)
+    extra = readme[len(draft):]
+    assert not extra.strip() or extra.lstrip().startswith("## Deploying from the repo")
     a = load("actor.json")
     for k, v in json.loads((DRAFT / "actor-text.json").read_text()).items():
         if k == "description":  # the draft is 414 characters; Apify takes at most 300, so DOM shortened it (told Gavriel)
@@ -65,3 +70,11 @@ def test_u30_dockerfile():
 def test_version_and_changelog():
     assert load("actor.json")["version"] == "0.1"
     assert "## 0.1.0" in (ROOT / "CHANGELOG.md").read_text()
+
+
+def test_actor_json_references_assemblyai_secret_by_name_only():
+    a = load("actor.json")
+    assert a["environmentVariables"] == {"ASSEMBLYAI_API_KEY": "@assemblyaiApiKey"}
+    raw = (ROOT / ".actor" / "actor.json").read_text()
+    assert not re.search(r"AIza|sk-[A-Za-z0-9]|gsk_|[0-9a-f]{32}|[A-Za-z0-9_-]{40,}", raw)
+    assert raw.count("@") == 1

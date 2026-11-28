@@ -122,7 +122,15 @@ def parse_assemblyai(data: dict) -> Result:
                  "speaker": f"spk_{_spk(u['speaker'])}" if u.get("speaker") else None} for u in utter]
     else:
         segs = words_to_segments(words)
-    return Result(segs, words or None, _lang(data.get("language_code")), data.get("speech_model") or "universal-2")
+    return Result(segs, words or None, _lang(data.get("language_code")), _used_model(data))
+
+
+def _used_model(data: dict) -> str:
+    used = data.get("speech_model_used")
+    if not used:
+        models = data.get("speech_models")
+        used = models[0] if isinstance(models, list) and models and isinstance(models[0], str) else data.get("speech_model")
+    return used if isinstance(used, str) and used else "universal-2"
 
 
 def _spk(label) -> int:
@@ -184,9 +192,11 @@ class AssemblyAI(Engine):
     MAX_POLLS = 1200
 
     async def transcribe(self, path, *, language, speakers, words):
+        if not self.key:
+            raise EngineError("assemblyai: ASSEMBLYAI_API_KEY is not set", transient=False)
         h = {"authorization": self.key}
         r = await self._post(f"{self.BASE}/upload", headers=h, content=path.read_bytes())
-        body = {"audio_url": r.json()["upload_url"], "speaker_labels": bool(speakers), "speech_model": "universal"}
+        body = {"audio_url": r.json()["upload_url"], "speaker_labels": bool(speakers), "speech_models": [self.model]}
         if language:
             body["language_code"] = language
         else:

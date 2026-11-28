@@ -13,6 +13,9 @@
   "storages": {
     "dataset": "./dataset_schema.json"
   },
+  "environmentVariables": {
+    "ASSEMBLYAI_API_KEY": "@assemblyaiApiKey"
+  },
   "dockerfile": "../Dockerfile",
   "readme": "../README.md",
   "minMemoryMbytes": 512,

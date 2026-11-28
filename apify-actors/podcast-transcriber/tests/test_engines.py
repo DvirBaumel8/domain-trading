@@ -92,6 +92,27 @@ def test_u14_adapters_send_the_key_only_in_a_header(tmp_path, monkeypatch):
     _key_only_in_header(seen, CANARIES["ASSEMBLYAI_API_KEY"])
 
 
+def test_assemblyai_request_uses_speech_models_list(tmp_path, monkeypatch):
+    routes = {"https://api.assemblyai.com/v2/upload": httpx.Response(200, json={"upload_url": "https://cdn.assemblyai.com/upload/x"}),
+              "https://api.assemblyai.com/v2/transcript/": httpx.Response(200, json=load("stt-assemblyai.synthetic.json")),
+              "https://api.assemblyai.com/v2/transcript": httpx.Response(200, json={"id": "synthetic-id", "status": "queued"})}
+    res, seen = _adapter_run(AssemblyAI, routes, tmp_path, monkeypatch)
+    posts = [json.loads(r.content) for r in seen if r.method == "POST" and r.url.path == "/v2/transcript"]
+    assert len(posts) == 1
+    assert "speech_model" not in posts[0]
+    assert posts[0]["speech_models"] == ["universal-2"]
+    assert res.model == "universal-2"
+
+
+def test_assemblyai_without_key_is_a_clear_error(tmp_path, monkeypatch):
+    monkeypatch.delenv("ASSEMBLYAI_API_KEY", raising=False)
+    p = tmp_path / "c.mp3"
+    p.write_bytes(b"x")
+    eng = AssemblyAI(httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(500))))
+    with pytest.raises(engines.EngineError, match="ASSEMBLYAI_API_KEY is not set"):
+        run(eng.transcribe(p, language=None, speakers=False, words=False))
+
+
 def _tr(engs, tmp_path, **kw):
     src = tmp_path / "a.mp3"
     src.write_bytes(b"x")

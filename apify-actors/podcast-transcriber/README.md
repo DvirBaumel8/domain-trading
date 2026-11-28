@@ -63,3 +63,7 @@ You confirm with a checkbox that you may transcribe the recordings you submit: t
 ## Permissions
 
 This Actor needs only limited permissions: it reads its input and writes to its own default dataset. It also writes transcript files to its default key-value store.
+
+## Deploying from the repo
+
+`.actor/actor.json` passes `ASSEMBLYAI_API_KEY` to the run as the Apify account secret `@assemblyaiApiKey`. That secret must already exist in the Apify account under the name `assemblyaiApiKey` before a push, or the run will not receive `ASSEMBLYAI_API_KEY`. No secret value is kept in this repo. If the key is missing, the AssemblyAI engine is skipped while another engine still has a key; if no engine has a key, the run ends as `stt_failed`.

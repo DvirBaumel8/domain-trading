@@ -4,7 +4,8 @@
   "id": "synthetic-id",
   "status": "completed",
   "language_code": "en",
-  "speech_model": "universal",
+  "speech_models": ["universal-2"],
+  "speech_model_used": "universal-2",
   "text": "Introduction to the Meditations of Marcus Aurelius. This is a LibriVox recording.",
   "words": [
     {"text": "Introduction", "start": 800, "end": 1400, "confidence": 0.99, "speaker": "A"}, {"text": "to", "start": 1400, "end": 1500, "confidence": 0.99, "speaker": "A"},
