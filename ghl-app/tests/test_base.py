@@ -79,7 +79,11 @@ class TestModules(Base):
     def test_app_routes(self):
         import app
         self.assertIn(("GET", "/health"), app.ROUTES)
-        self.assertEqual(len(app.ROUTES), 7)
+        for name in ("oauth", "store", "runs", "page"):
+            routes = {}
+            importlib.import_module(name).register(routes)
+            for key in routes:
+                self.assertIn(key, app.ROUTES)
 
 
 if __name__ == "__main__":
