@@ -48,8 +48,9 @@ def http_get(path: str, token: str) -> tuple[int, object]:
         return status, None
 
 
-def get(path: str, token: str, http=http_get, sleep=time.sleep, soft=False):
-    """Returns the `data` of a 200. 401 fails at once; 429/5xx back off then fail. soft: other 4xx -> None."""
+def get(path: str, token: str, http=http_get, sleep=time.sleep, soft=False, soft404=False):
+    """Returns the `data` of a 200. 401 fails at once; 429/5xx back off then fail.
+    soft: other 4xx -> None. soft404: only a 404 -> None (logged, no URL); other 4xx still fail."""
     for attempt in range(RETRIES):
         status, body = http(path, token)
         if status == 200:
@@ -63,15 +64,22 @@ def get(path: str, token: str, http=http_get, sleep=time.sleep, soft=False):
             raise UsageError(f"HTTP {status} from Apify after {RETRIES} tries")
         if soft:
             return None
+        if soft404 and status == 404:
+            print("HTTP 404 from Apify on a per-actor call; field recorded as unavailable", file=sys.stderr)
+            return None
         raise UsageError(f"HTTP {status} from Apify")
     raise UsageError("unreachable")
 
 
-def paginate(path: str, token: str, **kw) -> tuple[list, int]:
+def paginate(path: str, token: str, **kw) -> tuple[list, int | None]:
+    """With soft404 in kw, a 404 on the first page gives ([], None); a 404 later keeps what was read."""
     sep = "&" if "?" in path else "?"
     items, offset, total = [], 0, None
     while True:
-        page = get(f"{path}{sep}limit={PAGE}&offset={offset}", token, **kw) or {}
+        page = get(f"{path}{sep}limit={PAGE}&offset={offset}", token, **kw)
+        if page is None and kw.get("soft404") and offset == 0:
+            return [], None
+        page = page or {}
         batch = page.get("items") or []
         total = page.get("total", total)
         items.extend(batch)
@@ -110,22 +118,26 @@ def price_view(actor: dict, now: datetime) -> dict:
 
 
 def actor_report(item: dict, token: str, now: datetime, our_id, **kw) -> dict:
-    actor = get(f"/v2/acts/{item['id']}", token, **kw) or {}
+    """Per-actor calls tolerate a 404: that field is None (unavailable) and the report goes on."""
+    kw = {**kw, "soft404": True}
+    actor_data = get(f"/v2/acts/{item['id']}", token, **kw)
+    actor = actor_data or {}
     stats = actor.get("stats") or {}
     runs, runs_total = paginate(f"/v2/acts/{item['id']}/runs?desc=1", token, **kw)
     reviews, reviews_total = paginate(f"/v2/acts/{item['id']}/reviews", token, **kw)
-    issues_data = get(f"/v2/acts/{item['id']}/issues?limit=1", token, soft=True, **kw)
+    issues_data = get(f"/v2/acts/{item['id']}/issues?limit=1", token, soft=True, **{k: v for k, v in kw.items() if k != "soft404"})
     issues_total = None if issues_data is None else issues_data.get("total", len(issues_data.get("items") or []))
-    total_runs = stats.get("totalRuns") or 0
+    total_runs = None if actor_data is None else (stats.get("totalRuns") or 0)
     by_status: dict = {}
     for r in runs:
         by_status[r.get("status") or "UNKNOWN"] = by_status.get(r.get("status") or "UNKNOWN", 0) + 1
+    others = None if total_runs is None or runs_total is None else max(0, total_runs - runs_total)
     return {
-        "id": actor.get("id"), "name": actor.get("name"), "isPublic": actor.get("isPublic"),
+        "id": actor.get("id") or item["id"], "name": actor.get("name"), "isPublic": actor.get("isPublic"),
         "prices": price_view(actor, now),
         "users": {"total_includes_owner": stats.get("totalUsers"), "active_7d": stats.get("totalUsers7Days"),
                   "active_30d": stats.get("totalUsers30Days"), "active_90d": stats.get("totalUsers90Days")},
-        "runs": {"total": total_runs, "ours": runs_total, "others_all_time": max(0, total_runs - runs_total),
+        "runs": {"total": total_runs, "ours": runs_total, "others_all_time": others,
                  "ours_by_status": by_status, "last_started_at": runs[0].get("startedAt") if runs else None},
         "reviews": {"total": reviews_total, "rating": stats.get("actorReviewRating")},
         "issues": {"total": issues_total},

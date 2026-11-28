@@ -314,6 +314,41 @@ def test_failure_writes_no_file(tmp_path, status):
     assert (len(sleeps) == usage.RETRIES - 1) if status == 429 else sleeps == []  # backoff only on 429
 
 
+@pytest.mark.parametrize("sub", ["/reviews", "/runs", "/v2/acts/A"])
+def test_404_on_per_actor_call_is_soft(tmp_path, sub):
+    acts = {"A": {"actor": actor("A", 3), "runs": [], "reviews": [], "issues": []},
+            "B": {"actor": actor("B", 1), "runs": [], "reviews": [], "issues": []}}
+    http0, _ = fake_api(acts)
+
+    def http(path, token):
+        if path.startswith("/v2/acts/A") and (path == sub or (sub != "/v2/acts/A" and sub in path)):
+            return 404, {"error": {}}
+        return http0(path, token)
+
+    p = usage.run("t", tmp_path, tmp_path, NOW, http=http, sleep=lambda s: None)
+    rep = json.loads(p.read_text())
+    a, b = rep["actors"]
+    assert a["id"] == "A" and b["runs"]["total"] == 1  # other actor unaffected
+    if sub == "/reviews":
+        assert a["reviews"]["total"] is None and a["runs"]["total"] == 3
+    elif sub == "/runs":
+        assert a["runs"]["ours"] is None and a["runs"]["others_all_time"] is None
+    else:
+        assert a["runs"]["total"] is None and a["name"] is None
+    assert rep["deltas"]["A"]["new_reviews"] is None or sub != "/reviews"
+
+
+def test_404_on_users_me_fails_job(tmp_path):
+    http0, _ = fake_api({"A": {"actor": actor("A"), "runs": [], "reviews": [], "issues": []}})
+
+    def http(path, token):
+        return (404, {"error": {}}) if path == "/v2/users/me" else http0(path, token)
+
+    with pytest.raises(usage.UsageError, match="404"):
+        usage.run("t", tmp_path / "usage", tmp_path / "usage", NOW, http=http)
+    assert not (tmp_path / "usage").exists()
+
+
 def test_earnings_note_and_no_email(tmp_path):
     http, _ = fake_api({"A": {"actor": actor("A"), "runs": [], "reviews": [], "issues": []}})
     p = usage.run("t", tmp_path, tmp_path, NOW, http=http)
