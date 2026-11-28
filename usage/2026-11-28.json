@@ -1,0 +1,409 @@
+{
+  "account": {
+    "plan": "FREE",
+    "username": "looped_kite"
+  },
+  "actors": [
+    {
+      "earnings": "unavailable",
+      "id": "VnrYq91nbRYrRMmS1",
+      "isPublic": true,
+      "issues": {
+        "total": null
+      },
+      "name": "bulk-dns-email-auth-checker",
+      "prices": {
+        "current": {
+          "events": {
+            "apify-actor-start": 5e-05,
+            "result": {
+              "BRONZE": 0.0016,
+              "DIAMOND": 0.001,
+              "FREE": 0.002,
+              "GOLD": 0.001,
+              "PLATINUM": 0.001,
+              "SILVER": 0.0013
+            }
+          },
+          "pricingModel": "PAY_PER_EVENT",
+          "startedAt": "2026-11-26T09:29:33.956Z"
+        },
+        "pending": []
+      },
+      "reviews": {
+        "rating": 0,
+        "total": null
+      },
+      "runs": {
+        "last_started_at": "2026-11-26T15:51:54.600Z",
+        "others_all_time": 1,
+        "ours": 11,
+        "ours_by_status": {
+          "FAILED": 1,
+          "SUCCEEDED": 10
+        },
+        "total": 12
+      },
+      "users": {
+        "active_30d": 1,
+        "active_7d": 1,
+        "active_90d": 1,
+        "total_includes_owner": 2
+      }
+    },
+    {
+      "earnings": "unavailable",
+      "id": "HcsxPAYrb95rOsOrQ",
+      "isPublic": true,
+      "issues": {
+        "total": null
+      },
+      "name": "sitemap-url-extractor",
+      "prices": {
+        "current": {
+          "events": {
+            "apify-actor-start": 5e-05,
+            "result": {
+              "BRONZE": 0.0003,
+              "DIAMOND": 0.0001,
+              "FREE": 0.0005,
+              "GOLD": 0.0001,
+              "PLATINUM": 0.0001,
+              "SILVER": 0.0002
+            }
+          },
+          "pricingModel": "PAY_PER_EVENT",
+          "startedAt": "2026-11-26T09:29:35.882Z"
+        },
+        "pending": []
+      },
+      "reviews": {
+        "rating": 0,
+        "total": null
+      },
+      "runs": {
+        "last_started_at": "2026-11-27T07:52:41.509Z",
+        "others_all_time": 1,
+        "ours": 19,
+        "ours_by_status": {
+          "FAILED": 3,
+          "SUCCEEDED": 16
+        },
+        "total": 20
+      },
+      "users": {
+        "active_30d": 1,
+        "active_7d": 1,
+        "active_90d": 1,
+        "total_includes_owner": 2
+      }
+    },
+    {
+      "earnings": "unavailable",
+      "id": "mKqSGmlx8krmtqgpU",
+      "isPublic": true,
+      "issues": {
+        "total": null
+      },
+      "name": "bulk-domain-availability-checker",
+      "prices": {
+        "current": {
+          "events": {
+            "apify-actor-start": 5e-05,
+            "result": {
+              "BRONZE": 0.002,
+              "DIAMOND": 0.0012,
+              "FREE": 0.0025,
+              "GOLD": 0.0012,
+              "PLATINUM": 0.0012,
+              "SILVER": 0.0015
+            }
+          },
+          "pricingModel": "PAY_PER_EVENT",
+          "startedAt": "2026-11-26T09:29:38.036Z"
+        },
+        "pending": []
+      },
+      "reviews": {
+        "rating": 0,
+        "total": null
+      },
+      "runs": {
+        "last_started_at": "2026-11-27T07:52:39.607Z",
+        "others_all_time": 1,
+        "ours": 18,
+        "ours_by_status": {
+          "FAILED": 4,
+          "SUCCEEDED": 14
+        },
+        "total": 19
+      },
+      "users": {
+        "active_30d": 1,
+        "active_7d": 1,
+        "active_90d": 1,
+        "total_includes_owner": 2
+      }
+    },
+    {
+      "earnings": "unavailable",
+      "id": "Hfr4MI0LjpkjEYXcA",
+      "isPublic": true,
+      "issues": {
+        "total": null
+      },
+      "name": "domain-checkup-report",
+      "prices": {
+        "current": {
+          "events": {
+            "apify-actor-start": 5e-05,
+            "report": {
+              "BRONZE": 0.022,
+              "DIAMOND": 0.016,
+              "FREE": 0.025,
+              "GOLD": 0.016,
+              "PLATINUM": 0.016,
+              "SILVER": 0.019
+            }
+          },
+          "pricingModel": "PAY_PER_EVENT",
+          "startedAt": "2026-11-25T11:01:33.024Z"
+        },
+        "pending": []
+      },
+      "reviews": {
+        "rating": 0,
+        "total": null
+      },
+      "runs": {
+        "last_started_at": "2026-11-27T08:31:14.596Z",
+        "others_all_time": 1,
+        "ours": 11,
+        "ours_by_status": {
+          "FAILED": 1,
+          "SUCCEEDED": 10
+        },
+        "total": 12
+      },
+      "users": {
+        "active_30d": 1,
+        "active_7d": 1,
+        "active_90d": 1,
+        "total_includes_owner": 2
+      }
+    },
+    {
+      "earnings": "unavailable",
+      "id": "IkdbAa0f9FDvlmidW",
+      "isPublic": false,
+      "issues": {
+        "total": null
+      },
+      "name": "wayback-domain-history",
+      "prices": {
+        "current": null,
+        "pending": []
+      },
+      "reviews": {
+        "rating": null,
+        "total": null
+      },
+      "runs": {
+        "last_started_at": "2026-11-26T11:32:21.363Z",
+        "others_all_time": 0,
+        "ours": 2,
+        "ours_by_status": {
+          "SUCCEEDED": 2
+        },
+        "total": 2
+      },
+      "users": {
+        "active_30d": 0,
+        "active_7d": 0,
+        "active_90d": 0,
+        "total_includes_owner": 1
+      }
+    },
+    {
+      "earnings": "unavailable",
+      "id": "LMy1jvSaxBuRsQzYd",
+      "isPublic": true,
+      "issues": {
+        "total": null
+      },
+      "name": "broken-link-auditor",
+      "prices": {
+        "current": {
+          "events": {
+            "apify-actor-start": 5e-05,
+            "result": {
+              "BRONZE": 0.0005,
+              "DIAMOND": 0.0004,
+              "FREE": 0.0006,
+              "GOLD": 0.0004,
+              "PLATINUM": 0.0004,
+              "SILVER": 0.00045
+            }
+          },
+          "pricingModel": "PAY_PER_EVENT",
+          "startedAt": "2026-11-26T13:08:29.881Z"
+        },
+        "pending": []
+      },
+      "reviews": {
+        "rating": 0,
+        "total": null
+      },
+      "runs": {
+        "last_started_at": "2026-11-27T07:52:37.862Z",
+        "others_all_time": 0,
+        "ours": 21,
+        "ours_by_status": {
+          "SUCCEEDED": 18,
+          "TIMED-OUT": 3
+        },
+        "total": 21
+      },
+      "users": {
+        "active_30d": 0,
+        "active_7d": 0,
+        "active_90d": 0,
+        "total_includes_owner": 1
+      }
+    },
+    {
+      "earnings": "unavailable",
+      "id": "N3kP7mY8JfUQ1LsDo",
+      "isPublic": true,
+      "issues": {
+        "total": null
+      },
+      "name": "bulk-pagespeed-checker",
+      "prices": {
+        "current": {
+          "events": {
+            "apify-actor-start": 5e-05,
+            "result": {
+              "BRONZE": 0.0014,
+              "DIAMOND": 0.0012,
+              "FREE": 0.0015,
+              "GOLD": 0.0012,
+              "PLATINUM": 0.0012,
+              "SILVER": 0.0013
+            }
+          },
+          "pricingModel": "PAY_PER_EVENT",
+          "startedAt": "2026-11-26T13:36:41.295Z"
+        },
+        "pending": []
+      },
+      "reviews": {
+        "rating": 0,
+        "total": null
+      },
+      "runs": {
+        "last_started_at": "2026-11-26T15:52:01.276Z",
+        "others_all_time": 0,
+        "ours": 13,
+        "ours_by_status": {
+          "FAILED": 1,
+          "SUCCEEDED": 12
+        },
+        "total": 13
+      },
+      "users": {
+        "active_30d": 0,
+        "active_7d": 0,
+        "active_90d": 0,
+        "total_includes_owner": 1
+      }
+    },
+    {
+      "earnings": "unavailable",
+      "id": "mRBZmcvl4GYbW1zqn",
+      "isPublic": false,
+      "issues": {
+        "total": null
+      },
+      "name": "ai-brand-mention-check",
+      "prices": {
+        "current": null,
+        "pending": []
+      },
+      "reviews": {
+        "rating": null,
+        "total": null
+      },
+      "runs": {
+        "last_started_at": "2026-11-27T08:15:26.711Z",
+        "others_all_time": 0,
+        "ours": 7,
+        "ours_by_status": {
+          "FAILED": 2,
+          "SUCCEEDED": 5
+        },
+        "total": 7
+      },
+      "users": {
+        "active_30d": 0,
+        "active_7d": 0,
+        "active_90d": 0,
+        "total_includes_owner": 1
+      }
+    }
+  ],
+  "date": "2026-11-28",
+  "deltas": {
+    "HcsxPAYrb95rOsOrQ": {
+      "new_issues": null,
+      "new_reviews": null,
+      "new_runs_by_others": null,
+      "new_users": null
+    },
+    "Hfr4MI0LjpkjEYXcA": {
+      "new_issues": null,
+      "new_reviews": null,
+      "new_runs_by_others": null,
+      "new_users": null
+    },
+    "IkdbAa0f9FDvlmidW": {
+      "new_issues": null,
+      "new_reviews": null,
+      "new_runs_by_others": null,
+      "new_users": null
+    },
+    "LMy1jvSaxBuRsQzYd": {
+      "new_issues": null,
+      "new_reviews": null,
+      "new_runs_by_others": null,
+      "new_users": null
+    },
+    "N3kP7mY8JfUQ1LsDo": {
+      "new_issues": null,
+      "new_reviews": null,
+      "new_runs_by_others": null,
+      "new_users": null
+    },
+    "VnrYq91nbRYrRMmS1": {
+      "new_issues": null,
+      "new_reviews": null,
+      "new_runs_by_others": null,
+      "new_users": null
+    },
+    "mKqSGmlx8krmtqgpU": {
+      "new_issues": null,
+      "new_reviews": null,
+      "new_runs_by_others": null,
+      "new_users": null
+    },
+    "mRBZmcvl4GYbW1zqn": {
+      "new_issues": null,
+      "new_reviews": null,
+      "new_runs_by_others": null,
+      "new_users": null
+    }
+  },
+  "earnings_note": "Earnings and other users' charged events are not available through the official Apify API; none are reported. Source: Console > Insights > Analytics and Payouts.",
+  "generatedAt": "2026-11-28T20:07:45+02:00",
+  "our_platform_usage_usd_this_cycle": 0.13272850222956611
+}
