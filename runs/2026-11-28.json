@@ -1,0 +1,84 @@
+{
+  "date": "2026-11-28",
+  "kills": {
+    "read": 1660,
+    "unreadable_lines": 0
+  },
+  "files": {
+    "auction": {
+      "file_built_at": "2026-11-28T15:57:59+02:00",
+      "counts": {
+        "read": 96265,
+        "not_com": 56083,
+        "not_letters": 10188,
+        "too_long": 14596,
+        "unreadable": 0
+      },
+      "dropped": {
+        "no_bid": 15102,
+        "adult": 107,
+        "over_total": 1,
+        "over_per_name": 12
+      },
+      "checked": 176,
+      "logged": 175
+    },
+    "closeout": {
+      "file_built_at": "2026-11-28T16:01:05+02:00",
+      "counts": {
+        "read": 465409,
+        "not_com": 284045,
+        "not_letters": 36410,
+        "too_long": 70548,
+        "unreadable": 0
+      },
+      "dropped": {
+        "ended": 6894,
+        "price": 40509,
+        "adult": 460,
+        "no_demand_sign": 26078,
+        "already_logged": 273
+      },
+      "checked": 192,
+      "logged": 190
+    }
+  },
+  "killed": [
+    {
+      "domain": "movaras.com",
+      "source": "auction",
+      "by": "web_risk",
+      "evidence": [
+        "SOCIAL_ENGINEERING"
+      ]
+    },
+    {
+      "domain": "rukub.com",
+      "source": "closeout",
+      "by": "web_risk",
+      "evidence": [
+        "SOCIAL_ENGINEERING"
+      ]
+    },
+    {
+      "domain": "sseddy.com",
+      "source": "closeout",
+      "by": "web_risk",
+      "evidence": [
+        "SOCIAL_ENGINEERING"
+      ]
+    }
+  ],
+  "history_coverage": {
+    "checked": 1,
+    "reused": 0,
+    "not_checked": 356,
+    "error": 8
+  },
+  "closes": 527,
+  "totals": {
+    "auctions": 1028,
+    "closeouts": 1419,
+    "with_last_price": 1746
+  }
+}
