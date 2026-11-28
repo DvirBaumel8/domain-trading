@@ -43,9 +43,17 @@ class H(http.server.BaseHTTPRequestHandler):
         pass
 
     def _send(self, status, payload):
-        raw = json.dumps(payload).encode()
+        extra = {}
+        if hasattr(payload, "body"):            # page.Html: raw body, own type and headers
+            raw, ctype, extra = payload.body, payload.content_type, dict(payload.headers)
+        else:
+            raw, ctype = json.dumps(payload).encode(), "application/json"
+            if status in (301, 302, 303, 307) and isinstance(payload, dict) and payload.get("location"):
+                extra["Location"] = str(payload["location"])
         self.send_response(status)
-        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Type", ctype)
+        for k, v in extra.items():
+            self.send_header(k, v)
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
         if self.command != "HEAD":
