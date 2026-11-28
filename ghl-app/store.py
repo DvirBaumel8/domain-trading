@@ -1,8 +1,9 @@
 """Data layer: one Store interface, SQLite (default) or Postgres (DATABASE_URL). Never stores Gemini output.
 
 Retention: the newest 12 runs per location and engine are kept (a run is one engine's pass over the prompts).
-Spend rows are global (no location) and are not touched by delete_location.
-Tokens are encrypted at rest with a key from env GHL_TOKEN_KEY (stdlib only: HMAC-SHA256 stream + HMAC tag).
+Spend rows keep the global totals after an uninstall: delete_location only unlinks their location id.
+Tokens (location and company) are encrypted at rest with the key GHL_TOKEN_KEY, read through config
+(stdlib only: HMAC-SHA256 stream + HMAC tag). get_store() is the one shared Store for the whole app.
 """
 import base64, hashlib, hmac, json, os, sqlite3, threading
 from datetime import datetime, timezone
@@ -28,7 +29,7 @@ def _now():
 
 # ---- token encryption -------------------------------------------------------
 def _keys():
-    raw = (os.environ.get(KEY_ENV) or "").strip()
+    raw = config.get()[KEY_ENV]
     if not raw:
         raise StoreError("no_encryption_key", f"{KEY_ENV} is not set; tokens cannot be stored")
     root = hashlib.sha256(raw.encode()).digest()
@@ -92,10 +93,26 @@ MIGRATIONS = [
         """CREATE TABLE spend (
             date TEXT NOT NULL, engine TEXT NOT NULL, usd DOUBLE PRECISION NOT NULL)""",
     ]),
+    (2, [
+        "ALTER TABLE installs ADD COLUMN expires_at BIGINT",
+        "ALTER TABLE installs ADD COLUMN user_type TEXT",
+        "ALTER TABLE installs ADD COLUMN scopes TEXT",
+        "ALTER TABLE installs ADD COLUMN plan TEXT NOT NULL DEFAULT 'trial'",
+        """CREATE TABLE company_tokens (
+            company_id TEXT PRIMARY KEY, access_token_enc TEXT, refresh_token_enc TEXT, expires_at BIGINT)""",
+        """CREATE TABLE run_claims (
+            location_id TEXT NOT NULL, run_key TEXT NOT NULL, claimed_at TEXT NOT NULL,
+            PRIMARY KEY (location_id, run_key))""",
+        "ALTER TABLE spend ADD COLUMN location_id TEXT",
+        "CREATE INDEX spend_date ON spend(date)",
+    ]),
 ]
 
 INSTALL_FIELDS = ("company_id", "business_name", "business_website", "business_category", "business_city",
-                  "trial_started_at", "status")
+                  "trial_started_at", "status", "expires_at", "user_type", "scopes", "plan")
+_INSTALL_COLS = ("location_id", "company_id", "business_name", "business_website", "business_category",
+                 "business_city", "access_token_enc", "refresh_token_enc", "installed_at", "trial_started_at",
+                 "status", "expires_at", "user_type", "scopes", "plan")
 
 
 class Store:
@@ -172,20 +189,73 @@ class Store:
                 self._exec(f"UPDATE installs SET {cols} WHERE location_id=?", (*sets.values(), location_id))
         self._tx(go)
 
+    def save_install(self, location_id, company_id, access_token, refresh_token, expires_at, user_type, scopes):
+        """Create or update an install with its (encrypted) tokens; expires_at is epoch seconds."""
+        self.upsert_install(location_id, access_token, refresh_token, company_id=company_id,
+                            expires_at=int(expires_at) if expires_at is not None else None,
+                            user_type=user_type, scopes=scopes, status="active")
+
     def get_install(self, location_id, with_tokens=False):
         with self._lock:
-            cur = self._exec("SELECT location_id, company_id, business_name, business_website, business_category, "
-                             "business_city, access_token_enc, refresh_token_enc, installed_at, trial_started_at, status "
-                             "FROM installs WHERE location_id=?", (location_id,))
+            cur = self._exec(f"SELECT {', '.join(_INSTALL_COLS)} FROM installs WHERE location_id=?", (location_id,))
             row = cur.fetchone()
         if not row:
             return None
-        d = dict(zip(("location_id", "company_id", "business_name", "business_website", "business_category",
-                      "business_city", "access_token", "refresh_token", "installed_at", "trial_started_at", "status"), row))
-        a, r = d.pop("access_token"), d.pop("refresh_token")
+        d = dict(zip(_INSTALL_COLS, row))
+        a, r = d.pop("access_token_enc"), d.pop("refresh_token_enc")
         if with_tokens:
             d["access_token"], d["refresh_token"] = decrypt(a), decrypt(r)
         return d
+
+    def update_location(self, location_id, name=None, website=None, city=None, category=None):
+        """Update business fields of an installed location; None leaves a field as is. False if not installed."""
+        sets = {k: v for k, v in (("business_name", name), ("business_website", website), ("business_city", city),
+                                  ("business_category", category)) if v is not None}
+
+        def go():
+            if not self._exec("SELECT 1 FROM installs WHERE location_id=?", (location_id,)).fetchone():
+                return False
+            if sets:
+                cols = ", ".join(f"{k}=?" for k in sets)
+                self._exec(f"UPDATE installs SET {cols} WHERE location_id=?", (*sets.values(), location_id))
+            return True
+        return self._tx(go)
+
+    @staticmethod
+    def _loc(d):
+        """Install row -> the location dict the run engine uses."""
+        return {"id": d["location_id"], "agency_id": d["company_id"], "name": d["business_name"] or "",
+                "website": d["business_website"] or "", "category": d["business_category"] or "",
+                "city": d["business_city"] or "", "plan": d["plan"] or "trial", "installed_at": d["installed_at"],
+                "active": d["status"] == "active"}
+
+    def get_location(self, location_id):
+        d = self.get_install(location_id)
+        return self._loc(d) if d else None
+
+    def list_locations(self):
+        with self._lock:
+            rows = self._exec(f"SELECT {', '.join(_INSTALL_COLS)} FROM installs ORDER BY installed_at, location_id").fetchall()
+        return [self._loc(dict(zip(_INSTALL_COLS, r))) for r in rows]
+
+    # -- company (agency) tokens
+    def save_company_token(self, company_id, access_token, refresh_token, expires_at):
+        at, rt = encrypt(access_token), encrypt(refresh_token)
+
+        def go():
+            self._exec("DELETE FROM company_tokens WHERE company_id=?", (company_id,))
+            self._exec("INSERT INTO company_tokens (company_id, access_token_enc, refresh_token_enc, expires_at) "
+                       "VALUES (?, ?, ?, ?)", (company_id, at, rt, int(expires_at) if expires_at is not None else None))
+        self._tx(go)
+
+    def get_company_token(self, company_id):
+        with self._lock:
+            row = self._exec("SELECT access_token_enc, refresh_token_enc, expires_at FROM company_tokens "
+                             "WHERE company_id=?", (company_id,)).fetchone()
+        if not row:
+            return None
+        return {"company_id": company_id, "access_token": decrypt(row[0]), "refresh_token": decrypt(row[1]),
+                "expires_at": row[2]}
 
     # -- prompts
     def add_prompt(self, location_id, text):
@@ -206,8 +276,36 @@ class Store:
             rows = self._exec("SELECT id, text FROM prompts WHERE location_id=? ORDER BY id", (location_id,)).fetchall()
         return [{"id": i, "text": t} for i, t in rows]
 
+    def replace_prompts(self, location_id, texts):
+        """Replace all prompts of a location in one transaction (empty list = back to the defaults)."""
+        texts = [(t or "").strip() for t in texts]
+        texts = [t for t in texts if t]
+        if len(texts) > MAX_PROMPTS:
+            raise StoreError("prompt_cap", f"at most {MAX_PROMPTS} prompts per location")
+
+        def go():
+            self._exec("DELETE FROM prompts WHERE location_id=?", (location_id,))
+            for t in texts:
+                self._exec("INSERT INTO prompts (location_id, text) VALUES (?, ?)", (location_id, t))
+        self._tx(go)
+        return self.list_prompts(location_id)
+
     def delete_prompt(self, location_id, prompt_id):
         self._tx(lambda: self._exec("DELETE FROM prompts WHERE location_id=? AND id=?", (location_id, prompt_id)))
+
+    # -- run claims (atomic: one (location, run key) is claimed once, ever)
+    def claim_run(self, location_id, run_key):
+        """True if this call claimed the key; False if it was already claimed."""
+        def go():
+            cur = self._exec("INSERT INTO run_claims (location_id, run_key, claimed_at) VALUES (?, ?, ?) "
+                             "ON CONFLICT (location_id, run_key) DO NOTHING", (location_id, run_key, _now()))
+            return cur.rowcount == 1
+        return self._tx(go)
+
+    def has_run(self, location_id, run_key):
+        with self._lock:
+            return bool(self._exec("SELECT 1 FROM run_claims WHERE location_id=? AND run_key=?",
+                                   (location_id, run_key)).fetchone())
 
     # -- runs and answers
     @staticmethod
@@ -273,30 +371,36 @@ class Store:
                 for i, s, e, t, m in rows]
 
     # -- spend
-    def add_spend(self, date, engine, usd):
-        self._tx(lambda: self._exec("INSERT INTO spend (date, engine, usd) VALUES (?, ?, ?)", (date, engine, float(usd))))
+    def add_spend(self, date, engine, usd, location_id=None):
+        self._tx(lambda: self._exec("INSERT INTO spend (date, engine, usd, location_id) VALUES (?, ?, ?, ?)",
+                                    (date, engine, float(usd), location_id)))
 
-    def spend_total(self, month_prefix=None):
+    def spend_total(self, month_prefix=None, location_id=None):
+        q, args, where = "SELECT COALESCE(SUM(usd), 0) FROM spend", [], []
+        if month_prefix:
+            where.append("date LIKE ?")
+            args.append(month_prefix + "%")
+        if location_id:
+            where.append("location_id=?")
+            args.append(location_id)
         with self._lock:
-            if month_prefix:
-                r = self._exec("SELECT COALESCE(SUM(usd), 0) FROM spend WHERE date LIKE ?", (month_prefix + "%",))
-            else:
-                r = self._exec("SELECT COALESCE(SUM(usd), 0) FROM spend")
+            r = self._exec(q + (" WHERE " + " AND ".join(where) if where else ""), tuple(args))
             return float(r.fetchone()[0])
 
     # -- uninstall
     def delete_location(self, location_id):
         def go():
             self._exec("DELETE FROM answers WHERE run_id IN (SELECT id FROM runs WHERE location_id=?)", (location_id,))
-            for t in ("runs", "prompts", "installs"):
+            for t in ("runs", "prompts", "run_claims", "installs"):
                 self._exec(f"DELETE FROM {t} WHERE location_id=?", (location_id,))
+            self._exec("UPDATE spend SET location_id=NULL WHERE location_id=?", (location_id,))
         self._tx(go)
 
     def count_rows(self, location_id):
         """Rows still held for a location (installs, prompts, runs, answers); 0 after delete_location."""
         with self._lock:
             n = 0
-            for t in ("installs", "prompts", "runs"):
+            for t in ("installs", "prompts", "runs", "run_claims"):
                 n += self._exec(f"SELECT COUNT(*) FROM {t} WHERE location_id=?", (location_id,)).fetchone()[0]
             n += self._exec("SELECT COUNT(*) FROM answers WHERE run_id IN (SELECT id FROM runs WHERE location_id=?)",
                             (location_id,)).fetchone()[0]
@@ -305,6 +409,26 @@ class Store:
 
 def open_store(url=None):
     return Store(url)
+
+
+_shared = None
+_shared_lock = threading.Lock()
+
+
+def get_store():
+    """The one shared Store, created lazily from DATABASE_URL."""
+    global _shared
+    with _shared_lock:
+        if _shared is None:
+            _shared = Store(config.get()["DATABASE_URL"])
+        return _shared
+
+
+def set_store(store=None):
+    """Replace the shared Store (tests); None resets it so the next get_store() opens a new one."""
+    global _shared
+    with _shared_lock:
+        _shared = store
 
 
 def handle_todo(req):

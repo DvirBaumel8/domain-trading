@@ -3,7 +3,7 @@ import importlib, json, os, sys, threading, unittest, urllib.request
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 ENV_KEYS = ("GHL_CLIENT_ID", "GHL_CLIENT_SECRET", "GHL_SHARED_SECRET", "GHL_WEBHOOK_PUBLIC_KEY", "DATABASE_URL",
             "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "PERPLEXITY_API_KEY", "GHL_MONTHLY_CAP_USD",
-            "GHL_PER_LOCATION_CAP_USD", "GHL_TRIAL_MAX_LOCATIONS", "PORT", "GHL_APP_ENABLED")
+            "GHL_PER_LOCATION_CAP_USD", "GHL_TRIAL_MAX_LOCATIONS", "GHL_TOKEN_KEY", "GHL_CRON_SECRET", "PORT", "GHL_APP_ENABLED")
 
 
 class Base(unittest.TestCase):

@@ -112,6 +112,98 @@ class StoreContract:
         self.assertAlmostEqual(self.s.spend_total("2026-04") - before, 0.75)
         self.s.add_spend("2026-04-03", "gemini", 0.1)  # spend is cost only, not output
 
+    def test_save_install_roundtrip_with_expiry(self):
+        self.s.save_install(self.LOC, "co-test", "AT", "RT", 1234, "Location", "locations.readonly")
+        d = self.s.get_install(self.LOC, with_tokens=True)
+        self.assertEqual((d["access_token"], d["refresh_token"], d["expires_at"], d["user_type"], d["scopes"],
+                          d["company_id"]), ("AT", "RT", 1234, "Location", "locations.readonly", "co-test"))
+        self.s.save_install(self.LOC, "co-test", "AT2", "RT2", 5678, "Location", "s")   # rotated refresh token
+        d = self.s.get_install(self.LOC, with_tokens=True)
+        self.assertEqual((d["refresh_token"], d["expires_at"]), ("RT2", 5678))
+        self.assertNotIn("access_token", self.s.get_install(self.LOC))
+
+    def test_company_token_roundtrip(self):
+        self.assertIsNone(self.s.get_company_token("co-test"))
+        self.s.save_company_token("co-test", "CAT", "CRT", 99)
+        self.s.save_company_token("co-test", "CAT2", "CRT2", 100)
+        self.assertEqual(self.s.get_company_token("co-test"),
+                         {"company_id": "co-test", "access_token": "CAT2", "refresh_token": "CRT2", "expires_at": 100})
+        self.s._tx(lambda: self.s._exec("DELETE FROM company_tokens WHERE company_id=?", ("co-test",)))
+
+    def test_update_location_only_given_fields(self):
+        self.assertFalse(self.s.update_location(self.LOC, "x", None, None))
+        self.assertIsNone(self.s.get_install(self.LOC))
+        self.s.save_install(self.LOC, "co", "A", "R", 1, "Location", "s")
+        self.assertTrue(self.s.update_location(self.LOC, "Acme", "acme.example", "Haifa"))
+        self.assertTrue(self.s.update_location(self.LOC, None, None, "Tel Aviv", category="plumber"))
+        d = self.s.get_install(self.LOC)
+        self.assertEqual((d["business_name"], d["business_website"], d["business_city"], d["business_category"]),
+                         ("Acme", "acme.example", "Tel Aviv", "plumber"))
+
+    def test_location_dict_and_plan(self):
+        self.s.save_install(self.LOC, "co", "A", "R", 1, "Location", "s")
+        self.s.update_location(self.LOC, "Acme", None, "Haifa", category="plumber")
+        loc = self.s.get_location(self.LOC)
+        self.assertEqual((loc["id"], loc["agency_id"], loc["name"], loc["category"], loc["city"], loc["plan"], loc["active"]),
+                         (self.LOC, "co", "Acme", "plumber", "Haifa", "trial", True))
+        self.assertTrue(loc["installed_at"])
+        self.s.upsert_install(self.LOC, plan="paid", status="inactive")
+        loc = self.s.get_location(self.LOC)
+        self.assertEqual((loc["plan"], loc["active"]), ("paid", False))
+        self.assertIn(self.LOC, [l["id"] for l in self.s.list_locations()])
+
+    def test_replace_prompts(self):
+        self.s.add_prompt(self.LOC, "old")
+        self.assertEqual([p["text"] for p in self.s.replace_prompts(self.LOC, [" a ", "", "b"])], ["a", "b"])
+        with self.assertRaises(StoreError):
+            self.s.replace_prompts(self.LOC, [f"p{i}" for i in range(11)])
+        self.assertEqual(len(self.s.list_prompts(self.LOC)), 2)       # failed replace changed nothing
+        self.assertEqual(self.s.replace_prompts(self.LOC, []), [])
+
+    def test_claim_run_is_once(self):
+        self.assertTrue(self.s.claim_run(self.LOC, "install"))
+        self.assertFalse(self.s.claim_run(self.LOC, "install"))
+        self.assertTrue(self.s.has_run(self.LOC, "install"))
+        self.assertFalse(self.s.has_run(self.LOC, "2026-12-01"))
+        self.s.delete_location(self.LOC)
+        self.assertFalse(self.s.has_run(self.LOC, "install"))
+
+    def test_spend_by_month_and_location(self):
+        before = self.s.spend_total()
+        self.s.add_spend("2026-12-01", "openai", 0.5, self.LOC)
+        self.s.add_spend("2026-12-02", "openai", 0.25, "loc-other")
+        self.s.add_spend("2027-01-01", "openai", 1.0, self.LOC)
+        self.assertAlmostEqual(self.s.spend_total("2026-12", self.LOC), 0.5)
+        self.assertAlmostEqual(self.s.spend_total(location_id=self.LOC), 1.5)
+        self.assertAlmostEqual(self.s.spend_total() - before, 1.75)
+        self.s.delete_location(self.LOC)                              # totals stay, the link goes
+        self.assertAlmostEqual(self.s.spend_total() - before, 1.75)
+        self.assertEqual(self.s.spend_total(location_id=self.LOC), 0)
+        self.s._tx(lambda: self.s._exec("DELETE FROM spend WHERE location_id='loc-other' OR date IN "
+                                        "('2026-12-01','2027-01-01')"))
+
+    def test_delete_location_counts_claims(self):
+        self.s.save_install(self.LOC, "co", "A", "R", 1, "Location", "s")
+        self.s.claim_run(self.LOC, "install")
+        self.assertEqual(self.s.count_rows(self.LOC), 2)
+        self.s.delete_location(self.LOC)
+        self.assertEqual(self.s.count_rows(self.LOC), 0)
+
+    def test_no_key_fails_closed(self):
+        os.environ.pop(store.KEY_ENV)
+        for fn in (lambda: self.s.save_install(self.LOC, "co", "A", "R", 1, "Location", "s"),
+                   lambda: self.s.save_company_token("co", "A", "R", 1)):
+            with self.assertRaises(StoreError):
+                fn()
+        self.assertIsNone(self.s.get_install(self.LOC))
+
+    def test_shared_store_accessor(self):
+        store.set_store(self.s)
+        try:
+            self.assertIs(store.get_store(), self.s)
+        finally:
+            store.set_store(None)
+
 
 class TestSqlite(StoreContract, unittest.TestCase):
     def make_store(self):
@@ -145,7 +237,7 @@ class TestSqlite(StoreContract, unittest.TestCase):
     def test_reopen_is_idempotent(self):
         self.s.close()
         self.s = Store("sqlite:///" + self.path)
-        self.assertEqual(self.s.schema_version(), 1)
+        self.assertEqual(self.s.schema_version(), store.MIGRATIONS[-1][0])
 
 
 @unittest.skipUnless(PG_URL, "DATABASE_URL (postgres) not set")

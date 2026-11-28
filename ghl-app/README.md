@@ -8,13 +8,15 @@ Run: `python3 app.py` (listens on `0.0.0.0`, port from `PORT`, default 8080). Te
 |---|---|
 | `app.py` | Server, `GET /health`; collects routes from the modules below (`register(routes)`), so a module issue never edits it |
 | `config.py` | Every setting from env with safe defaults; `status(feature)` gives `configured` or `not_configured` |
-| `oauth.py` | Install and tokens (stub) |
-| `store.py` | Storage (stub) |
-| `runs.py` | Twice-a-month runs (stub) |
-| `page.py` | Page inside HighLevel (stub) |
+| `oauth.py` | Install, token refresh and lifecycle webhooks, saved through the shared Store |
+| `store.py` | The one shared Store (`get_store()`): installs, encrypted tokens, prompts, runs, spend, run claims; numbered migrations |
+| `runs.py` | Twice-a-month runs; claims, spend and caps all live in the shared Store |
+| `page.py` | Page data (`page_view`, `save_prompts`, `run_now`) from the Store; routes still a stub |
 | `tests/test_base.py` | Health, config, stubs register |
 | `Dockerfile`, `docker-compose.yml`, `.env.example` | Portable run: app + Postgres |
 | `ci/ghl-app-tests.yml` | CI job, to be installed under `.github/workflows/` |
+
+`GHL_TOKEN_KEY` (token encryption; without it token writes fail) and `GHL_CRON_SECRET` (`X-Cron-Secret` header for `/cron/tick`; without it the tick returns 401) are set as server secrets, never in git.
 
 New tests go in new files under `tests/`.  Hosting is undecided: the app is portable (Docker) and does not touch the root `render.yaml`.
 

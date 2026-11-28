@@ -2,9 +2,9 @@
 
 Routes: GET /oauth/callback?code=, GET /oauth/success, POST /webhooks/ghl.
 
-Store interface used (module `store`, owned by another issue; tests use a fake):
+Store interface used (the shared Store from store.get_store()):
   save_install(location_id, company_id, access_token, refresh_token, expires_at, user_type, scopes)
-  get_install(location_id) -> dict with those keys, or None
+  get_install(location_id, with_tokens=True) -> dict with those keys, or None
   save_company_token(company_id, access_token, refresh_token, expires_at)
   get_company_token(company_id) -> dict or None
   update_location(location_id, name, website, city)
@@ -69,7 +69,7 @@ def _expires_at(data):
 
 
 def _save_location(data, location_id, company_id, user_type="Location"):
-    store.save_install(location_id=location_id, company_id=company_id or data.get("companyId"),
+    store.get_store().save_install(location_id=location_id, company_id=company_id or data.get("companyId"),
                        access_token=data["access_token"], refresh_token=data["refresh_token"],
                        expires_at=_expires_at(data), user_type=user_type,
                        scopes=data.get("scope") or " ".join(SCOPES))
@@ -99,13 +99,13 @@ def _installed_locations(company_token, company_id):
 
 
 def _fresh_company_token(company_id):
-    rec = store.get_company_token(company_id)
+    rec = store.get_store().get_company_token(company_id)
     if not rec:
         return None
     if rec["expires_at"] - _now() >= REFRESH_MARGIN:
         return rec["access_token"]
     data = _token_call({"grant_type": "refresh_token", "refresh_token": rec["refresh_token"], "user_type": "Company"})
-    store.save_company_token(company_id, data["access_token"], data["refresh_token"], _expires_at(data))
+    store.get_store().save_company_token(company_id, data["access_token"], data["refresh_token"], _expires_at(data))
     return data["access_token"]
 
 
@@ -121,7 +121,7 @@ def _lock_for(key):
 def get_location_token(location_id):
     """Access token for a location; refreshes (and stores the rotated refresh token) when <5 min remain."""
     with _lock_for(location_id):
-        rec = store.get_install(location_id)
+        rec = store.get_store().get_install(location_id, with_tokens=True)
         if not rec:
             raise OAuthError("location not installed")
         if rec["expires_at"] - _now() >= REFRESH_MARGIN:
@@ -146,7 +146,7 @@ def handle_callback(req):
         user_type = data.get("userType") or data.get("user_type")
         company_id = data.get("companyId")
         if user_type == "Company":
-            store.save_company_token(company_id, data["access_token"], data["refresh_token"], _expires_at(data))
+            store.get_store().save_company_token(company_id, data["access_token"], data["refresh_token"], _expires_at(data))
             ids = _installed_locations(data["access_token"], company_id)
             for loc in ids:
                 _location_token_from_company(data["access_token"], company_id, loc)
@@ -256,12 +256,12 @@ def _refresh_location_info(location_id, payload):
             raise OAuthError(f"locations returned {status}")
         loc = data.get("location") or data
         name, website, city = loc.get("name"), loc.get("website"), loc.get("city")
-    store.update_location(location_id, name, website, city)
+    store.get_store().update_location(location_id, name, website, city)
 
 
 def _on_install(payload):
     location_id, company_id = payload.get("locationId"), payload.get("companyId")
-    if not location_id or store.get_install(location_id):
+    if not location_id or store.get_store().get_install(location_id):
         return
     token = _fresh_company_token(company_id) if company_id else None
     if not token:
@@ -289,7 +289,7 @@ def handle_webhook(req):
         if kind == "INSTALL":
             _on_install(payload)
         elif kind == "UNINSTALL" and location_id:
-            store.delete_location(location_id)
+            store.get_store().delete_location(location_id)
             log.info("uninstalled location %s", location_id)
         elif kind == "LocationUpdate" and location_id:
             _refresh_location_info(location_id, payload)
