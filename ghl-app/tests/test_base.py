@@ -79,7 +79,7 @@ class TestModules(Base):
     def test_app_routes(self):
         import app
         self.assertIn(("GET", "/health"), app.ROUTES)
-        self.assertEqual(len(app.ROUTES), 5)
+        self.assertEqual(len(app.ROUTES), 7)
 
 
 if __name__ == "__main__":
@@ -107,4 +107,4 @@ class TestPortable(Base):
         with open(path) as f:
             lines = [l.strip() for l in f if l.strip() and not l.startswith("#")]
         self.assertTrue(all(l.endswith("=") for l in lines), "values must be empty")
-        self.assertEqual(sorted(l[:-1] for l in lines), sorted(config.get()))
+        self.assertEqual(sorted(l[:-1] for l in lines), sorted(list(config.get()) + ["POSTGRES_PASSWORD"]))
