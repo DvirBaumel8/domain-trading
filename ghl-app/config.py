@@ -13,6 +13,8 @@ FEATURES = {
     "openai": ("OPENAI_API_KEY",),
     "anthropic": ("ANTHROPIC_API_KEY",),
     "perplexity": ("PERPLEXITY_API_KEY",),
+    "token_key": ("GHL_TOKEN_KEY",),
+    "cron": ("GHL_CRON_SECRET",),
 }
 
 
@@ -35,6 +37,8 @@ def get():
         "GHL_SHARED_SECRET": _str("GHL_SHARED_SECRET"),
         "GHL_WEBHOOK_PUBLIC_KEY": _str("GHL_WEBHOOK_PUBLIC_KEY"),
         "DATABASE_URL": _str("DATABASE_URL", "sqlite:///ghl-app.db"),
+        "GHL_TOKEN_KEY": _str("GHL_TOKEN_KEY"),
+        "GHL_CRON_SECRET": _str("GHL_CRON_SECRET"),
         "OPENAI_API_KEY": _str("OPENAI_API_KEY"),
         "ANTHROPIC_API_KEY": _str("ANTHROPIC_API_KEY"),
         "PERPLEXITY_API_KEY": _str("PERPLEXITY_API_KEY"),

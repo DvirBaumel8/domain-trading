@@ -1,10 +1,11 @@
-import os, sys, unittest
+import os, sys, tempfile, unittest
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from test_base import Base  # noqa: E402
 import runs  # noqa: E402
+import store  # noqa: E402
 
 
 def T(d, h=12):
@@ -21,7 +22,10 @@ class RunsBase(Base):
         super().setUp()
         self._cron = os.environ.pop("GHL_CRON_SECRET", None)
         os.environ["GHL_APP_ENABLED"] = "1"
-        runs.set_store(runs.MemStore())
+        os.environ["GHL_TOKEN_KEY"] = "test-key-for-unit-tests"
+        self.tmp = tempfile.TemporaryDirectory()
+        self.store = store.Store("sqlite:///" + os.path.join(self.tmp.name, "t.db"))
+        store.set_store(self.store)
         self.calls = []
         self._callers = dict(runs.CALLERS)
         for e in runs.ENGINES:
@@ -29,6 +33,9 @@ class RunsBase(Base):
 
     def tearDown(self):
         runs.CALLERS.update(self._callers)
+        store.set_store(None)
+        self.store.close()
+        self.tmp.cleanup()
         os.environ.pop("GHL_CRON_SECRET", None)
         if self._cron is not None:
             os.environ["GHL_CRON_SECRET"] = self._cron
@@ -41,8 +48,13 @@ class RunsBase(Base):
         return f
 
     def loc(self, i="L1", agency="A", plan="paid", installed="2026-11-20T00:00:00+00:00"):
-        runs.STORE.add_location({"id": i, "agency_id": agency, "name": "Acme Plumbing", "category": "plumber",
-                                 "city": "Austin", "plan": plan, "installed_at": installed, "active": True})
+        self.store.save_install(i, agency, "AT", "RT", 1, "Location", "s")
+        self.store.update_location(i, "Acme Plumbing", None, "Austin", category="plumber")
+        self.store.upsert_install(i, plan=plan)
+        self.store._tx(lambda: self.store._exec("UPDATE installs SET installed_at=? WHERE location_id=?", (installed, i)))
+
+    def runs_of(self, i, engine="openai"):
+        return self.store.history(i, 50).get(engine, [])
 
 
 class TestSchedule(RunsBase):
@@ -63,7 +75,7 @@ class TestSchedule(RunsBase):
             self.assertEqual(runs.tick(T(3))["started"], [])
         self.assertEqual([s["key"] for s in runs.tick(T(15))["started"]], ["2026-12-15"])
         self.assertEqual(runs.tick(T(15, 20))["started"], [])
-        self.assertEqual(len(runs.STORE.list_runs("L1")), 3)
+        self.assertEqual(len(self.runs_of("L1")), 3)
 
     def test_disabled_does_nothing(self):
         os.environ["OPENAI_API_KEY"] = "k"
@@ -79,26 +91,30 @@ class TestEngines(RunsBase):
         os.environ["PERPLEXITY_API_KEY"] = "k"
         self.loc()
         runs.tick(T(1))
-        run = runs.STORE.list_runs("L1")[0]
-        self.assertEqual(run["engines"]["anthropic"]["status"], "not_configured")
-        self.assertEqual(run["engines"]["openai"]["status"], "ok")
+        self.assertEqual(self.store.history("L1", 5).keys(), {"openai", "perplexity"})   # no run row for anthropic
         self.assertEqual({c[0] for c in self.calls}, {"openai", "perplexity"})
         self.assertEqual(len(self.calls), 20)                      # one call per prompt per engine
+        self.assertAlmostEqual(self.store.spend_total("2026-12", "L1"), 10 * 0.0095 + 10 * 0.0060)
+        self.assertEqual(runs.execute_run(self.store.get_location("L1"), "k2", T(2))["engines"]["anthropic"]["status"],
+                         "not_configured")
+
 
     def test_parse_and_prompts(self):
         os.environ["OPENAI_API_KEY"] = "k"
         self.loc()
-        self.assertEqual(runs.prompts_for(runs.STORE.list_locations()[0])[0], "best plumber in Austin")
-        runs.STORE.set_prompts("L1", ["only this one"])
+        self.assertEqual(runs.prompts_for(self.store.list_locations()[0])[0], "best plumber in Austin")
+        self.store.replace_prompts("L1", ["only this one"])
         runs.tick(T(1))
         self.assertEqual(len(self.calls), 1)
-        c = runs.STORE.list_runs("L1")[0]["calls"][0]
+        c = self.runs_of("L1")[0]["answers"][0]
+        self.assertEqual(c["prompt_id"], self.store.list_prompts("L1")[0]["id"])
         self.assertTrue(c["mentioned"])
         self.assertEqual(c["position"], 2)
         self.assertEqual(c["competitors"], ["Rival One"])
         self.assertEqual(c["sources"], ["https://x.example/a"])
         self.assertLessEqual(len(c["excerpt"]), 300)
         self.assertNotIn("text", c)
+        self.assertNotIn("gemini", self.store.history("L1", 5))
 
 
 class TestCaps(RunsBase):

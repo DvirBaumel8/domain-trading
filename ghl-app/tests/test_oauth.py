@@ -1,8 +1,9 @@
-import base64, hashlib, io, json, logging, os, random, re, sys, types, unittest
+import base64, hashlib, io, json, logging, os, random, re, sys, tempfile, types, unittest
 from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 import oauth  # noqa: E402
+import store  # noqa: E402
 from test_base import Base  # noqa: E402
 
 # ---- tiny RSA key (pure python, deterministic) so signatures can be made without third-party libs ----
@@ -71,32 +72,6 @@ def sign(body):
     return base64.b64encode(pow(int.from_bytes(em, "big"), D, N).to_bytes(k, "big")).decode()
 
 
-# ---- fakes ----
-
-class FakeStore:
-    def __init__(self):
-        self.installs, self.companies, self.locations, self.answers = {}, {}, {}, {}
-
-    def save_install(self, **kw):
-        self.installs[kw["location_id"]] = kw
-
-    def get_install(self, location_id):
-        return self.installs.get(location_id)
-
-    def save_company_token(self, company_id, access_token, refresh_token, expires_at):
-        self.companies[company_id] = dict(access_token=access_token, refresh_token=refresh_token, expires_at=expires_at)
-
-    def get_company_token(self, company_id):
-        return self.companies.get(company_id)
-
-    def update_location(self, location_id, name, website, city):
-        self.locations[location_id] = dict(name=name, website=website, city=city)
-
-    def delete_location(self, location_id):
-        for table in (self.installs, self.locations, self.answers):
-            table.pop(location_id, None)
-
-
 class Req:
     def __init__(self, method="GET", query=None, headers=None, body=b""):
         self.method, self.query, self.headers, self.body = method, query or {}, headers or {}, body
@@ -109,14 +84,26 @@ class OAuthCase(Base):
     def setUp(self):
         super().setUp()
         os.environ.update(GHL_CLIENT_ID="app123-xyz", GHL_CLIENT_SECRET="client-secret-value", GHL_WEBHOOK_PUBLIC_KEY=PEM)
-        self.store = FakeStore()
+        os.environ["GHL_TOKEN_KEY"] = "test-key-for-unit-tests"
+        self.tmp = tempfile.TemporaryDirectory()
+        self.store = store.Store("sqlite:///" + os.path.join(self.tmp.name, "t.db"))
+        store.set_store(self.store)
+        self.addCleanup(self.tmp.cleanup)
+        self.addCleanup(store.set_store, None)
+        self.addCleanup(self.store.close)
         self.calls = []
         self.responses = []         # list of (match substring, status, dict)
-        for p in (mock.patch.object(oauth, "store", self.store), mock.patch.object(oauth, "_http", self.fake_http),
+        for p in (mock.patch.object(oauth, "_http", self.fake_http),
                   mock.patch.object(oauth, "_now", lambda: NOW)):
             p.start()
             self.addCleanup(p.stop)
         oauth._seen.clear()
+
+    def inst(self, location_id):
+        return self.store.get_install(location_id, with_tokens=True)
+
+    def put(self, location_id, access="T", refresh="r", expires=NOW + 3600, company="co1"):
+        self.store.save_install(location_id, company, access, refresh, expires, "Location", "s")
 
     def fake_http(self, method, url, form=None, headers=None):
         self.calls.append((method, url, form, headers))
@@ -145,7 +132,7 @@ class TestCallback(OAuthCase):
         self.responses = [("/oauth/token", 200, self.token())]
         status, body = self.callback()
         self.assertEqual((status, body["location"]), (302, "/oauth/success"))
-        inst = self.store.installs["loc1"]
+        inst = self.inst("loc1")
         self.assertEqual((inst["access_token"], inst["refresh_token"], inst["company_id"]), ("AT-1", "RT-1", "co1"))
         self.assertEqual(inst["expires_at"], NOW + 86400)
         _, url, form, _ = self.calls[0]
@@ -161,8 +148,8 @@ class TestCallback(OAuthCase):
         ]
         status, body = self.callback()
         self.assertEqual((status, body["installed"]), (302, 3))
-        self.assertEqual(sorted(self.store.installs), ["a", "b", "c"])
-        self.assertEqual(self.store.installs["b"]["access_token"], "LT-b")
+        self.assertEqual(sorted(l["id"] for l in self.store.list_locations()), ["a", "b", "c"])
+        self.assertEqual(self.inst("b")["access_token"], "LT-b")
         loc_calls = [c for c in self.calls if "locationToken" in c[1]]
         self.assertTrue(all(c[3]["Authorization"] == "Bearer CO-AT" for c in loc_calls))
         self.assertIn("appId=app123", [c for c in self.calls if "installedLocations" in c[1]][0][1])
@@ -171,23 +158,22 @@ class TestCallback(OAuthCase):
         self.assertEqual(oauth.handle_callback(Req())[0], 400)
         self.responses = [("/oauth/token", 400, {"error": "bad"})]
         self.assertEqual(self.callback()[0], 502)
-        self.assertEqual(self.store.installs, {})
+        self.assertEqual(self.store.list_locations(), [])
 
 
 class TestRefresh(OAuthCase):
     def test_3_expired_token_refreshes_once_and_saves_rotated_refresh(self):
-        self.store.installs["loc1"] = dict(location_id="loc1", company_id="co1", access_token="OLD", refresh_token="RT-old",
-                                           expires_at=NOW + 60)
+        self.put("loc1", "OLD", "RT-old", NOW + 60)
         self.responses = [("/oauth/token", 200, self.token(access_token="AT-new", refresh_token="RT-rotated"))]
         self.assertEqual(oauth.get_location_token("loc1"), "AT-new")
         self.assertEqual(oauth.get_location_token("loc1"), "AT-new")      # now fresh: no second call
         self.assertEqual(len(self.calls), 1)
         form = self.calls[0][2]
         self.assertEqual((form["grant_type"], form["refresh_token"]), ("refresh_token", "RT-old"))
-        self.assertEqual(self.store.installs["loc1"]["refresh_token"], "RT-rotated")
+        self.assertEqual((self.inst("loc1")["refresh_token"], self.inst("loc1")["expires_at"]), ("RT-rotated", int(NOW + 86400)))
 
     def test_fresh_token_not_refreshed(self):
-        self.store.installs["loc1"] = dict(location_id="loc1", access_token="OK", refresh_token="r", expires_at=NOW + 3600)
+        self.put("loc1", "OK")
         self.assertEqual(oauth.get_location_token("loc1"), "OK")
         self.assertEqual(self.calls, [])
 
@@ -195,7 +181,7 @@ class TestRefresh(OAuthCase):
 class TestWebhooks(OAuthCase):
     def setUp(self):
         super().setUp()
-        self.store.companies["co1"] = dict(access_token="CO-AT", refresh_token="CO-RT", expires_at=NOW + 3600)
+        self.store.save_company_token("co1", "CO-AT", "CO-RT", NOW + 3600)
         self.responses = [("locationToken", 200, {"access_token": "LT", "refresh_token": "LR", "expires_in": 3600})]
 
     def test_4_signature_rules(self):
@@ -205,12 +191,12 @@ class TestWebhooks(OAuthCase):
         self.assertEqual(oauth.handle_webhook(Req("POST", headers={"X-WH-Signature": sign(body + b" ")}, body=body))[0], 401)
         os.environ["GHL_WEBHOOK_PUBLIC_KEY"] = ""
         self.assertEqual(oauth.handle_webhook(Req("POST", headers={"X-WH-Signature": sign(body)}, body=body))[0], 401)
-        self.assertEqual(self.store.installs, {})
+        self.assertEqual(self.store.list_locations(), [])
 
     def test_4_install_creates_install_and_duplicate_processed_once(self):
         p = {"type": "INSTALL", "webhookId": "w1", "locationId": "loc9", "companyId": "co1"}
         self.assertEqual(self.webhook(p), (200, {"ok": True}))
-        self.assertEqual(self.store.installs["loc9"]["access_token"], "LT")
+        self.assertEqual(self.inst("loc9")["access_token"], "LT")
         self.assertEqual(self.webhook(p)[1].get("duplicate"), True)
         self.assertEqual(len([c for c in self.calls if "locationToken" in c[1]]), 1)
 
@@ -218,25 +204,28 @@ class TestWebhooks(OAuthCase):
         self.assertEqual(self.webhook({"type": "Whatever", "webhookId": "w2"}), (200, {"ok": True, "ignored": True}))
 
     def test_location_update(self):
+        self.put("loc1")
         self.webhook({"type": "LocationUpdate", "webhookId": "w3", "id": "loc1", "name": "Acme", "website": "acme.com", "city": "Haifa"})
-        self.assertEqual(self.store.locations["loc1"], {"name": "Acme", "website": "acme.com", "city": "Haifa"})
+        d = self.store.get_install("loc1")
+        self.assertEqual((d["business_name"], d["business_website"], d["business_city"]), ("Acme", "acme.com", "Haifa"))
 
     def test_location_update_fetches_when_payload_bare(self):
-        self.store.installs["loc1"] = dict(location_id="loc1", access_token="T", refresh_token="r", expires_at=NOW + 3600)
+        self.put("loc1")
         self.responses = [("/locations/loc1", 200, {"location": {"name": "Acme", "website": "w", "city": "Haifa"}})]
         self.webhook({"type": "LocationUpdate", "webhookId": "w4", "locationId": "loc1"})
-        self.assertEqual(self.store.locations["loc1"]["city"], "Haifa")
+        self.assertEqual(self.store.get_install("loc1")["business_city"], "Haifa")
 
     def test_5_uninstall_removes_tokens_and_all_rows(self):
-        self.store.installs["loc1"] = dict(location_id="loc1", access_token="T", refresh_token="r", expires_at=NOW)
-        self.store.installs["loc2"] = dict(location_id="loc2", access_token="T2", refresh_token="r2", expires_at=NOW)
-        self.store.locations["loc1"] = {"name": "x"}
-        self.store.answers["loc1"] = ["answer"]
+        self.put("loc1")
+        self.put("loc2")
+        self.store.add_prompt("loc1", "p")
+        self.store.claim_run("loc1", "install")
+        self.store.add_run("loc1", "openai", answers=[{"prompt_id": 1, "mentioned": True}])
+        self.assertGreater(self.store.count_rows("loc1"), 3)
         self.assertEqual(self.webhook({"type": "UNINSTALL", "webhookId": "w5", "locationId": "loc1"})[0], 200)
-        self.assertNotIn("loc1", self.store.installs)
-        self.assertNotIn("loc1", self.store.locations)
-        self.assertNotIn("loc1", self.store.answers)
-        self.assertIn("loc2", self.store.installs)
+        self.assertEqual(self.store.count_rows("loc1"), 0)
+        self.assertIsNone(self.store.get_install("loc1"))
+        self.assertIsNotNone(self.store.get_install("loc2"))
 
 
 class TestNoTokensInLogs(OAuthCase):
@@ -252,11 +241,11 @@ class TestNoTokensInLogs(OAuthCase):
         self.responses = [("/oauth/token", 200, self.token(access_token="AT-secret", refresh_token="RT-secret")),
                           ]
         self.callback()
-        self.store.installs["loc1"]["expires_at"] = NOW
+        self.put("loc1", "AT-secret", "RT-secret", NOW)
         oauth.get_location_token("loc1")
         self.responses = [("/oauth/token", 401, {"access_token": "CO-secret"})]
         self.callback()                                         # failure path
-        self.store.companies["co1"] = dict(access_token="CO-secret", refresh_token="CO-RT-secret", expires_at=NOW + 3600)
+        self.store.save_company_token("co1", "CO-secret", "CO-RT-secret", NOW + 3600)
         self.responses = [("locationToken", 200, {"access_token": "LT-secret", "refresh_token": "RT-secret", "expires_in": 9})]
         self.webhook({"type": "INSTALL", "webhookId": "w6", "locationId": "new", "companyId": "co1"})
         self.webhook({"type": "UNINSTALL", "webhookId": "w7", "locationId": "new"})
